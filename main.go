@@ -6,6 +6,6 @@ import (
 )
 
 func main() {
-    server := network.NewTcpServer(":5555")
+    server := network.NewTcpServer(":8080")
     log.Fatalln(server.Serve())
 }
