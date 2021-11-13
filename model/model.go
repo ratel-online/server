@@ -22,9 +22,19 @@ func (p *Player) Write(bytes []byte) error {
 	})
 }
 
+func (p *Player) Read() (*protocol.Packet, error){
+	return p.conn.Read()
+}
+
 func (p *Player) WriteString(data string) error {
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(data),
+	})
+}
+
+func (p *Player) WriteError(err error) error {
+	return p.conn.Write(protocol.Packet{
+		Body: []byte(err.Error()),
 	})
 }
 

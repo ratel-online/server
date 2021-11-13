@@ -2,8 +2,8 @@ package network
 
 import (
     "github.com/gorilla/websocket"
+    "github.com/ratel-online/core/log"
     "github.com/ratel-online/core/protocol"
-    "log"
     "net/http"
 )
 
@@ -25,15 +25,18 @@ func NewWebsocketServer(addr string) Websocket {
 
 func (w Websocket) Serve() error {
     http.HandleFunc("/ws", serveWs)
-    log.Printf("Websocket server listener on %s\n", w.addr)
+    log.Infof("Websocket server listener on %s\n", w.addr)
     return http.ListenAndServe(w.addr, nil)
 }
 
 func serveWs(w http.ResponseWriter, r *http.Request) {
     conn, err := upgrader.Upgrade(w, r, nil)
     if err != nil {
-        log.Println(err)
+        log.Error(err)
         return
     }
-    handle(protocol.NewWebsocketReadWriteCloser(conn))
+    err = handle(protocol.NewWebsocketReadWriteCloser(conn))
+    if err != nil{
+        log.Error(err)
+    }
 }

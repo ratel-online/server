@@ -5,7 +5,8 @@ import "errors"
 type StateID int
 
 const (
-	Welcome StateID = 1
+	_ StateID = iota
+	Welcome
 	PanelMode
 	PanelPvp
 	PanelPve
