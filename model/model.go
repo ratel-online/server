@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/protocol"
@@ -42,7 +43,7 @@ func (p *Player) WriteError(err error) error {
 		return err
 	}
 	return p.conn.Write(protocol.Packet{
-		Body: []byte(err.Error()),
+		Body: []byte(err.Error() + "\n"),
 	})
 }
 
@@ -52,6 +53,10 @@ func (p *Player) AskForPacket(msg ...string) (*protocol.Packet, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	err := p.WriteString(consts.IS)
+	if err != nil {
+		return nil, err
 	}
 	packet, err := p.read()
 	if err != nil {
@@ -98,6 +103,14 @@ func (p *Player) GetState() consts.StateID {
 
 func (p *Player) Conn(conn *network.Conn) {
 	p.conn = conn
+}
+
+func (p *Player) Terminal(keys ...string) string {
+	local := "~"
+	if len(keys) > 0 {
+		local = keys[0]
+	}
+	return fmt.Sprintf("[%s@ratel %s]# ", strings.TrimSpace(strings.ToLower(p.Name)), local)
 }
 
 type Room struct {

@@ -10,11 +10,11 @@ import (
 
 type waiting struct{}
 
-func (*waiting) Init(player *model.Player) error {
-	return player.WriteString("You joined room!\n")
-}
-
 func (*waiting) Next(player *model.Player) (consts.StateID, error) {
+	err := player.WriteString("You joined room!\n")
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
 	room := database.GetRoom(player.RoomID)
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsRoomInvalid)
@@ -25,7 +25,7 @@ func (*waiting) Next(player *model.Player) (consts.StateID, error) {
 			break
 		}
 	}
-	err := player.WriteString("Game starting!")
+	err = player.WriteString("Game starting!")
 	if err != nil {
 		return 0, player.WriteError(err)
 	}

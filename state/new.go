@@ -10,31 +10,31 @@ import (
 
 type new struct{}
 
-func (*new) Init(player *model.Player) error {
-	return player.WriteString("New Room\n")
-}
-
 func (*new) Next(player *model.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
+	buf.WriteString("Please choose game type: \n")
 	for id, name := range consts.GameTypes {
 		buf.WriteString(fmt.Sprintf("%d.%s\n", id, name))
 	}
-	buf.WriteString("Type: ")
-	gameType, err := player.AskForInt(buf.String())
+	err := player.WriteString(buf.String())
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
+	gameType, err := player.AskForInt(player.Terminal("type"))
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
 	if _, ok := consts.GameTypes[gameType]; !ok {
 		return 0, player.WriteError(consts.ErrorsGameTypeInvalid)
 	}
-	players, err := player.AskForInt("Players: ")
+	players, err := player.AskForInt(player.Terminal("players"))
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
 	if players < consts.MinPlayers || players > consts.MaxPlayers {
 		return 0, player.WriteError(consts.ErrorsPlayersInvalid)
 	}
-	robots, err := player.AskForInt("Robots: ")
+	robots, err := player.AskForInt(player.Terminal("robots"))
 	if err != nil {
 		return 0, player.WriteError(err)
 	}

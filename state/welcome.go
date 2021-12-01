@@ -7,11 +7,11 @@ import (
 
 type welcome struct{}
 
-func (*welcome) Init(player *model.Player) error {
-	return player.WriteString(`Welcome to ratel-online.`)
-}
-
 func (*welcome) Next(player *model.Player) (consts.StateID, error) {
+	err := player.WriteString("Welcome to ratel online! \n")
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
 	return consts.StateHome, nil
 }
 

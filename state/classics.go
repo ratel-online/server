@@ -9,15 +9,15 @@ import (
 
 type classics struct{}
 
-func (*classics) Init(player *model.Player) error {
+func (*classics) Next(player *model.Player) (consts.StateID, error) {
 	room := database.GetRoom(player.RoomID)
 	if room == nil {
-		return consts.ErrorsExist
+		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	return player.WriteString("You joined room!\n")
-}
-
-func (*classics) Next(player *model.Player) (consts.StateID, error) {
+	err := player.WriteString("You joined room!\n")
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
 	return 0, nil
 }
 

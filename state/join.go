@@ -10,7 +10,7 @@ import (
 
 type join struct{}
 
-func (*join) Init(player *model.Player) error {
+func (*join) Next(player *model.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	rooms := database.GetRooms()
 	buf.WriteString(fmt.Sprintf("%s\t%s\t%s\t%s\n", "ID", "Type", "Players", "State"))
@@ -18,10 +18,10 @@ func (*join) Init(player *model.Player) error {
 		buf.WriteString(fmt.Sprintf("%d\t%s\t%d\t%s\n", room.ID, consts.GameTypes[room.Type], database.GetRoomPlayers(player.RoomID), consts.RoomStates[room.State]))
 	}
 	buf.Truncate(buf.Len() - 1)
-	return player.WriteString(buf.String())
-}
-
-func (*join) Next(player *model.Player) (consts.StateID, error) {
+	err := player.WriteString(buf.String())
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
 	roomId, err := player.AskForInt64()
 	if err != nil {
 		return 0, player.WriteError(err)

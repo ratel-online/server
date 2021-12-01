@@ -8,15 +8,15 @@ import (
 
 type home struct{}
 
-func (*home) Init(player *model.Player) error {
+func (*home) Next(player *model.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	buf.WriteString("1.Join\n")
 	buf.WriteString("2.New\n")
-	return player.WriteString(buf.String())
-}
-
-func (*home) Next(player *model.Player) (consts.StateID, error) {
-	selected, err := player.AskForInt()
+	err := player.WriteString(buf.String())
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
+	selected, err := player.AskForInt(player.Terminal())
 	if err != nil {
 		return 0, player.WriteError(err)
 	}

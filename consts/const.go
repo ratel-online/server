@@ -3,6 +3,7 @@ package consts
 import (
 	"errors"
 	"fmt"
+	"github.com/ratel-online/core/consts"
 )
 
 type StateID int
@@ -19,6 +20,8 @@ const (
 )
 
 const (
+	IS = consts.IS
+
 	MinPlayers       = 1
 	MaxPlayers       = 6
 	RoomStateWaiting = 1
