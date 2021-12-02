@@ -12,39 +12,37 @@ type new struct{}
 
 func (*new) Next(player *model.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
-	buf.WriteString("Please choose game type: \n")
-	for id, name := range consts.GameTypes {
-		buf.WriteString(fmt.Sprintf("%d.%s\n", id, name))
+	buf.WriteString("Game type: \n")
+	for _, id := range consts.GameTypesIds {
+		buf.WriteString(fmt.Sprintf("%d.%s\n", id, consts.GameTypes[id]))
 	}
 	err := player.WriteString(buf.String())
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	gameType, err := player.AskForInt(player.Terminal("type"))
+	gameType, err := player.AskForInt(player.Terminal())
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
 	if _, ok := consts.GameTypes[gameType]; !ok {
 		return 0, player.WriteError(consts.ErrorsGameTypeInvalid)
 	}
-	players, err := player.AskForInt(player.Terminal("players"))
+
+	err = player.WriteString("Player number: \n")
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
+
+	players, err := player.AskForInt(player.Terminal())
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
 	if players < consts.MinPlayers || players > consts.MaxPlayers {
 		return 0, player.WriteError(consts.ErrorsPlayersInvalid)
 	}
-	robots, err := player.AskForInt(player.Terminal("robots"))
-	if err != nil {
-		return 0, player.WriteError(err)
-	}
-	if robots < consts.MinPlayers || robots > consts.MaxPlayers {
-		return 0, player.WriteError(consts.ErrorsRobotsInvalid)
-	}
 	room := database.CreateRoom(player.ID)
 	room.Type = gameType
 	room.Players = players
-	room.Robots = robots
 	err = database.JoinRoom(room.ID, player.ID)
 	if err != nil {
 		return 0, player.WriteError(err)

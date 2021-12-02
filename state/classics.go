@@ -14,7 +14,7 @@ func (*classics) Next(player *model.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	err := player.WriteString("You joined room!\n")
+	err := player.WriteString("Game starting!\n")
 	if err != nil {
 		return 0, player.WriteError(err)
 	}

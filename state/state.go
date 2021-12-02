@@ -4,6 +4,7 @@ import (
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/model"
+	"strings"
 )
 
 var states = map[consts.StateID]State{}
@@ -13,6 +14,8 @@ func init() {
 	register(consts.StateHome, &home{})
 	register(consts.StateJoin, &join{})
 	register(consts.StateNew, &new{})
+	register(consts.StateWaiting, &waiting{})
+	register(consts.StateClassics, &classics{})
 }
 
 func register(id consts.StateID, state State) {
@@ -46,4 +49,23 @@ func Load(player *model.Player) error {
 		}
 	}
 	return err
+}
+
+func isExit(signal string) bool {
+	signal = strings.ToLower(signal)
+	return isX(signal, "exit", "e")
+}
+
+func isLs(signal string) bool {
+	return isX(signal, "ls")
+}
+
+func isX(signal string, x ...string) bool {
+	signal = strings.ToLower(signal)
+	for _, v := range x {
+		if v == signal {
+			return true
+		}
+	}
+	return false
 }

@@ -22,7 +22,7 @@ func PlayerConnected(conn *network.Conn, info *modelx.AuthInfo) *model.Player {
 		Score: info.Score,
 	}
 	player.Conn(conn)
-	players[conn.ID()] = player
+	players[info.ID] = player
 	return player
 }
 
@@ -39,7 +39,19 @@ func CreateRoom(creator int64) *model.Room {
 	}
 	rooms[room.ID] = room
 	roomLocks[room.ID] = &sync.Mutex{}
+	roomPlayers[room.ID] = map[int64]bool{}
 	return room
+}
+
+func DeleteRoom(roomId int64) error {
+	delete(rooms, roomId)
+	delete(roomLocks, roomId)
+	delete(roomPlayers, roomId)
+	return nil
+}
+
+func GetLock(roomId int64) *sync.Mutex {
+	return roomLocks[roomId]
 }
 
 func LockRoom(roomId int64) {
@@ -71,8 +83,9 @@ func JoinRoom(roomId, playerId int64) error {
 	if room == nil {
 		return consts.ErrorsRoomInvalid
 	}
-	LockRoom(roomId)
-	defer UnlockRoom(roomId)
+	lock := GetLock(roomId)
+	lock.Lock()
+	defer lock.Unlock()
 	if room.State == consts.RoomStateRunning {
 		return consts.ErrorsJoinFailForRoomRunning
 	}
@@ -93,10 +106,22 @@ func LeaveRoom(roomId, playerId int64) error {
 	if room == nil {
 		return nil
 	}
-	LockRoom(roomId)
-	defer UnlockRoom(roomId)
-	delete(roomPlayers[roomId], playerId)
+	lock := GetLock(roomId)
+	lock.Lock()
+	defer lock.Unlock()
+
 	player.RoomID = 0
+	playerIds := roomPlayers[roomId]
+	delete(roomPlayers[roomId], playerId)
+	if len(playerIds) == 0 {
+		return DeleteRoom(roomId)
+	}
+	if len(playerIds) > 0 {
+		for k := range playerIds {
+			room.Creator = k
+			break
+		}
+	}
 	return nil
 }
 
@@ -107,7 +132,7 @@ func GetRoomPlayers(roomId int64) int {
 func RoomBroadcast(roomId int64, msg string, exclude ...int64) error {
 	room := rooms[roomId]
 	if room == nil {
-		return consts.ErrorsRoomInvalid
+		return nil
 	}
 	excludeSet := map[int64]bool{}
 	for _, exc := range exclude {
@@ -115,7 +140,7 @@ func RoomBroadcast(roomId int64, msg string, exclude ...int64) error {
 	}
 	for playerId := range roomPlayers[roomId] {
 		if player, ok := players[playerId]; ok && !excludeSet[playerId] {
-			_ = player.WriteString(msg)
+			_ = player.WriteString(msg + player.Terminal())
 		}
 	}
 	return nil

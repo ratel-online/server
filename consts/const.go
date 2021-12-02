@@ -22,7 +22,7 @@ const (
 const (
 	IS = consts.IS
 
-	MinPlayers       = 1
+	MinPlayers       = 3
 	MaxPlayers       = 6
 	RoomStateWaiting = 1
 	RoomStateRunning = 2
@@ -47,7 +47,8 @@ var (
 		GameTypeLaiZi:   "LaiZi",
 		GameTypeRunFast: "RunFast",
 	}
-	RoomStates = map[int]string{
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeRunFast}
+	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",
 	}
