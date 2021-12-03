@@ -16,7 +16,7 @@ func (*home) Next(player *model.Player) (consts.StateID, error) {
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	selected, err := player.AskForInt(player.Terminal())
+	selected, err := player.AskForInt()
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
@@ -30,6 +30,6 @@ func (*home) Next(player *model.Player) (consts.StateID, error) {
 	return 0, player.WriteError(consts.ErrorsInputInvalid)
 }
 
-func (*home) Back(player *model.Player) consts.StateID {
+func (*home) Exit(player *model.Player) consts.StateID {
 	return 0
 }

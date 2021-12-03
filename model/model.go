@@ -1,12 +1,13 @@
 package model
 
 import (
-	"fmt"
+	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/protocol"
 	"github.com/ratel-online/server/consts"
 	"strings"
+	"time"
 )
 
 type Player struct {
@@ -16,9 +17,10 @@ type Player struct {
 	Mode   int    `json:"mode"`
 	Type   int    `json:"type"`
 	RoomID int64  `json:"roomId"`
-	GameID int64  `json:"gameId"`
 
 	conn  *network.Conn
+	data  chan *protocol.Packet
+	read  bool
 	state consts.StateID
 }
 
@@ -28,8 +30,18 @@ func (p *Player) Write(bytes []byte) error {
 	})
 }
 
-func (p *Player) read() (*protocol.Packet, error) {
-	return p.conn.Read()
+func (p *Player) ReadLoop() {
+	for {
+		pack, err := p.conn.Read()
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		if p.read {
+			p.data <- pack
+			p.read = false
+		}
+	}
 }
 
 func (p *Player) WriteString(data string) error {
@@ -47,46 +59,47 @@ func (p *Player) WriteError(err error) error {
 	})
 }
 
-func (p *Player) AskForPacket(msg ...string) (*protocol.Packet, error) {
-	if len(msg) > 0 {
-		err := p.WriteString(msg[0])
-		if err != nil {
-			return nil, err
-		}
-	}
+func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
 	err := p.WriteString(consts.IS)
 	if err != nil {
 		return nil, err
 	}
-	packet, err := p.read()
-	if err != nil {
-		return nil, err
+	p.read = true
+	var packet *protocol.Packet
+	if len(timeout) > 0 {
+		select {
+		case packet = <-p.data:
+		case <-time.After(timeout[0]):
+			return nil, consts.ErrorsTimeout
+		}
+	} else {
+		packet = <-p.data
 	}
-	str := strings.ToLower(packet.String())
-	if str == "exit" || str == "e" {
+	single := strings.ToLower(packet.String())
+	if single == "exit" || single == "e" {
 		return nil, consts.ErrorsExist
 	}
 	return packet, nil
 }
 
-func (p *Player) AskForInt(msg ...string) (int, error) {
-	packet, err := p.AskForPacket(msg...)
+func (p *Player) AskForInt(timeout ...time.Duration) (int, error) {
+	packet, err := p.AskForPacket(timeout...)
 	if err != nil {
 		return 0, err
 	}
 	return packet.Int()
 }
 
-func (p *Player) AskForInt64(msg ...string) (int64, error) {
-	packet, err := p.AskForPacket(msg...)
+func (p *Player) AskForInt64(timeout ...time.Duration) (int64, error) {
+	packet, err := p.AskForPacket(timeout...)
 	if err != nil {
 		return 0, err
 	}
 	return packet.Int64()
 }
 
-func (p *Player) AskForString(msg ...string) (string, error) {
-	packet, err := p.AskForPacket(msg...)
+func (p *Player) AskForString(timeout ...time.Duration) (string, error) {
+	packet, err := p.AskForPacket(timeout...)
 	if err != nil {
 		return "", err
 	}
@@ -103,19 +116,13 @@ func (p *Player) GetState() consts.StateID {
 
 func (p *Player) Conn(conn *network.Conn) {
 	p.conn = conn
-}
-
-func (p *Player) Terminal(keys ...string) string {
-	local := "~"
-	if len(keys) > 0 {
-		local = keys[0]
-	}
-	return fmt.Sprintf("[%s@ratel %s]# ", strings.TrimSpace(strings.ToLower(p.Name)), local)
+	p.data = make(chan *protocol.Packet)
 }
 
 type Room struct {
 	ID      int64 `json:"id"`
 	Type    int   `json:"type"`
+	Game    *Game `json:"gameId"`
 	State   int   `json:"state"`
 	Players int   `json:"players"`
 	Robots  int   `json:"robots"`
@@ -123,10 +130,13 @@ type Room struct {
 }
 
 type Game struct {
-	ID         int64                  `json:"id"`
-	Type       int                    `json:"type"`
-	Pokers     map[int64]model.Pokers `json:"pokers"`
-	Almighty   model.Pokers           `json:"almighty"`
-	Additional model.Pokers           `json:"pocket"`
-	Multiple   int                    `json:"multiple"`
+	Players     []int64                `json:"players"`
+	Groups      map[int64]int          `json:"groups"`
+	States      map[int64]chan int     `json:"states"`
+	Pokers      map[int64]model.Pokers `json:"pokers"`
+	Landlord    int64                  `json:"landlord"`
+	FirstPlayer int64                  `json:"firstPlayer"`
+	Almighty    model.Pokers           `json:"almighty"`
+	Additional  model.Pokers           `json:"pocket"`
+	Multiple    int                    `json:"multiple"`
 }

@@ -12,7 +12,7 @@ type new struct{}
 
 func (*new) Next(player *model.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
-	buf.WriteString("Game type: \n")
+	buf.WriteString("Please select game type\n")
 	for _, id := range consts.GameTypesIds {
 		buf.WriteString(fmt.Sprintf("%d.%s\n", id, consts.GameTypes[id]))
 	}
@@ -20,7 +20,7 @@ func (*new) Next(player *model.Player) (consts.StateID, error) {
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	gameType, err := player.AskForInt(player.Terminal())
+	gameType, err := player.AskForInt()
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
@@ -28,12 +28,11 @@ func (*new) Next(player *model.Player) (consts.StateID, error) {
 		return 0, player.WriteError(consts.ErrorsGameTypeInvalid)
 	}
 
-	err = player.WriteString("Player number: \n")
+	err = player.WriteString("Please input player number\n")
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-
-	players, err := player.AskForInt(player.Terminal())
+	players, err := player.AskForInt()
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
@@ -50,6 +49,6 @@ func (*new) Next(player *model.Player) (consts.StateID, error) {
 	return consts.StateWaiting, nil
 }
 
-func (*new) Back(player *model.Player) consts.StateID {
+func (*new) Exit(player *model.Player) consts.StateID {
 	return consts.StateHome
 }

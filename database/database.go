@@ -74,6 +74,10 @@ func GetRoom(roomId int64) *model.Room {
 	return rooms[roomId]
 }
 
+func UpdateRoom(room *model.Room) error {
+	return nil
+}
+
 func JoinRoom(roomId, playerId int64) error {
 	player := players[playerId]
 	if player == nil {
@@ -89,7 +93,7 @@ func JoinRoom(roomId, playerId int64) error {
 	if room.State == consts.RoomStateRunning {
 		return consts.ErrorsJoinFailForRoomRunning
 	}
-	if GetRoomPlayers(roomId) >= room.Players {
+	if len(GetRoomPlayers(roomId)) >= room.Players {
 		return consts.ErrorsRoomPlayersIsFull
 	}
 	roomPlayers[roomId][playerId] = true
@@ -125,8 +129,8 @@ func LeaveRoom(roomId, playerId int64) error {
 	return nil
 }
 
-func GetRoomPlayers(roomId int64) int {
-	return len(roomPlayers[roomId])
+func GetRoomPlayers(roomId int64) map[int64]bool {
+	return roomPlayers[roomId]
 }
 
 func RoomBroadcast(roomId int64, msg string, exclude ...int64) error {
@@ -140,8 +144,12 @@ func RoomBroadcast(roomId int64, msg string, exclude ...int64) error {
 	}
 	for playerId := range roomPlayers[roomId] {
 		if player, ok := players[playerId]; ok && !excludeSet[playerId] {
-			_ = player.WriteString(msg + player.Terminal())
+			_ = player.WriteString(msg)
 		}
 	}
 	return nil
+}
+
+func GetPlayer(playerId int64) *model.Player {
+	return players[playerId]
 }

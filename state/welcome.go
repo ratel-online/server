@@ -15,6 +15,6 @@ func (*welcome) Next(player *model.Player) (consts.StateID, error) {
 	return consts.StateHome, nil
 }
 
-func (*welcome) Back(player *model.Player) consts.StateID {
+func (*welcome) Exit(player *model.Player) consts.StateID {
 	return 0
 }

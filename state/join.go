@@ -16,18 +16,18 @@ func (s *join) Next(player *model.Player) (consts.StateID, error) {
 	rooms := database.GetRooms()
 	buf.WriteString(fmt.Sprintf("%s\t%s\t%s\t%s\n", "ID", "Type", "Players", "State"))
 	for _, room := range rooms {
-		buf.WriteString(fmt.Sprintf("%d\t%s\t%d\t%s\n", room.ID, consts.GameTypes[room.Type], database.GetRoomPlayers(room.ID), consts.RoomStates[room.State]))
+		buf.WriteString(fmt.Sprintf("%d\t%s\t%d\t%s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
 	}
 	err := player.WriteString(buf.String())
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	signal, err := player.AskForString(player.Terminal())
+	signal, err := player.AskForString()
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
 	if isExit(signal) {
-		return s.Back(player), nil
+		return s.Exit(player), nil
 	}
 	if isLs(signal) {
 		return consts.StateJoin, nil
@@ -40,13 +40,13 @@ func (s *join) Next(player *model.Player) (consts.StateID, error) {
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	err = database.RoomBroadcast(roomId, fmt.Sprintf("\r\r%s joined room!\n", player.Name), player.ID)
+	err = database.RoomBroadcast(roomId, fmt.Sprintf("%s joined room!\n", player.Name), player.ID)
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
 	return consts.StateWaiting, nil
 }
 
-func (*join) Back(player *model.Player) consts.StateID {
+func (*join) Exit(player *model.Player) consts.StateID {
 	return consts.StateHome
 }

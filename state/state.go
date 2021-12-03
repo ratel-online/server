@@ -24,7 +24,7 @@ func register(id consts.StateID, state State) {
 
 type State interface {
 	Next(player *model.Player) (consts.StateID, error)
-	Back(player *model.Player) consts.StateID
+	Exit(player *model.Player) consts.StateID
 }
 
 func Root() consts.StateID {
@@ -36,10 +36,14 @@ func Load(player *model.Player) error {
 	for {
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)
+
 		if err != nil {
-			if err == consts.ErrorsExist {
-				stateId = state.Back(player)
+			if err1, ok := err.(consts.Error); ok {
+				if err1 == consts.ErrorsExist {
+					stateId = state.Exit(player)
+				}
 			} else {
+				state.Exit(player)
 				log.Error(err)
 				break
 			}
