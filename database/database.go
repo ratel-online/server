@@ -120,6 +120,9 @@ func LeaveRoom(roomId, playerId int64) error {
 	if len(playerIds) == 0 {
 		return DeleteRoom(roomId)
 	}
+	if room.State == consts.RoomStateRunning {
+		room.State = consts.RoomStateWaiting
+	}
 	if len(playerIds) > 0 {
 		for k := range playerIds {
 			room.Creator = k

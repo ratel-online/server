@@ -39,7 +39,7 @@ func Load(player *model.Player) error {
 
 		if err != nil {
 			if err1, ok := err.(consts.Error); ok {
-				if err1 == consts.ErrorsExist {
+				if err1.Exit {
 					stateId = state.Exit(player)
 				}
 			} else {

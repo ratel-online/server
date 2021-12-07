@@ -37,7 +37,8 @@ const (
 )
 
 type Error struct {
-	Msg string
+	Msg  string
+	Exit bool
 }
 
 func (e Error) Error() string {
@@ -45,20 +46,25 @@ func (e Error) Error() string {
 }
 
 func NewErr(msg string) Error {
-	return Error{Msg: msg}
+	return Error{Msg: msg, Exit: false}
+}
+
+func NewExitErr(msg string) Error {
+	return Error{Msg: msg, Exit: true}
 }
 
 var (
 	ErrorsTimeout                = NewErr("Timeout. ")
-	ErrorsExist                  = NewErr("Exist. ")
+	ErrorsExist                  = NewExitErr("Exist. ")
 	ErrorsInputInvalid           = NewErr("Input invalid. ")
-	ErrorsAuthFail               = NewErr("Auth fail. ")
-	ErrorsRoomInvalid            = NewErr("Room invalid. ")
-	ErrorsPlayersInvalid         = NewErr(fmt.Sprintf("Invalid players, must %d-%d", MinPlayers, MaxPlayers))
+	ErrorsAuthFail               = NewExitErr("Auth fail. ")
+	ErrorsRoomInvalid            = NewExitErr("Room invalid. ")
+	ErrorsPlayersInvalid         = NewExitErr(fmt.Sprintf("Invalid players, must %d-%d", MinPlayers, MaxPlayers))
 	ErrorsGameTypeInvalid        = NewErr("Game type invalid. ")
 	ErrorsRoomPlayersIsFull      = NewErr("Room players is fill. ")
 	ErrorsJoinFailForRoomRunning = NewErr("Join fail, room is running. ")
 	ErrorsGamePlayersInvalid     = NewErr("Game players invalid. ")
+	ErrorsPokersFacesInvalid     = NewErr("Pokers faces invalid. ")
 
 	GameTypes = map[int]string{
 		GameTypeClassic: "Classic",

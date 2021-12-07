@@ -5,6 +5,7 @@ import (
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/protocol"
+	"github.com/ratel-online/core/util/arrays"
 	"github.com/ratel-online/server/consts"
 	"strings"
 	"time"
@@ -70,6 +71,7 @@ func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error
 		select {
 		case packet = <-p.data:
 		case <-time.After(timeout[0]):
+			p.read = false
 			return nil, consts.ErrorsTimeout
 		}
 	} else {
@@ -136,7 +138,14 @@ type Game struct {
 	Pokers      map[int64]model.Pokers `json:"pokers"`
 	Landlord    int64                  `json:"landlord"`
 	FirstPlayer int64                  `json:"firstPlayer"`
+	LastPlayer  int64                  `json:"lastPlayer"`
+	LastFaces   *model.Faces           `json:"lastFaces"`
 	Almighty    model.Pokers           `json:"almighty"`
 	Additional  model.Pokers           `json:"pocket"`
 	Multiple    int                    `json:"multiple"`
+}
+
+func (g Game) NextPlayer(curr int64) int64 {
+	idx := arrays.IndexOf(g.Players, curr)
+	return g.Players[(idx+1)%len(g.Players)]
 }
