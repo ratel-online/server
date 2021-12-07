@@ -2,15 +2,12 @@ package database
 
 import (
 	"fmt"
-	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
-	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/model"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 var roomIds int64 = 0
@@ -20,14 +17,14 @@ var rooms = map[int64]*model.Room{}
 var roomLocks = map[int64]*sync.Mutex{}
 var roomPlayers = map[int64]map[int64]bool{}
 
-func init() {
-	async.Async(func() {
-		for {
-			time.Sleep(10 * time.Second)
-			log.Infof("current conn %d\n", len(connPlayers))
-		}
-	})
-}
+//func init() {
+//	async.Async(func() {
+//		for {
+//			time.Sleep(10 * time.Second)
+//			log.Infof("current conn %d\n", len(connPlayers))
+//		}
+//	})
+//}
 
 func PlayerConnected(conn *network.Conn, info *modelx.AuthInfo) *model.Player {
 	player, ok := players[info.ID]

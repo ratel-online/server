@@ -27,7 +27,7 @@ func (s *waiting) Next(player *model.Player) (consts.StateID, error) {
 			break
 		}
 		signal = strings.ToLower(signal)
-		if room.Creator == player.ID && room.Players > 0 && (signal == "start" || signal == "s") {
+		if room.Creator == player.ID && room.Players > 1 && (signal == "start" || signal == "s") {
 			access = true
 			room.Game, err = initGame(room)
 			if err != nil {

@@ -44,7 +44,7 @@ func (s *join) Next(player *model.Player) (consts.StateID, error) {
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	database.RoomBroadcast(roomId, fmt.Sprintf("%s joined room! room current has %d players\n", player.Name, room.Players), player.ID)
+	database.RoomBroadcast(roomId, fmt.Sprintf("%s joined room! room current has %d players\n", player.Name, room.Players))
 	return consts.StateWaiting, nil
 }
 

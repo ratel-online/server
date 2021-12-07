@@ -3,7 +3,6 @@ package state
 import (
 	"bytes"
 	"fmt"
-	constx "github.com/ratel-online/core/consts"
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/util/poker"
@@ -145,7 +144,7 @@ func handleClassicsRob(player *model.Player, game *model.Game) error {
 		game.FirstPlayer = player.ID
 	}
 	database.RoomBroadcast(player.RoomID, fmt.Sprintf("Please waiting from %s confirm whether to be a landlord. \n", player.Name))
-	err := player.WriteString("Would you like to be a landlord y/f\n")
+	err := player.WriteString("Would you like to be a landlord: (y or f)\n")
 	if err != nil {
 		return player.WriteError(err)
 	}
@@ -163,6 +162,9 @@ func handleClassicsRob(player *model.Player, game *model.Game) error {
 	if strings.ToLower(ans) == "y" {
 		game.Landlord = player.ID
 		game.Multiple *= 2
+		database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s rob landlord\n", player.Name))
+	} else {
+		database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s don't rob landlord\n", player.Name))
 	}
 	game.States[game.NextPlayer(player.ID)] <- classicsStateRob
 	return nil
@@ -175,16 +177,17 @@ func handleClassicsPlay(player *model.Player, game *model.Game) error {
 	}
 	master := player.ID == game.LastPlayer || game.LastPlayer == 0
 	for {
-		prevPlayer, nextPlayer := database.GetPlayer(game.PrevPlayer(player.ID)), database.GetPlayer(game.NextPlayer(player.ID))
 		buf := bytes.Buffer{}
-		buf.WriteString(fmt.Sprintf("Timeout: %ds, prev player %s (%v): %d, next player %s (%v): %d\n", int(timeout.Seconds()), prevPlayer.Name, game.IsTeammate(player.ID, prevPlayer.ID), len(game.Pokers[prevPlayer.ID]), nextPlayer.Name, game.IsTeammate(player.ID, nextPlayer.ID), len(game.Pokers[nextPlayer.ID])))
-		buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
+		if !master && game.LastPokers != nil {
+			buf.WriteString(fmt.Sprintf("Last player is %s, sells %s\n", database.GetPlayer(game.LastPlayer).Name, game.LastPokers.String()))
+		}
+		buf.WriteString(fmt.Sprintf("Timeout: %ds, it's your turn to player \n", int(timeout.Seconds())))
+		buf.WriteString(fmt.Sprintf("Pokers: %s\n", game.Pokers[player.ID].String()))
 		err := player.WriteString(buf.String())
 		if err != nil {
 			return player.WriteError(err)
 		}
 		before := time.Now().Unix()
-		fmt.Println(before)
 		pokers := game.Pokers[player.ID]
 		ans, err := player.AskForString(timeout)
 		if err != nil && err != consts.ErrorsTimeout {
@@ -264,7 +267,7 @@ func handleClassicsPlay(player *model.Player, game *model.Game) error {
 		if !master && lastFaces != nil {
 			access := false
 			for _, faces := range facesArr {
-				if (faces.Type == constx.FacesBomb || lastFaces.Type == faces.Type) && faces.Score > lastFaces.Score {
+				if faces.Compare(lastFaces) {
 					access = true
 					lastFaces = &faces
 					break
@@ -288,6 +291,7 @@ func handleClassicsPlay(player *model.Player, game *model.Game) error {
 		game.Pokers[player.ID] = pokers
 		game.LastPlayer = player.ID
 		game.LastFaces = lastFaces
+		game.LastPokers = &sells
 
 		if len(pokers) == 0 {
 			database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s played %s, win the game! \n", player.Name, sells.String()))
@@ -301,6 +305,7 @@ func handleClassicsPlay(player *model.Player, game *model.Game) error {
 			}
 			return nil
 		}
+		nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
 		database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s played %s, next player is %s \n", player.Name, sells.String(), nextPlayer.Name))
 		game.States[nextPlayer.ID] <- classicsStatePlay
 		return nil
