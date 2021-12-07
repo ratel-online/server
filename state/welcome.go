@@ -1,6 +1,7 @@
 package state
 
 import (
+	"fmt"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/model"
 )
@@ -8,7 +9,7 @@ import (
 type welcome struct{}
 
 func (*welcome) Next(player *model.Player) (consts.StateID, error) {
-	err := player.WriteString("Welcome to ratel online! \n")
+	err := player.WriteString(fmt.Sprintf("Hi %s, Welcome to ratel online! \n", player.Name))
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
