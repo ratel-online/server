@@ -31,12 +31,12 @@ func (p *Player) Write(bytes []byte) error {
 	})
 }
 
-func (p *Player) ReadLoop() {
+func (p *Player) Listening() error {
 	for {
 		pack, err := p.conn.Read()
 		if err != nil {
 			log.Error(err)
-			return
+			return err
 		}
 		if p.read {
 			p.data <- pack
@@ -148,4 +148,13 @@ type Game struct {
 func (g Game) NextPlayer(curr int64) int64 {
 	idx := arrays.IndexOf(g.Players, curr)
 	return g.Players[(idx+1)%len(g.Players)]
+}
+
+func (g Game) PrevPlayer(curr int64) int64 {
+	idx := arrays.IndexOf(g.Players, curr)
+	return g.Players[(idx+len(g.Players))%len(g.Players)]
+}
+
+func (g Game) IsTeammate(player1, player2 int64) bool {
+	return g.Groups[player1] == g.Groups[player2]
 }

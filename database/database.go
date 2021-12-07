@@ -1,33 +1,57 @@
 package database
 
 import (
+	"fmt"
+	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
+	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/model"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var roomIds int64 = 0
 var players = map[int64]*model.Player{}
+var connPlayers = map[int64]*model.Player{}
 var rooms = map[int64]*model.Room{}
 var roomLocks = map[int64]*sync.Mutex{}
 var roomPlayers = map[int64]map[int64]bool{}
 
+func init() {
+	async.Async(func() {
+		for {
+			time.Sleep(10 * time.Second)
+			log.Infof("current conn %d\n", len(connPlayers))
+		}
+	})
+}
+
 func PlayerConnected(conn *network.Conn, info *modelx.AuthInfo) *model.Player {
-	player := &model.Player{
-		ID:    info.ID,
-		Name:  info.Name,
-		Score: info.Score,
+	player, ok := players[info.ID]
+	if !ok {
+		player = &model.Player{
+			ID:    info.ID,
+			Name:  info.Name,
+			Score: info.Score,
+		}
 	}
 	player.Conn(conn)
 	players[info.ID] = player
+	connPlayers[conn.ID()] = player
 	return player
 }
 
 func PlayerDisconnected(conn *network.Conn) {
-	delete(players, conn.ID())
+	player := connPlayers[conn.ID()]
+	if player != nil {
+		player.State(consts.StateWelcome)
+		RoomBroadcast(player.RoomID, fmt.Sprintf("%s lost connection!\n", player.Name))
+	}
+
+	delete(connPlayers, conn.ID())
 }
 
 func CreateRoom(creator int64) *model.Room {
@@ -93,35 +117,32 @@ func JoinRoom(roomId, playerId int64) error {
 	if room.State == consts.RoomStateRunning {
 		return consts.ErrorsJoinFailForRoomRunning
 	}
-	if len(GetRoomPlayers(roomId)) >= room.Players {
+	if room.Players >= consts.MaxPlayers {
 		return consts.ErrorsRoomPlayersIsFull
 	}
+	room.Players++
 	roomPlayers[roomId][playerId] = true
 	player.RoomID = roomId
 	return nil
 }
 
-func LeaveRoom(roomId, playerId int64) error {
+func LeaveRoom(roomId, playerId int64) {
 	player := players[playerId]
 	if player == nil {
-		return nil
+		return
 	}
 	room := rooms[roomId]
 	if room == nil {
-		return nil
+		return
 	}
 	lock := GetLock(roomId)
 	lock.Lock()
 	defer lock.Unlock()
-
 	player.RoomID = 0
 	playerIds := roomPlayers[roomId]
 	delete(roomPlayers[roomId], playerId)
 	if len(playerIds) == 0 {
-		return DeleteRoom(roomId)
-	}
-	if room.State == consts.RoomStateRunning {
-		room.State = consts.RoomStateWaiting
+		_ = DeleteRoom(roomId)
 	}
 	if len(playerIds) > 0 {
 		for k := range playerIds {
@@ -129,17 +150,17 @@ func LeaveRoom(roomId, playerId int64) error {
 			break
 		}
 	}
-	return nil
+	return
 }
 
 func GetRoomPlayers(roomId int64) map[int64]bool {
 	return roomPlayers[roomId]
 }
 
-func RoomBroadcast(roomId int64, msg string, exclude ...int64) error {
+func RoomBroadcast(roomId int64, msg string, exclude ...int64) {
 	room := rooms[roomId]
 	if room == nil {
-		return nil
+		return
 	}
 	excludeSet := map[int64]bool{}
 	for _, exc := range exclude {
@@ -150,7 +171,6 @@ func RoomBroadcast(roomId int64, msg string, exclude ...int64) error {
 			_ = player.WriteString(msg)
 		}
 	}
-	return nil
 }
 
 func GetPlayer(playerId int64) *model.Player {

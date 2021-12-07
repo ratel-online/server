@@ -27,16 +27,11 @@ type State interface {
 	Exit(player *model.Player) consts.StateID
 }
 
-func Root() consts.StateID {
-	return consts.StateWelcome
-}
-
-func Load(player *model.Player) error {
-	var err error
+func Run(player *model.Player) {
+	player.State(consts.StateWelcome)
 	for {
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)
-
 		if err != nil {
 			if err1, ok := err.(consts.Error); ok {
 				if err1.Exit {
@@ -52,7 +47,6 @@ func Load(player *model.Player) error {
 			player.State(stateId)
 		}
 	}
-	return err
 }
 
 func isExit(signal string) bool {

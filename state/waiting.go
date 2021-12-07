@@ -5,16 +5,13 @@ import (
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/model"
+	"strings"
 	"time"
 )
 
 type waiting struct{}
 
 func (s *waiting) Next(player *model.Player) (consts.StateID, error) {
-	err := player.WriteString("You joined room!\n")
-	if err != nil {
-		return 0, player.WriteError(err)
-	}
 	room := database.GetRoom(player.RoomID)
 	if room == nil {
 		return 0, consts.ErrorsExist
@@ -29,13 +26,14 @@ func (s *waiting) Next(player *model.Player) (consts.StateID, error) {
 			access = true
 			break
 		}
-		if room.Creator == player.ID && (signal == "start" || signal == "s") {
+		signal = strings.ToLower(signal)
+		if room.Creator == player.ID && room.Players > 0 && (signal == "start" || signal == "s") {
 			access = true
-			room.State = consts.RoomStateRunning
 			room.Game, err = initGame(room)
 			if err != nil {
 				return 0, err
 			}
+			room.State = consts.RoomStateRunning
 			break
 		}
 	}
@@ -48,9 +46,11 @@ func (s *waiting) Next(player *model.Player) (consts.StateID, error) {
 }
 
 func (*waiting) Exit(player *model.Player) consts.StateID {
-	roomId := player.RoomID
-	_ = database.LeaveRoom(player.RoomID, player.ID)
-	_ = database.RoomBroadcast(roomId, fmt.Sprintf("%s exited room!\n", player.Name))
+	room := database.GetRoom(player.RoomID)
+	if room != nil {
+		database.LeaveRoom(player.RoomID, player.ID)
+		database.RoomBroadcast(room.ID, fmt.Sprintf("%s joined room! room current has %d players\n", player.Name, room.Players))
+	}
 	return consts.StateHome
 }
 

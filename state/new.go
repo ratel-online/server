@@ -27,21 +27,12 @@ func (*new) Next(player *model.Player) (consts.StateID, error) {
 	if _, ok := consts.GameTypes[gameType]; !ok {
 		return 0, player.WriteError(consts.ErrorsGameTypeInvalid)
 	}
-
-	err = player.WriteString("Please input player number\n")
-	if err != nil {
-		return 0, player.WriteError(err)
-	}
-	players, err := player.AskForInt()
-	if err != nil {
-		return 0, player.WriteError(err)
-	}
-	if players < consts.MinPlayers || players > consts.MaxPlayers {
-		return 0, player.WriteError(consts.ErrorsPlayersInvalid)
-	}
 	room := database.CreateRoom(player.ID)
 	room.Type = gameType
-	room.Players = players
+	err = player.WriteString(fmt.Sprintf("Create room successful, id : %d\n", room.ID))
+	if err != nil {
+		return 0, player.WriteError(err)
+	}
 	err = database.JoinRoom(room.ID, player.ID)
 	if err != nil {
 		return 0, player.WriteError(err)

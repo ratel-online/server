@@ -34,6 +34,7 @@ const (
 
 	ClassicsRobTimeout  = 10 * time.Second
 	ClassicsPlayTimeout = 20 * time.Second
+	ClassicsLostTimeout = 3 * time.Second
 )
 
 type Error struct {
@@ -71,7 +72,7 @@ var (
 		GameTypeLaiZi:   "LaiZi",
 		GameTypeRunFast: "RunFast",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeRunFast}
+	GameTypesIds = []int{GameTypeClassic} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",

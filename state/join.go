@@ -36,14 +36,15 @@ func (s *join) Next(player *model.Player) (consts.StateID, error) {
 	if err != nil {
 		return 0, player.WriteError(consts.ErrorsRoomInvalid)
 	}
+	room := database.GetRoom(roomId)
+	if room == nil {
+		return 0, player.WriteError(consts.ErrorsRoomInvalid)
+	}
 	err = database.JoinRoom(roomId, player.ID)
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	err = database.RoomBroadcast(roomId, fmt.Sprintf("%s joined room!\n", player.Name), player.ID)
-	if err != nil {
-		return 0, player.WriteError(err)
-	}
+	database.RoomBroadcast(roomId, fmt.Sprintf("%s joined room! room current has %d players\n", player.Name, room.Players), player.ID)
 	return consts.StateWaiting, nil
 }
 

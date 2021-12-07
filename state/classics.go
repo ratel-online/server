@@ -18,9 +18,10 @@ import (
 type classics struct{}
 
 var (
-	classicsStateRob   = 1
-	classicsStatePlay  = 2
-	classicsStateReset = 3
+	classicsStateRob     = 1
+	classicsStatePlay    = 2
+	classicsStateReset   = 3
+	classicsStateWaiting = 4
 )
 
 var classicsRules = _classicsRules{}
@@ -70,7 +71,6 @@ func (s *classics) Next(player *model.Player) (consts.StateID, error) {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
 	game := room.Game
-
 	buf := bytes.Buffer{}
 	buf.WriteString("Game starting!\n")
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
@@ -90,9 +90,9 @@ func (s *classics) Next(player *model.Player) (consts.StateID, error) {
 				return 0, err
 			}
 		case classicsStateReset:
-			err := player.WriteString("All players have give up the landlord. Game restart.\n")
-			if err != nil {
-				return 0, player.WriteError(err)
+			if player.ID == room.Creator {
+				rand.Seed(time.Now().UnixNano())
+				game.States[game.Players[rand.Intn(len(game.States))]] <- classicsStateRob
 			}
 			return 0, nil
 		case classicsStatePlay:
@@ -100,13 +100,14 @@ func (s *classics) Next(player *model.Player) (consts.StateID, error) {
 			if err != nil {
 				return 0, err
 			}
+		case classicsStateWaiting:
+			return consts.StateWaiting, nil
 		}
 	}
 }
 
 func (*classics) Exit(player *model.Player) consts.StateID {
-	_ = database.LeaveRoom(player.RoomID, player.ID)
-	_ = database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s exited room!\n", player.Name))
+	database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s exited room!\n", player.Name))
 	return consts.StateHome
 }
 
@@ -118,6 +119,7 @@ func handleClassicsRob(player *model.Player, game *model.Game) error {
 				log.Error(err)
 				return err
 			}
+			database.RoomBroadcast(player.RoomID, "All players have give up the landlord. Game restart.\n")
 			for _, playerId := range game.Players {
 				game.States[playerId] <- classicsStateReset
 			}
@@ -129,7 +131,7 @@ func handleClassicsRob(player *model.Player, game *model.Game) error {
 			}
 			buf := bytes.Buffer{}
 			buf.WriteString(fmt.Sprintf("%s become landlord, and got additional pokers: %s\n", landlord.Name, game.Additional.String()))
-			_ = database.RoomBroadcast(player.RoomID, buf.String())
+			database.RoomBroadcast(player.RoomID, buf.String())
 			game.FirstPlayer = landlord.ID
 			game.LastPlayer = landlord.ID
 			game.Groups[landlord.ID] = 1
@@ -142,40 +144,52 @@ func handleClassicsRob(player *model.Player, game *model.Game) error {
 	if game.FirstPlayer == 0 {
 		game.FirstPlayer = player.ID
 	}
+	database.RoomBroadcast(player.RoomID, fmt.Sprintf("Please waiting from %s confirm whether to be a landlord. \n", player.Name))
 	err := player.WriteString("Would you like to be a landlord y/f\n")
 	if err != nil {
 		return player.WriteError(err)
 	}
-	ans, err := player.AskForString(consts.ClassicsRobTimeout)
+	timeout := consts.ClassicsRobTimeout
+	if player.GetState() != consts.StateClassics {
+		timeout = consts.ClassicsLostTimeout
+	}
+	ans, err := player.AskForString(timeout)
 	if err != nil {
 		if err != consts.ErrorsTimeout {
 			return err
 		}
 		ans = "f"
 	}
-	if strings.ToLower(ans) == "f" {
+	if strings.ToLower(ans) == "y" {
 		game.Landlord = player.ID
 		game.Multiple *= 2
-	} else {
-		game.States[game.NextPlayer(player.ID)] <- classicsStateRob
 	}
+	game.States[game.NextPlayer(player.ID)] <- classicsStateRob
 	return nil
 }
 
 func handleClassicsPlay(player *model.Player, game *model.Game) error {
 	timeout := consts.ClassicsPlayTimeout
+	if player.GetState() != consts.StateClassics {
+		timeout = consts.ClassicsLostTimeout
+	}
 	master := player.ID == game.LastPlayer || game.LastPlayer == 0
 	for {
-		err := player.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
+		prevPlayer, nextPlayer := database.GetPlayer(game.PrevPlayer(player.ID)), database.GetPlayer(game.NextPlayer(player.ID))
+		buf := bytes.Buffer{}
+		buf.WriteString(fmt.Sprintf("Timeout: %ds, prev player %s (%v): %d, next player %s (%v): %d\n", int(timeout.Seconds()), prevPlayer.Name, game.IsTeammate(player.ID, prevPlayer.ID), len(game.Pokers[prevPlayer.ID]), nextPlayer.Name, game.IsTeammate(player.ID, nextPlayer.ID), len(game.Pokers[nextPlayer.ID])))
+		buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
+		err := player.WriteString(buf.String())
 		if err != nil {
 			return player.WriteError(err)
 		}
-		before := time.Now().Second()
+		before := time.Now().Unix()
+		fmt.Println(before)
+		pokers := game.Pokers[player.ID]
 		ans, err := player.AskForString(timeout)
 		if err != nil && err != consts.ErrorsTimeout {
 			return err
 		}
-		pokers := game.Pokers[player.ID]
 		if err == consts.ErrorsTimeout {
 			if master {
 				ans = poker.GetAlias(pokers[0].Key)
@@ -183,10 +197,10 @@ func handleClassicsPlay(player *model.Player, game *model.Game) error {
 				ans = "p"
 			}
 		} else {
-			timeout -= time.Second * time.Duration(time.Now().Second()-before)
+			timeout -= time.Second * time.Duration(time.Now().Unix()-before)
 		}
 		if ans == "" {
-			err := player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
+			err = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 			if err != nil {
 				return player.WriteError(err)
 			}
@@ -205,10 +219,7 @@ func handleClassicsPlay(player *model.Player, game *model.Game) error {
 				if nextPlayer == nil {
 					return consts.ErrorsPlayersInvalid
 				}
-				err := database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s passed, next player is %s \n", player.Name, nextPlayer.Name))
-				if err != nil {
-					return err
-				}
+				database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s passed, next player is %s \n", player.Name, nextPlayer.Name))
 				game.States[nextPlayer.ID] <- classicsStatePlay
 				return nil
 			}
@@ -279,28 +290,18 @@ func handleClassicsPlay(player *model.Player, game *model.Game) error {
 		game.LastFaces = lastFaces
 
 		if len(pokers) == 0 {
-			err = database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s played %s, win the game! \n", player.Name, sells.String()))
-			if err != nil {
-				return err
-			}
-			err := resetClassicsGame(game)
-			if err != nil {
-				log.Error(err)
-				return err
+			database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s played %s, win the game! \n", player.Name, sells.String()))
+			room := database.GetRoom(player.RoomID)
+			if room != nil {
+				room.Game = nil
+				room.State = consts.RoomStateWaiting
 			}
 			for _, playerId := range game.Players {
-				game.States[playerId] <- classicsStateReset
+				game.States[playerId] <- classicsStateWaiting
 			}
 			return nil
 		}
-		nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
-		if nextPlayer == nil {
-			return consts.ErrorsPlayersInvalid
-		}
-		err = database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s played %s, next player is %s \n", player.Name, sells.String(), nextPlayer.Name))
-		if err != nil {
-			return err
-		}
+		database.RoomBroadcast(player.RoomID, fmt.Sprintf("%s played %s, next player is %s \n", player.Name, sells.String(), nextPlayer.Name))
 		game.States[nextPlayer.ID] <- classicsStatePlay
 		return nil
 	}
@@ -320,7 +321,7 @@ func initClassicsGame(room *model.Room) (*model.Game, error) {
 	groups := map[int64]int{}
 	pokers := map[int64]modelx.Pokers{}
 	for i := range players {
-		states[players[i]] = make(chan int)
+		states[players[i]] = make(chan int, 1)
 		groups[players[i]] = 0
 		pokers[players[i]] = distributes[i]
 	}
@@ -345,9 +346,9 @@ func resetClassicsGame(game *model.Game) error {
 	for i := range players {
 		game.Pokers[players[i]] = distributes[i]
 	}
-	rand.Seed(time.Now().UnixNano())
-	game.States[players[rand.Intn(len(states))]] <- classicsStateRob
 	game.Groups = map[int64]int{}
+	game.FirstPlayer = 0
+	game.LastPlayer = 0
 	game.Multiple = 1
 	game.Landlord = 0
 	return nil
