@@ -32,9 +32,9 @@ const (
 	GameTypeLaiZi   = 2
 	GameTypeRunFast = 3
 
-	ClassicsRobTimeout  = 10 * time.Second
-	ClassicsPlayTimeout = 20 * time.Second
-	ClassicsLostTimeout = 3 * time.Second
+	ClassicsRobTimeout  = 1000 * time.Second
+	ClassicsPlayTimeout = 30 * time.Second
+	ClassicsLostTimeout = 1 * time.Second
 )
 
 type Error struct {
@@ -55,6 +55,7 @@ func NewExitErr(msg string) Error {
 }
 
 var (
+	ErrorsChanClosed             = NewExitErr("Chan closed. ")
 	ErrorsTimeout                = NewErr("Timeout. ")
 	ErrorsExist                  = NewExitErr("Exist. ")
 	ErrorsInputInvalid           = NewErr("Input invalid. ")

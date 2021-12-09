@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
-	"github.com/ratel-online/server/model"
 )
 
 type new struct{}
 
-func (*new) Next(player *model.Player) (consts.StateID, error) {
+func (*new) Next(player *database.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	buf.WriteString("Please select game type\n")
 	for _, id := range consts.GameTypesIds {
@@ -40,6 +39,6 @@ func (*new) Next(player *model.Player) (consts.StateID, error) {
 	return consts.StateWaiting, nil
 }
 
-func (*new) Exit(player *model.Player) consts.StateID {
+func (*new) Exit(player *database.Player) consts.StateID {
 	return consts.StateHome
 }

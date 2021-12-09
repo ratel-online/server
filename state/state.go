@@ -3,7 +3,7 @@ package state
 import (
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/model"
+	"github.com/ratel-online/server/database"
 	"strings"
 )
 
@@ -23,12 +23,18 @@ func register(id consts.StateID, state State) {
 }
 
 type State interface {
-	Next(player *model.Player) (consts.StateID, error)
-	Exit(player *model.Player) consts.StateID
+	Next(player *database.Player) (consts.StateID, error)
+	Exit(player *database.Player) consts.StateID
 }
 
-func Run(player *model.Player) {
+func Run(player *database.Player) {
 	player.State(consts.StateWelcome)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("%s recover %v\n", player.Name, err)
+		}
+		log.Infof("player %s state machine break up.\n", player)
+	}()
 	for {
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)

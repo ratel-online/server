@@ -25,18 +25,16 @@ func handle(rwc protocol.ReadWriteCloser) error {
 			log.Error(err)
 		}
 	}()
-	log.Infof("new player connected! ")
+	log.Info("new player connected! ")
 	authInfo, err := loginAuth(c)
 	if err != nil || authInfo.ID == 0 {
 		_ = c.Write(protocol.ErrorPacket(consts.ErrorsAuthFail))
 		return consts.ErrorsAuthFail
 	}
-	log.Infof("player auth accessed, %d:%s", authInfo.ID, authInfo.Name)
+	log.Infof("player auth accessed, %d:%s\n", authInfo.ID, authInfo.Name)
 	player := database.PlayerConnected(c, authInfo)
 	defer database.PlayerDisconnected(c)
-	async.Async(func() {
-		state.Run(player)
-	})
+	go state.Run(player)
 	return player.Listening()
 }
 

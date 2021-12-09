@@ -1,6 +1,7 @@
-package model
+package database
 
 import (
+	"fmt"
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
@@ -8,6 +9,7 @@ import (
 	"github.com/ratel-online/core/util/arrays"
 	"github.com/ratel-online/server/consts"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,10 +21,11 @@ type Player struct {
 	Type   int    `json:"type"`
 	RoomID int64  `json:"roomId"`
 
-	conn  *network.Conn
-	data  chan *protocol.Packet
-	read  bool
-	state consts.StateID
+	conn   *network.Conn
+	data   chan *protocol.Packet
+	read   bool
+	state  consts.StateID
+	online bool
 }
 
 func (p *Player) Write(bytes []byte) error {
@@ -35,6 +38,7 @@ func (p *Player) Listening() error {
 	for {
 		pack, err := p.conn.Read()
 		if err != nil {
+			p.online = false
 			log.Error(err)
 			return err
 		}
@@ -46,7 +50,7 @@ func (p *Player) Listening() error {
 }
 
 func (p *Player) WriteString(data string) error {
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(data),
 	})
@@ -77,6 +81,9 @@ func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error
 		}
 	} else {
 		packet = <-p.data
+	}
+	if packet == nil {
+		return nil, consts.ErrorsChanClosed
 	}
 	single := strings.ToLower(packet.String())
 	if single == "exit" || single == "e" {
@@ -117,12 +124,27 @@ func (p *Player) GetState() consts.StateID {
 	return p.state
 }
 
+func (p *Player) Online(online bool) {
+	p.online = online
+}
+
+func (p *Player) IsOnline() bool {
+	return p.online
+}
+
 func (p *Player) Conn(conn *network.Conn) {
 	p.conn = conn
 	p.data = make(chan *protocol.Packet)
+	p.online = true
+}
+
+func (p Player) String() string {
+	return fmt.Sprintf("%s[%d]", p.Name, p.ID)
 }
 
 type Room struct {
+	sync.Mutex
+
 	ID      int64 `json:"id"`
 	Type    int   `json:"type"`
 	Game    *Game `json:"gameId"`
@@ -137,12 +159,14 @@ type Game struct {
 	Groups      map[int64]int          `json:"groups"`
 	States      map[int64]chan int     `json:"states"`
 	Pokers      map[int64]model.Pokers `json:"pokers"`
-	Landlord    int64                  `json:"landlord"`
 	Almighty    model.Pokers           `json:"almighty"`
 	Additional  model.Pokers           `json:"pocket"`
 	Multiple    int                    `json:"multiple"`
 	FirstPlayer int64                  `json:"firstPlayer"`
 	LastPlayer  int64                  `json:"lastPlayer"`
+	FirstRob    int64                  `json:"firstRob"`
+	LastRob     int64                  `json:"lastRob"`
+	FinalRob    bool                   `json:"finalRob"`
 	LastFaces   *model.Faces           `json:"lastFaces"`
 	LastPokers  *model.Pokers          `json:"lastPokers"`
 }
@@ -159,4 +183,8 @@ func (g Game) PrevPlayer(curr int64) int64 {
 
 func (g Game) IsTeammate(player1, player2 int64) bool {
 	return g.Groups[player1] == g.Groups[player2]
+}
+
+func (g Game) IsLandlord(playerId int64) bool {
+	return g.Groups[playerId] == 1
 }

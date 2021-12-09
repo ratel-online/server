@@ -6,6 +6,6 @@ import (
 )
 
 func main() {
-	server := network.NewTcpServer(":8080")
+	server := network.NewTcpServer(":9999")
 	log.Error(server.Serve())
 }

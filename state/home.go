@@ -3,12 +3,12 @@ package state
 import (
 	"bytes"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/model"
+	"github.com/ratel-online/server/database"
 )
 
 type home struct{}
 
-func (*home) Next(player *model.Player) (consts.StateID, error) {
+func (*home) Next(player *database.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	buf.WriteString("1.Join\n")
 	buf.WriteString("2.New\n")
@@ -30,6 +30,6 @@ func (*home) Next(player *model.Player) (consts.StateID, error) {
 	return 0, player.WriteError(consts.ErrorsInputInvalid)
 }
 
-func (*home) Exit(player *model.Player) consts.StateID {
+func (*home) Exit(player *database.Player) consts.StateID {
 	return 0
 }
