@@ -389,7 +389,7 @@ func resetGame(game *database.Game) error {
 
 func viewGame(game *database.Game, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name ↓", "Pokers", "Identity"))
+	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name v", "Pokers", "Identity"))
 	for _, id := range game.Players {
 		player := database.GetPlayer(id)
 		flag := ""
