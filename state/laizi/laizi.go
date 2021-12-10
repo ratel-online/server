@@ -342,8 +342,8 @@ func InitGame(room *database.Room) (*database.Game, error) {
 	groups := map[int64]int{}
 	pokers := map[int64]modelx.Pokers{}
 	mnemonic := map[int]int{
-		14: 2 * sets,
-		15: 2 * sets,
+		14: sets,
+		15: sets,
 	}
 	for i := 1; i <= 13; i++ {
 		mnemonic[i] = 4 * sets
