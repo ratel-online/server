@@ -127,9 +127,6 @@ func handleRob(player *database.Player, game *database.Game) error {
 			}
 		} else if game.FirstRob == game.LastRob {
 			landlord := database.GetPlayer(game.LastRob)
-			if landlord == nil {
-				return consts.ErrorsPlayersInvalid
-			}
 			buf := bytes.Buffer{}
 			buf.WriteString(fmt.Sprintf("%s become landlord, got more pokers: %s\n", landlord.Name, game.Additional.String()))
 			database.Broadcast(player.RoomID, buf.String())
@@ -211,13 +208,10 @@ func handlePlay(player *database.Player, game *database.Game) error {
 			continue
 		} else if ans == "p" || ans == "pass" {
 			if master {
-				_ = player.WriteString("Have to play! \n")
+				_ = player.WriteError(consts.ErrorsHaveToPlay)
 				continue
 			} else {
 				nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
-				if nextPlayer == nil {
-					return consts.ErrorsPlayersInvalid
-				}
 				database.Broadcast(player.RoomID, fmt.Sprintf("%s passed, next player is %s \n", player.Name, nextPlayer.Name))
 				game.States[nextPlayer.ID] <- statePlay
 				return nil

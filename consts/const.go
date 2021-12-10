@@ -1,7 +1,6 @@
 package consts
 
 import (
-	"fmt"
 	"github.com/ratel-online/core/consts"
 	"time"
 )
@@ -43,6 +42,7 @@ const (
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
 
 type Error struct {
+	Code int
 	Msg  string
 	Exit bool
 }
@@ -51,27 +51,23 @@ func (e Error) Error() string {
 	return e.Msg
 }
 
-func NewErr(msg string) Error {
-	return Error{Msg: msg, Exit: false}
-}
-
-func NewExitErr(msg string) Error {
-	return Error{Msg: msg, Exit: true}
+func NewErr(code int, exit bool, msg string) Error {
+	return Error{Code: code, Exit: exit, Msg: msg}
 }
 
 var (
-	ErrorsChanClosed             = NewExitErr("Chan closed. ")
-	ErrorsTimeout                = NewErr("Timeout. ")
-	ErrorsExist                  = NewExitErr("Exist. ")
-	ErrorsInputInvalid           = NewErr("Input invalid. ")
-	ErrorsAuthFail               = NewExitErr("Auth fail. ")
-	ErrorsRoomInvalid            = NewExitErr("Room invalid. ")
-	ErrorsPlayersInvalid         = NewExitErr(fmt.Sprintf("Invalid players, must %d-%d", MinPlayers, MaxPlayers))
-	ErrorsGameTypeInvalid        = NewErr("Game type invalid. ")
-	ErrorsRoomPlayersIsFull      = NewErr("Room players is fill. ")
-	ErrorsJoinFailForRoomRunning = NewErr("Join fail, room is running. ")
-	ErrorsGamePlayersInvalid     = NewErr("Game players invalid. ")
-	ErrorsPokersFacesInvalid     = NewErr("Pokers faces invalid. ")
+	ErrorsExist                  = NewErr(1, true, "Exist. ")
+	ErrorsChanClosed             = NewErr(1, true, "Chan closed. ")
+	ErrorsTimeout                = NewErr(1, false, "Timeout. ")
+	ErrorsInputInvalid           = NewErr(1, false, "Input invalid. ")
+	ErrorsAuthFail               = NewErr(1, true, "Auth fail. ")
+	ErrorsRoomInvalid            = NewErr(1, true, "Room invalid. ")
+	ErrorsGameTypeInvalid        = NewErr(1, false, "Game type invalid. ")
+	ErrorsRoomPlayersIsFull      = NewErr(1, false, "Room players is fill. ")
+	ErrorsJoinFailForRoomRunning = NewErr(1, false, "Join fail, room is running. ")
+	ErrorsGamePlayersInvalid     = NewErr(1, false, "Game players invalid. ")
+	ErrorsPokersFacesInvalid     = NewErr(1, false, "Pokers faces invalid. ")
+	ErrorsHaveToPlay             = NewErr(1, false, "Have to play. ")
 
 	GameTypes = map[int]string{
 		GameTypeClassic: "Classic",

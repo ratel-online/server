@@ -24,7 +24,7 @@ var roomPlayers = map[int64]map[int64]bool{}
 //	})
 //}
 
-func PlayerConnected(conn *network.Conn, info *modelx.AuthInfo) *Player {
+func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	player, ok := players[info.ID]
 	if !ok {
 		player = &Player{
@@ -39,7 +39,7 @@ func PlayerConnected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	return player
 }
 
-func PlayerDisconnected(conn *network.Conn) {
+func Disconnected(conn *network.Conn) {
 	player := connPlayers[conn.ID()]
 	if player != nil {
 		player.state = consts.StateWelcome
