@@ -13,9 +13,9 @@ type join struct{}
 func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	rooms := database.GetRooms()
-	buf.WriteString(fmt.Sprintf("%s\t\t%s\t\t%s\t\t%s\n", "ID", "Type", "Players", "State"))
+	buf.WriteString(fmt.Sprintf("%-10s%-10s%-10s%-10s\n", "ID", "Type", "Players", "State"))
 	for _, room := range rooms {
-		buf.WriteString(fmt.Sprintf("%d\t\t%s\t\t%d\t\t%s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
+		buf.WriteString(fmt.Sprintf("%-10d%-10s%-10d%-10s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
 	}
 	err := player.WriteString(buf.String())
 	if err != nil {

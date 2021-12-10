@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/state/classics"
+	"github.com/ratel-online/server/state/laizi"
 	"strings"
 	"time"
 )
@@ -44,6 +46,8 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if access {
 		if room.Type == consts.GameTypeClassic {
 			return consts.StateClassics, nil
+		} else if room.Type == consts.GameTypeLaiZi {
+			return consts.StateLaiZi, nil
 		}
 	}
 	return s.Exit(player), nil
@@ -65,21 +69,23 @@ func (*waiting) Exit(player *database.Player) consts.StateID {
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("%s\t\t%s\t\t%s\n", "Name", "Score", "Title"))
+	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
 	for playerId := range database.RoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"
 		}
 		player := database.GetPlayer(playerId)
-		buf.WriteString(fmt.Sprintf("%s\t\t%d\t\t%s\n", player.Name, player.Score, title))
+		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
 	_ = currPlayer.WriteString(buf.String())
 }
 
 func initGame(room *database.Room) (*database.Game, error) {
 	if room.Type == consts.GameTypeClassic {
-		return initClassicsGame(room)
+		return classics.InitGame(room)
+	} else if room.Type == consts.GameTypeLaiZi {
+		return laizi.InitGame(room)
 	}
 	return nil, nil
 }

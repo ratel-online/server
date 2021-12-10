@@ -1,4 +1,4 @@
-package state
+package laizi
 
 import (
 	"bytes"
@@ -9,25 +9,26 @@ import (
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 )
 
-type classics struct{}
+type LaiZi struct{}
 
 var (
-	classicsStateRob     = 1
-	classicsStatePlay    = 2
-	classicsStateReset   = 3
-	classicsStateWaiting = 4
+	stateRob     = 1
+	statePlay    = 2
+	stateReset   = 3
+	stateWaiting = 4
 )
 
-var classicsRules = _classicsRules{}
+var rules = _rules{}
 
-type _classicsRules struct {
+type _rules struct {
 }
 
-func (c _classicsRules) Value(key int) int {
+func (c _rules) Value(key int) int {
 	if key == 1 {
 		return 12
 	} else if key == 2 {
@@ -38,7 +39,7 @@ func (c _classicsRules) Value(key int) int {
 	return key - 2
 }
 
-func (c _classicsRules) IsStraight(faces []int, count int) bool {
+func (c _rules) IsStraight(faces []int, count int) bool {
 	if faces[len(faces)-1]-faces[0] != len(faces)-1 {
 		return false
 	}
@@ -55,23 +56,27 @@ func (c _classicsRules) IsStraight(faces []int, count int) bool {
 	return false
 }
 
-func (c _classicsRules) StraightBoundary() (int, int) {
+func (c _rules) StraightBoundary() (int, int) {
 	return 1, 12
 }
 
-func (c _classicsRules) Reserved() bool {
+func (c _rules) Reserved() bool {
 	return true
 }
 
-func (s *classics) Next(player *database.Player) (consts.StateID, error) {
+func (s *LaiZi) Next(player *database.Player) (consts.StateID, error) {
 	room := database.GetRoom(player.RoomID)
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
 	game := room.Game
+	game.Pokers[player.ID].SetOaa(game.OAA[0])
+	game.Pokers[player.ID].SortByOaaValue()
+
 	buf := bytes.Buffer{}
 	buf.WriteString("Game starting!\n")
-	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
+	buf.WriteString(fmt.Sprintf("The first universal poker is: %s\n", poker.GetDesc(game.OAA[0])))
+	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].OaaString()))
 	err := player.WriteString(buf.String())
 	if err != nil {
 		return 0, player.WriteError(err)
@@ -82,25 +87,25 @@ func (s *classics) Next(player *database.Player) (consts.StateID, error) {
 		}
 		state := <-game.States[player.ID]
 		switch state {
-		case classicsStateRob:
-			err := handleClassicsRob(player, game)
+		case stateRob:
+			err := handleRob(player, game)
 			if err != nil {
 				log.Error(err)
 				return 0, err
 			}
-		case classicsStateReset:
+		case stateReset:
 			if player.ID == room.Creator {
 				rand.Seed(time.Now().UnixNano())
-				game.States[game.Players[rand.Intn(len(game.States))]] <- classicsStateRob
+				game.States[game.Players[rand.Intn(len(game.States))]] <- stateRob
 			}
 			return 0, nil
-		case classicsStatePlay:
-			err := handleClassicsPlay(player, game)
+		case statePlay:
+			err := handlePlay(player, game)
 			if err != nil {
 				log.Error(err)
 				return 0, err
 			}
-		case classicsStateWaiting:
+		case stateWaiting:
 			return consts.StateWaiting, nil
 		default:
 			return 0, consts.ErrorsChanClosed
@@ -108,50 +113,54 @@ func (s *classics) Next(player *database.Player) (consts.StateID, error) {
 	}
 }
 
-func (*classics) Exit(player *database.Player) consts.StateID {
+func (*LaiZi) Exit(player *database.Player) consts.StateID {
 	return consts.StateHome
 }
 
-func handleClassicsRob(player *database.Player, game *database.Game) error {
-	if game.FirstPlayer == player.ID || game.FinalRob {
+func handleRob(player *database.Player, game *database.Game) error {
+	if game.FirstPlayer == player.ID && !game.FinalRob {
 		if game.FirstRob == 0 {
-			err := resetClassicsGame(game)
+			err := resetGame(game)
 			if err != nil {
 				log.Error(err)
 				return err
 			}
 			database.Broadcast(player.RoomID, "All players have give up the landlord. Game restart.\n")
 			for _, playerId := range game.Players {
-				game.States[playerId] <- classicsStateReset
+				game.States[playerId] <- stateReset
 			}
-		} else if game.FirstRob == game.LastRob || game.FinalRob {
+		} else if game.FirstRob == game.LastRob {
 			landlord := database.GetPlayer(game.LastRob)
 			if landlord == nil {
 				return consts.ErrorsPlayersInvalid
 			}
+			lastOaa := poker.Random(14, 15, game.OAA[0])
 			buf := bytes.Buffer{}
-			buf.WriteString(fmt.Sprintf("%s become landlord, and got additional pokers: %s\n", landlord.Name, game.Additional.String()))
+			buf.WriteString(fmt.Sprintf("%s become landlord, got more pokers: %s\n", landlord.Name, game.Additional.String()))
+			buf.WriteString(fmt.Sprintf("The last universal poker is: %s\n", poker.GetDesc(lastOaa)))
 			database.Broadcast(player.RoomID, buf.String())
 			game.FirstPlayer = landlord.ID
 			game.LastPlayer = landlord.ID
 			game.Groups[landlord.ID] = 1
 			game.Pokers[landlord.ID] = append(game.Pokers[landlord.ID], game.Additional...)
-			game.Pokers[landlord.ID].SortByValue()
-			game.States[landlord.ID] <- classicsStatePlay
+			game.OAA = append(game.OAA, lastOaa)
+			for _, pokers := range game.Pokers {
+				pokers.SetOaa(game.OAA...)
+				pokers.SortByOaaValue()
+			}
+			game.States[landlord.ID] <- statePlay
 		} else {
-			game.States[game.FirstRob] <- classicsStateRob
+			game.FinalRob = true
+			game.States[game.FirstRob] <- stateRob
 		}
 		return nil
 	}
 	if game.FirstPlayer == 0 {
 		game.FirstPlayer = player.ID
 	}
-	if player.ID == game.FirstRob {
-		game.FinalRob = true
-	}
 	database.Broadcast(player.RoomID, fmt.Sprintf("Please waiting from %s confirm whether to be a landlord. \n", player.Name))
 	_ = player.WriteString("Would you like to be a landlord: (y or n)\n")
-	ans, err := player.AskForString(consts.ClassicsRobTimeout)
+	ans, err := player.AskForString(consts.LaiZiRobTimeout)
 	if err != nil {
 		ans = "n"
 	}
@@ -165,25 +174,31 @@ func handleClassicsRob(player *database.Player, game *database.Game) error {
 	} else {
 		database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob landlord\n", player.Name))
 	}
-	game.States[game.NextPlayer(player.ID)] <- classicsStateRob
+	if game.FinalRob {
+		game.FinalRob = false
+		game.FirstRob = game.LastRob
+		game.States[game.FirstPlayer] <- stateRob
+	} else {
+		game.States[game.NextPlayer(player.ID)] <- stateRob
+	}
 	return nil
 }
 
-func handleClassicsPlay(player *database.Player, game *database.Game) error {
-	timeout := consts.ClassicsPlayTimeout
+func handlePlay(player *database.Player, game *database.Game) error {
+	timeout := consts.LaiZiPlayTimeout
 	master := player.ID == game.LastPlayer || game.LastPlayer == 0
 	for {
 		buf := bytes.Buffer{}
 		buf.WriteString("\n")
-		if !master && game.LastPokers != nil {
+		if !master && len(game.LastPokers) > 0 {
 			flag := "landlord"
-			if game.IsLandlord(game.LastPlayer) {
+			if !game.IsLandlord(game.LastPlayer) {
 				flag = "peasant"
 			}
-			buf.WriteString(fmt.Sprintf("Last player is %s: %s, sells: %s\n", database.GetPlayer(game.LastPlayer).Name, flag, game.LastPokers.String()))
+			buf.WriteString(fmt.Sprintf("Last player is %s: %s, sells: %s\n", flag, database.GetPlayer(game.LastPlayer).Name, game.LastPokers.OaaString()))
 		}
 		buf.WriteString(fmt.Sprintf("Timeout: %ds, it's your turn to play \n", int(timeout.Seconds())))
-		buf.WriteString(fmt.Sprintf("Pokers: %s\n", game.Pokers[player.ID].String()))
+		buf.WriteString(fmt.Sprintf("Pokers: %s\n", game.Pokers[player.ID].OaaString()))
 		_ = player.WriteString(buf.String())
 		before := time.Now().Unix()
 		pokers := game.Pokers[player.ID]
@@ -202,7 +217,7 @@ func handleClassicsPlay(player *database.Player, game *database.Game) error {
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 			continue
 		} else if ans == "ls" || ans == "v" {
-			viewClassicsGame(game, player)
+			viewGame(game, player)
 			continue
 		} else if ans == "p" || ans == "pass" {
 			if master {
@@ -214,13 +229,19 @@ func handleClassicsPlay(player *database.Player, game *database.Game) error {
 					return consts.ErrorsPlayersInvalid
 				}
 				database.Broadcast(player.RoomID, fmt.Sprintf("%s passed, next player is %s \n", player.Name, nextPlayer.Name))
-				game.States[nextPlayer.ID] <- classicsStatePlay
+				game.States[nextPlayer.ID] <- statePlay
 				return nil
 			}
 		}
-		currPokers := map[int]modelx.Pokers{}
+		normalPokers := map[int]modelx.Pokers{}
+		universalPokers := make(modelx.Pokers, 0)
+		realSellKeys := make([]int, 0)
 		for _, v := range pokers {
-			currPokers[v.Key] = append(currPokers[v.Key], v)
+			if v.OAA {
+				universalPokers = append(universalPokers, v)
+			} else {
+				normalPokers[v.Key] = append(normalPokers[v.Key], v)
+			}
 		}
 		sells := make(modelx.Pokers, 0)
 		invalid := false
@@ -230,20 +251,28 @@ func handleClassicsPlay(player *database.Player, game *database.Game) error {
 				invalid = true
 				break
 			}
-			if len(currPokers[key]) == 0 {
-				invalid = true
-				break
-			}
-			if len(currPokers[key]) > 0 {
-				sells = append(sells, currPokers[key][len(currPokers[key])-1])
-				currPokers[key] = currPokers[key][:len(currPokers[key])-1]
+			if len(normalPokers[key]) == 0 {
+				if key == 14 || key == 15 || len(universalPokers) == 0 {
+					invalid = true
+					break
+				}
+				realSellKeys = append(realSellKeys, universalPokers[0].Key)
+				universalPokers[0].Key = key
+				universalPokers[0].Desc = poker.GetDesc(key)
+				universalPokers[0].Val = rules.Value(key)
+				sells = append(sells, universalPokers[0])
+				universalPokers = universalPokers[1:]
+			} else {
+				realSellKeys = append(realSellKeys, key)
+				sells = append(sells, normalPokers[key][len(normalPokers[key])-1])
+				normalPokers[key] = normalPokers[key][:len(normalPokers[key])-1]
 			}
 		}
 		if invalid {
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 			continue
 		}
-		facesArr := poker.ParseFaces(sells, classicsRules)
+		facesArr := poker.ParseFaces(sells, rules)
 		if len(facesArr) == 0 {
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 			continue
@@ -265,18 +294,21 @@ func handleClassicsPlay(player *database.Player, game *database.Game) error {
 		} else {
 			lastFaces = &facesArr[0]
 		}
+		for _, key := range realSellKeys {
+			game.Mnemonic[key]--
+		}
 		pokers = make(modelx.Pokers, 0)
-		for _, curr := range currPokers {
+		for _, curr := range normalPokers {
 			pokers = append(pokers, curr...)
 		}
-		pokers.SortByValue()
+		pokers = append(pokers, universalPokers...)
+		pokers.SortByOaaValue()
 		game.Pokers[player.ID] = pokers
 		game.LastPlayer = player.ID
 		game.LastFaces = lastFaces
-		game.LastPokers = &sells
-
+		game.LastPokers = sells
 		if len(pokers) == 0 {
-			database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, win the game! \n", player.Name, sells.String()))
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, win the game! \n", player.Name, sells.OaaString()))
 			room := database.GetRoom(player.RoomID)
 			if room != nil {
 				room.Lock()
@@ -285,19 +317,19 @@ func handleClassicsPlay(player *database.Player, game *database.Game) error {
 				room.Unlock()
 			}
 			for _, playerId := range game.Players {
-				game.States[playerId] <- classicsStateWaiting
+				game.States[playerId] <- stateWaiting
 			}
 			return nil
 		}
 		nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, next player is %s \n", player.Name, sells.String(), nextPlayer.Name))
-		game.States[nextPlayer.ID] <- classicsStatePlay
+		database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, next player is %s \n", player.Name, sells.OaaString(), nextPlayer.Name))
+		game.States[nextPlayer.ID] <- statePlay
 		return nil
 	}
 }
 
-func initClassicsGame(room *database.Room) (*database.Game, error) {
-	distributes := poker.Distribute(room.Players, classicsRules)
+func InitGame(room *database.Room) (*database.Game, error) {
+	distributes, sets := poker.Distribute(room.Players, rules)
 	players := make([]int64, 0)
 	roomPlayers := database.RoomPlayers(room.ID)
 	for playerId := range roomPlayers {
@@ -309,13 +341,20 @@ func initClassicsGame(room *database.Room) (*database.Game, error) {
 	states := map[int64]chan int{}
 	groups := map[int64]int{}
 	pokers := map[int64]modelx.Pokers{}
+	mnemonic := map[int]int{
+		14: 2 * sets,
+		15: 2 * sets,
+	}
+	for i := 1; i <= 13; i++ {
+		mnemonic[i] = 4 * sets
+	}
 	for i := range players {
 		states[players[i]] = make(chan int, 1)
 		groups[players[i]] = 0
 		pokers[players[i]] = distributes[i]
 	}
 	rand.Seed(time.Now().UnixNano())
-	states[players[rand.Intn(len(states))]] <- classicsStateRob
+	states[players[rand.Intn(len(states))]] <- stateRob
 	return &database.Game{
 		States:     states,
 		Players:    players,
@@ -323,11 +362,13 @@ func initClassicsGame(room *database.Room) (*database.Game, error) {
 		Pokers:     pokers,
 		Additional: distributes[len(distributes)-1],
 		Multiple:   1,
+		OAA:        []int{poker.Random(14, 15)},
+		Mnemonic:   mnemonic,
 	}, nil
 }
 
-func resetClassicsGame(game *database.Game) error {
-	distributes := poker.Distribute(len(game.Players), classicsRules)
+func resetGame(game *database.Game) error {
+	distributes, _ := poker.Distribute(len(game.Players), rules)
 	if len(distributes) != len(game.Players)+1 {
 		return consts.ErrorsGamePlayersInvalid
 	}
@@ -342,12 +383,13 @@ func resetClassicsGame(game *database.Game) error {
 	game.LastRob = 0
 	game.FinalRob = false
 	game.Multiple = 1
+	game.OAA = make([]int, 0)
 	return nil
 }
 
-func viewClassicsGame(game *database.Game, currPlayer *database.Player) {
+func viewGame(game *database.Game, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("%s\t\t%s\t\t%s\n", "Name ↓", "Pokers", "Identity"))
+	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name ↓", "Pokers", "Identity"))
 	for _, id := range game.Players {
 		player := database.GetPlayer(id)
 		flag := ""
@@ -355,10 +397,26 @@ func viewClassicsGame(game *database.Game, currPlayer *database.Player) {
 			flag = "*"
 		}
 		identity := "landlord"
-		if game.IsLandlord(id) {
+		if !game.IsLandlord(id) {
 			identity = "peasant"
 		}
-		buf.WriteString(fmt.Sprintf("%s%s\t\t%d\t\t%s\n", player.Name, flag, len(game.Pokers[id]), identity))
+		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name+flag, len(game.Pokers[id]), identity))
 	}
+	buf.WriteString("Pokers  : ")
+	for _, i := range consts.MnemonicSorted {
+		buf.WriteString(poker.GetDesc(i) + "  ")
+	}
+	buf.WriteString("\nSurplus : ")
+	for _, i := range consts.MnemonicSorted {
+		buf.WriteString(strconv.Itoa(game.Mnemonic[i]) + "  ")
+		if i == 10 {
+			buf.WriteString(" ")
+		}
+	}
+	buf.WriteString("\nThe Universal pokers are: ")
+	for _, key := range game.OAA {
+		buf.WriteString(poker.GetDesc(key) + " ")
+	}
+	buf.WriteString("\n")
 	_ = currPlayer.WriteString(buf.String())
 }

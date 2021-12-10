@@ -159,7 +159,7 @@ type Game struct {
 	Groups      map[int64]int          `json:"groups"`
 	States      map[int64]chan int     `json:"states"`
 	Pokers      map[int64]model.Pokers `json:"pokers"`
-	Almighty    model.Pokers           `json:"almighty"`
+	OAA         []int                  `json:"oaa"`
 	Additional  model.Pokers           `json:"pocket"`
 	Multiple    int                    `json:"multiple"`
 	FirstPlayer int64                  `json:"firstPlayer"`
@@ -168,7 +168,8 @@ type Game struct {
 	LastRob     int64                  `json:"lastRob"`
 	FinalRob    bool                   `json:"finalRob"`
 	LastFaces   *model.Faces           `json:"lastFaces"`
-	LastPokers  *model.Pokers          `json:"lastPokers"`
+	LastPokers  model.Pokers           `json:"lastPokers"`
+	Mnemonic    map[int]int            `json:"mnemonic"`
 }
 
 func (g Game) NextPlayer(curr int64) int64 {

@@ -17,6 +17,7 @@ const (
 	StateSetting
 	StateWaiting
 	StateClassics
+	StateLaiZi
 )
 
 const (
@@ -32,10 +33,14 @@ const (
 	GameTypeLaiZi   = 2
 	GameTypeRunFast = 3
 
-	ClassicsRobTimeout  = 1000 * time.Second
+	ClassicsRobTimeout  = 20 * time.Second
 	ClassicsPlayTimeout = 30 * time.Second
-	ClassicsLostTimeout = 1 * time.Second
+
+	LaiZiRobTimeout  = 20 * time.Second
+	LaiZiPlayTimeout = 30 * time.Second
 )
+
+var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
 
 type Error struct {
 	Msg  string
@@ -73,7 +78,7 @@ var (
 		GameTypeLaiZi:   "LaiZi",
 		GameTypeRunFast: "RunFast",
 	}
-	GameTypesIds = []int{GameTypeClassic} // GameTypeLaiZi, GameTypeRunFast
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",
