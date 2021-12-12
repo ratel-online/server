@@ -5,6 +5,7 @@ import (
 	"github.com/awesome-cap/hashmap"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
+	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/server/consts"
 	"sort"
 	"sync/atomic"
@@ -211,6 +212,24 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	for playerId := range roomPlayers {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
 			_ = player.WriteString(msg)
+		}
+	}
+}
+
+func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {
+	room := getRoom(roomId)
+	if room == nil {
+		return
+	}
+	excludeSet := map[int64]bool{}
+	for _, exc := range exclude {
+		excludeSet[exc] = true
+	}
+	msg := json.Marshal(object)
+	roomPlayers := getRoomPlayers(roomId)
+	for playerId := range roomPlayers {
+		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
+			_ = player.WriteString(string(msg))
 		}
 	}
 }

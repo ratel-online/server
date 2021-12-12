@@ -7,6 +7,7 @@ import (
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/protocol"
 	"github.com/ratel-online/core/util/arrays"
+	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/server/consts"
 	"strings"
 	"sync"
@@ -49,9 +50,14 @@ func (p *Player) Listening() error {
 }
 
 func (p *Player) WriteString(data string) error {
-	//time.Sleep(10 * time.Millisecond)
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(data),
+	})
+}
+
+func (p *Player) WriteObject(data interface{}) error {
+	return p.conn.Write(protocol.Packet{
+		Body: json.Marshal(data),
 	})
 }
 
@@ -125,12 +131,12 @@ func (p *Player) AskForStringWithoutTransaction(timeout ...time.Duration) (strin
 
 func (p *Player) StartTransaction() {
 	p.read = true
-	_ = p.WriteString(consts.IS_START)
+	_ = p.WriteString(consts.IsStart)
 }
 
 func (p *Player) StopTransaction() {
 	p.read = false
-	_ = p.WriteString(consts.IS_STOP)
+	_ = p.WriteString(consts.IsStop)
 }
 
 func (p *Player) State(s consts.StateID) {
@@ -147,6 +153,20 @@ func (p *Player) Conn(conn *network.Conn) {
 	p.online = true
 }
 
+func (p Player) Model() model.Player {
+	modelPlayer := model.Player{
+		ID:    p.ID,
+		Name:  p.Name,
+		Score: p.Score,
+	}
+	room := getRoom(p.RoomID)
+	if room != nil && room.Game != nil {
+		modelPlayer.Pokers = len(room.Game.Pokers[p.ID])
+		modelPlayer.Group = room.Game.Groups[p.ID]
+	}
+	return modelPlayer
+}
+
 func (p Player) String() string {
 	return fmt.Sprintf("%s[%d]", p.Name, p.ID)
 }
@@ -161,6 +181,18 @@ type Room struct {
 	Players int   `json:"players"`
 	Robots  int   `json:"robots"`
 	Creator int64 `json:"creator"`
+}
+
+func (r Room) Model() model.Room {
+	return model.Room{
+		ID:        r.ID,
+		Type:      r.Type,
+		TypeDesc:  consts.GameTypes[r.Type],
+		Players:   r.Players,
+		State:     r.State,
+		StateDesc: consts.RoomStates[r.State],
+		Creator:   r.Creator,
+	}
 }
 
 type Game struct {

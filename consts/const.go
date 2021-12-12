@@ -20,8 +20,8 @@ const (
 )
 
 const (
-	IS_START = consts.IS_START
-	IS_STOP  = consts.IS_STOP
+	IsStart = consts.IS_START
+	IsStop  = consts.IS_STOP
 
 	MinPlayers = 3
 	MaxPlayers = 6
