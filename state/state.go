@@ -1,14 +1,12 @@
 package state
 
 import (
-	"bytes"
-	"fmt"
 	"github.com/ratel-online/core/log"
+	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/state/classics"
 	"github.com/ratel-online/server/state/laizi"
-	"runtime"
 	"strings"
 )
 
@@ -37,16 +35,7 @@ func Run(player *database.Player) {
 	player.State(consts.StateWelcome)
 	defer func() {
 		if err := recover(); err != nil {
-			buf := bytes.Buffer{}
-			buf.WriteString(fmt.Sprintf("%v\n", err))
-			for i := 1; ; i++ {
-				pc, file, line, ok := runtime.Caller(i)
-				if !ok {
-					break
-				}
-				buf.WriteString(fmt.Sprintf("%s:%d (0x%x)\n", file, line, pc))
-			}
-			fmt.Println(buf.String())
+			async.PrintStackTrace(err)
 		}
 		log.Infof("player %s state machine break up.\n", player)
 	}()
@@ -55,6 +44,7 @@ func Run(player *database.Player) {
 		stateId, err := state.Next(player)
 		if err != nil {
 			if err1, ok := err.(consts.Error); ok {
+				log.Error(err1)
 				if err1.Exit {
 					stateId = state.Exit(player)
 				}

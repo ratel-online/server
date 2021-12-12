@@ -19,8 +19,10 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, consts.ErrorsExist
 	}
 	access := false
+	player.StartTransaction()
+	defer player.StopTransaction()
 	for {
-		signal, err := player.AskForString(time.Second)
+		signal, err := player.AskForStringWithoutTransaction(time.Second)
 		if err != nil && err != consts.ErrorsTimeout {
 			return 0, err
 		}
@@ -57,7 +59,7 @@ func (*waiting) Exit(player *database.Player) consts.StateID {
 	room := database.GetRoom(player.RoomID)
 	if room != nil {
 		isOwner := room.Creator == player.ID
-		database.LeaveRoom(player.RoomID, player.ID)
+		database.LeaveRoom(room.ID, player.ID)
 		database.Broadcast(room.ID, fmt.Sprintf("%s exited room! room current has %d players\n", player.Name, room.Players))
 		if isOwner {
 			newOwner := database.GetPlayer(room.Creator)

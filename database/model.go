@@ -44,13 +44,12 @@ func (p *Player) Listening() error {
 		}
 		if p.read {
 			p.data <- pack
-			p.read = false
 		}
 	}
 }
 
 func (p *Player) WriteString(data string) error {
-	time.Sleep(10 * time.Millisecond)
+	//time.Sleep(10 * time.Millisecond)
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(data),
 	})
@@ -66,17 +65,17 @@ func (p *Player) WriteError(err error) error {
 }
 
 func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
-	err := p.WriteString(consts.IS)
-	if err != nil {
-		return nil, err
-	}
-	p.read = true
+	p.StartTransaction()
+	defer p.StopTransaction()
+	return p.askForPacket(timeout...)
+}
+
+func (p *Player) askForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
 	var packet *protocol.Packet
 	if len(timeout) > 0 {
 		select {
 		case packet = <-p.data:
 		case <-time.After(timeout[0]):
-			p.read = false
 			return nil, consts.ErrorsTimeout
 		}
 	} else {
@@ -116,6 +115,24 @@ func (p *Player) AskForString(timeout ...time.Duration) (string, error) {
 	return packet.String(), nil
 }
 
+func (p *Player) AskForStringWithoutTransaction(timeout ...time.Duration) (string, error) {
+	packet, err := p.askForPacket(timeout...)
+	if err != nil {
+		return "", err
+	}
+	return packet.String(), nil
+}
+
+func (p *Player) StartTransaction() {
+	p.read = true
+	_ = p.WriteString(consts.IS_START)
+}
+
+func (p *Player) StopTransaction() {
+	p.read = false
+	_ = p.WriteString(consts.IS_STOP)
+}
+
 func (p *Player) State(s consts.StateID) {
 	p.state = s
 }
@@ -124,17 +141,9 @@ func (p *Player) GetState() consts.StateID {
 	return p.state
 }
 
-func (p *Player) Online(online bool) {
-	p.online = online
-}
-
-func (p *Player) IsOnline() bool {
-	return p.online
-}
-
 func (p *Player) Conn(conn *network.Conn) {
 	p.conn = conn
-	p.data = make(chan *protocol.Packet)
+	p.data = make(chan *protocol.Packet, 8)
 	p.online = true
 }
 

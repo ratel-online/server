@@ -40,6 +40,7 @@ func handle(rwc protocol.ReadWriteCloser) error {
 
 func loginAuth(c *network.Conn) (*model.AuthInfo, error) {
 	authChan := make(chan *model.AuthInfo)
+	defer close(authChan)
 	async.Async(func() {
 		packet, err := c.Read()
 		if err != nil {
