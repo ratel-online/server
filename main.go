@@ -1,19 +1,17 @@
 package main
 
 import (
-	"fmt"
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/server/network"
 )
 
 func main() {
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println("main", err)
-			async.PrintStackTrace(err)
-		}
-	}()
+	async.Async(func() {
+		wsServer := network.NewWebsocketServer(":9998")
+		log.Panic(wsServer.Serve())
+	})
+
 	server := network.NewTcpServer(":9999")
-	log.Error(server.Serve())
+	log.Panic(server.Serve())
 }

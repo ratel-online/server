@@ -231,7 +231,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 		universalPokers := make(modelx.Pokers, 0)
 		realSellKeys := make([]int, 0)
 		for _, v := range pokers {
-			if v.OAA {
+			if v.Oaa {
 				universalPokers = append(universalPokers, v)
 			} else {
 				normalPokers[v.Key] = append(normalPokers[v.Key], v)
