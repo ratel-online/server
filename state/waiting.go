@@ -18,32 +18,9 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
-	access := false
-	player.StartTransaction()
-	defer player.StopTransaction()
-	for {
-		signal, err := player.AskForStringWithoutTransaction(time.Second)
-		if err != nil && err != consts.ErrorsTimeout {
-			return 0, err
-		}
-		if room.State == consts.RoomStateRunning {
-			access = true
-			break
-		}
-		signal = strings.ToLower(signal)
-		if signal == "ls" || signal == "v" {
-			viewRoomPlayers(room, player)
-		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
-			access = true
-			room.Lock()
-			room.Game, err = initGame(room)
-			if err != nil {
-				return 0, err
-			}
-			room.State = consts.RoomStateRunning
-			room.Unlock()
-			break
-		}
+	access, err := waitingForStart(player, room)
+	if err != nil {
+		return 0, err
 	}
 	if access {
 		if room.Type == consts.GameTypeClassic {
@@ -67,6 +44,37 @@ func (*waiting) Exit(player *database.Player) consts.StateID {
 		}
 	}
 	return consts.StateHome
+}
+
+func waitingForStart(player *database.Player, room *database.Room) (bool, error) {
+	access := false
+	player.StartTransaction()
+	defer player.StopTransaction()
+	for {
+		signal, err := player.AskForStringWithoutTransaction(time.Second)
+		if err != nil && err != consts.ErrorsTimeout {
+			return access, err
+		}
+		if room.State == consts.RoomStateRunning {
+			access = true
+			break
+		}
+		signal = strings.ToLower(signal)
+		if signal == "ls" || signal == "v" {
+			viewRoomPlayers(room, player)
+		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
+			access = true
+			room.Lock()
+			room.Game, err = initGame(room)
+			if err != nil {
+				return access, err
+			}
+			room.State = consts.RoomStateRunning
+			room.Unlock()
+			break
+		}
+	}
+	return access, nil
 }
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {

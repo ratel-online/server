@@ -50,7 +50,6 @@ func Run(player *database.Player) {
 				}
 			} else {
 				state.Exit(player)
-				log.Error(err)
 				break
 			}
 		}

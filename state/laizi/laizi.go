@@ -362,13 +362,20 @@ func InitGame(room *database.Room) (*database.Game, error) {
 }
 
 func resetGame(game *database.Game) error {
-	distributes, _ := poker.Distribute(len(game.Players), rules)
+	distributes, sets := poker.Distribute(len(game.Players), rules)
 	if len(distributes) != len(game.Players)+1 {
 		return consts.ErrorsGamePlayersInvalid
 	}
 	players := game.Players
 	for i := range players {
 		game.Pokers[players[i]] = distributes[i]
+	}
+	mnemonic := map[int]int{
+		14: sets,
+		15: sets,
+	}
+	for i := 1; i <= 13; i++ {
+		mnemonic[i] = 4 * sets
 	}
 	game.Groups = map[int64]int{}
 	game.FirstPlayer = 0
@@ -377,7 +384,8 @@ func resetGame(game *database.Game) error {
 	game.LastRob = 0
 	game.FinalRob = false
 	game.Multiple = 1
-	game.OAA = make([]int, 0)
+	game.OAA = []int{poker.Random(14, 15)}
+	game.Mnemonic = mnemonic
 	return nil
 }
 
@@ -396,13 +404,17 @@ func viewGame(game *database.Game, currPlayer *database.Player) {
 		}
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name+flag, len(game.Pokers[id]), identity))
 	}
+	currKeys := map[int]int{}
+	for _, currPoker := range game.Pokers[currPlayer.ID] {
+		currKeys[currPoker.Key]++
+	}
 	buf.WriteString("Pokers  : ")
 	for _, i := range consts.MnemonicSorted {
 		buf.WriteString(poker.GetDesc(i) + "  ")
 	}
 	buf.WriteString("\nSurplus : ")
 	for _, i := range consts.MnemonicSorted {
-		buf.WriteString(strconv.Itoa(game.Mnemonic[i]) + "  ")
+		buf.WriteString(strconv.Itoa(game.Mnemonic[i]-currKeys[i]) + "  ")
 		if i == 10 {
 			buf.WriteString(" ")
 		}

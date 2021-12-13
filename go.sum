@@ -1,6 +1,4 @@
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
-github.com/awesome-cap/hashmap v0.0.0-20210722064206-97baca51c69a h1:hrpN+VE7L4LGZ4z7dKCxGRx2F3aUqTOcwHBJVeHW38Q=
-github.com/awesome-cap/hashmap v0.0.0-20210722064206-97baca51c69a/go.mod h1:5vIRKw3P2HirHOPm1xQfJ6GmPfZQemzbIXfU0MqLlZU=
 github.com/awesome-cap/hashmap v0.0.0-20211211100532-e3300ac4ae14 h1:YH6IXdLClQbuKrhYdyXYzdE9cicwU7HaD7YDMmo0oRY=
 github.com/awesome-cap/hashmap v0.0.0-20211211100532-e3300ac4ae14/go.mod h1:5vIRKw3P2HirHOPm1xQfJ6GmPfZQemzbIXfU0MqLlZU=
 github.com/awesome-cap/im v0.0.0-20210720090440-7556eb92965d h1:lc5kZK/lqmqAfNeXcRPkwXKdwO/9fQ09Wpz9p/qp4So=

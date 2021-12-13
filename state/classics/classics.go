@@ -369,13 +369,17 @@ func viewGame(game *database.Game, currPlayer *database.Player) {
 		}
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name+flag, len(game.Pokers[id]), identity))
 	}
+	currKeys := map[int]int{}
+	for _, currPoker := range game.Pokers[currPlayer.ID] {
+		currKeys[currPoker.Key]++
+	}
 	buf.WriteString("Pokers  : ")
 	for _, i := range consts.MnemonicSorted {
 		buf.WriteString(poker.GetDesc(i) + "  ")
 	}
 	buf.WriteString("\nSurplus : ")
 	for _, i := range consts.MnemonicSorted {
-		buf.WriteString(strconv.Itoa(game.Mnemonic[i]) + "  ")
+		buf.WriteString(strconv.Itoa(game.Mnemonic[i]-currKeys[i]) + "  ")
 		if i == 10 {
 			buf.WriteString(" ")
 		}

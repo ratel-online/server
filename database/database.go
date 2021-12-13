@@ -42,8 +42,6 @@ func Disconnected(conn *network.Conn) {
 	if v, ok := connPlayers.Get(conn.ID()); ok {
 		player := v.(*Player)
 		roomId := player.RoomID
-		player.state = consts.StateWelcome
-		player.RoomID = 0
 		close(player.data)
 		offline(roomId, player.ID)
 		Broadcast(roomId, fmt.Sprintf("%s lost connection!\n", player.Name))
@@ -65,7 +63,6 @@ func CreateRoom(creator int64) *Room {
 
 func deleteRoom(room *Room) {
 	if room != nil {
-		fmt.Println("delete", room.ID)
 		rooms.Del(room.ID)
 		roomPlayers.Del(room.ID)
 		deleteGame(room.Game)
@@ -136,9 +133,9 @@ func JoinRoom(roomId, playerId int64) error {
 	players := getRoomPlayers(roomId)
 	if players != nil {
 		players[playerId] = true
+		room.Players++
+		player.RoomID = roomId
 	}
-	room.Players++
-	player.RoomID = roomId
 	return nil
 }
 
@@ -156,16 +153,19 @@ func leaveRoom(room *Room, player *Player) {
 		return
 	}
 	roomPlayers := getRoomPlayers(room.ID)
-	room.Players--
-	delete(roomPlayers, player.ID)
+	if _, ok := roomPlayers[player.ID]; ok {
+		room.Players--
+		player.RoomID = 0
+		delete(roomPlayers, player.ID)
+		if len(roomPlayers) > 0 && room.Creator == player.ID {
+			for k := range roomPlayers {
+				room.Creator = k
+				break
+			}
+		}
+	}
 	if len(roomPlayers) == 0 {
 		deleteRoom(room)
-	}
-	if len(roomPlayers) > 0 && room.Creator == player.ID {
-		for k := range roomPlayers {
-			room.Creator = k
-			break
-		}
 	}
 	return
 }
@@ -177,20 +177,17 @@ func offline(roomId, playerId int64) {
 		defer room.Unlock()
 		if room.State == consts.RoomStateWaiting {
 			leaveRoom(room, getPlayer(playerId))
-			return
 		}
-		if room.State == consts.RoomStateRunning {
-			living := false
-			roomPlayers := getRoomPlayers(room.ID)
-			for id := range roomPlayers {
-				if getPlayer(id).online {
-					living = true
-					break
-				}
+		living := false
+		roomPlayers := getRoomPlayers(room.ID)
+		for id := range roomPlayers {
+			if getPlayer(id).online {
+				living = true
+				break
 			}
-			if !living {
-				deleteRoom(room)
-			}
+		}
+		if !living {
+			deleteRoom(room)
 		}
 	}
 }
