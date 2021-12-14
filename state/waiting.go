@@ -80,7 +80,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
-	for playerId := range database.RoomPlayers(room.ID) {
+	for playerId := range database.GetRoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"

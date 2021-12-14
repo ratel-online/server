@@ -3,8 +3,6 @@ package database
 import (
 	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/core/log"
-	modelx "github.com/ratel-online/core/model"
-	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/server/consts"
@@ -28,18 +26,6 @@ func init() {
 			})
 		}
 	})
-}
-
-func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
-	player := &Player{
-		ID:    info.ID,
-		Name:  info.Name,
-		Score: info.Score,
-	}
-	player.Conn(conn)
-	players.Set(info.ID, player)
-	connPlayers.Set(conn.ID(), player)
-	return player
 }
 
 func CreateRoom(creator int64) *Room {
@@ -190,7 +176,7 @@ func roomCancel(room *Room) {
 	}
 }
 
-func RoomPlayers(roomId int64) map[int64]bool {
+func GetRoomPlayers(roomId int64) map[int64]bool {
 	return getRoomPlayers(roomId)
 }
 

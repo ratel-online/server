@@ -2,11 +2,13 @@ package database
 
 import (
 	"fmt"
+	constx "github.com/ratel-online/core/consts"
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/protocol"
 	"github.com/ratel-online/core/util/arrays"
+	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/server/consts"
 	"strings"
@@ -15,18 +17,28 @@ import (
 )
 
 type Player struct {
+	conn     *network.Conn
+	online   bool
+	channels map[int]chan *protocol.Packet
+
 	ID     int64  `json:"id"`
 	Name   string `json:"name"`
 	Score  int64  `json:"score"`
 	Mode   int    `json:"mode"`
 	Type   int    `json:"type"`
 	RoomID int64  `json:"roomId"`
+}
 
-	conn   *network.Conn
-	data   chan *protocol.Packet
-	read   bool
-	state  consts.StateID
-	online bool
+func NewPlayer(conn *network.Conn) *Player {
+	player := &Player{}
+	player.conn = conn
+	player.online = true
+	player.channels = map[int]chan *protocol.Packet{}
+	for i := 1; i <= 3; i++ {
+		player.channels[i] = make(chan *protocol.Packet, 10)
+	}
+	connPlayers.Set(conn.ID(), player)
+	return player
 }
 
 func (p *Player) Write(bytes []byte) error {
@@ -35,10 +47,41 @@ func (p *Player) Write(bytes []byte) error {
 	})
 }
 
+func (p *Player) Auth() error {
+	authChan := make(chan *model.AuthInfo)
+	defer close(authChan)
+	async.Async(func() {
+		packet, err := p.conn.Read()
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		authInfo := &model.AuthInfo{}
+		err = packet.Unmarshal(authInfo)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		authChan <- authInfo
+	})
+	select {
+	case authInfo := <-authChan:
+		p.ID = authInfo.ID
+		p.Name = authInfo.Name
+		p.Score = authInfo.Score
+		log.Infof("player auth accessed, %d:%s\n", authInfo.ID, authInfo.Name)
+		return nil
+	case <-time.After(3 * time.Second):
+		return consts.ErrorsAuthFail
+	}
+}
+
 func (p *Player) Offline() {
 	p.online = false
 	_ = p.conn.Close()
-	close(p.data)
+	for _, c := range p.channels {
+		close(c)
+	}
 	room := getRoom(p.RoomID)
 	if room != nil {
 		room.Lock()
@@ -53,13 +96,19 @@ func (p *Player) Offline() {
 
 func (p *Player) Listening() error {
 	for {
-		pack, err := p.conn.Read()
+		packet, err := p.conn.Read()
 		if err != nil {
 			log.Error(err)
 			return err
 		}
-		if p.read {
-			p.data <- pack
+		req := model.Req{}
+		err = packet.Unmarshal(&req)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		if c, ok := p.channels[req.Type]; ok {
+			c <- packet
 		}
 	}
 }
@@ -95,12 +144,12 @@ func (p *Player) askForPacket(timeout ...time.Duration) (*protocol.Packet, error
 	var packet *protocol.Packet
 	if len(timeout) > 0 {
 		select {
-		case packet = <-p.data:
+		case packet = <-p.channels[constx.Instruct]:
 		case <-time.After(timeout[0]):
 			return nil, consts.ErrorsTimeout
 		}
 	} else {
-		packet = <-p.data
+		packet = <-p.channels[constx.Instruct]
 	}
 	if packet == nil {
 		return nil, consts.ErrorsChanClosed
@@ -145,27 +194,18 @@ func (p *Player) AskForStringWithoutTransaction(timeout ...time.Duration) (strin
 }
 
 func (p *Player) StartTransaction() {
-	p.read = true
 	_ = p.WriteString(consts.IsStart)
 }
 
 func (p *Player) StopTransaction() {
-	p.read = false
 	_ = p.WriteString(consts.IsStop)
 }
 
 func (p *Player) State(s consts.StateID) {
-	p.state = s
 }
 
 func (p *Player) GetState() consts.StateID {
-	return p.state
-}
-
-func (p *Player) Conn(conn *network.Conn) {
-	p.conn = conn
-	p.data = make(chan *protocol.Packet, 8)
-	p.online = true
+	return 0
 }
 
 func (p Player) Model() model.Player {
@@ -173,11 +213,6 @@ func (p Player) Model() model.Player {
 		ID:    p.ID,
 		Name:  p.Name,
 		Score: p.Score,
-	}
-	room := getRoom(p.RoomID)
-	if room != nil && room.Game != nil {
-		modelPlayer.Pokers = len(room.Game.Pokers[p.ID])
-		modelPlayer.Group = room.Game.Groups[p.ID]
 	}
 	return modelPlayer
 }
@@ -198,7 +233,7 @@ type Room struct {
 	Creator int64 `json:"creator"`
 }
 
-func (r Room) Model() model.Room {
+func (r *Room) Model() model.Room {
 	return model.Room{
 		ID:        r.ID,
 		Type:      r.Type,
@@ -215,8 +250,8 @@ type Game struct {
 	Groups      map[int64]int          `json:"groups"`
 	States      map[int64]chan int     `json:"states"`
 	Pokers      map[int64]model.Pokers `json:"pokers"`
-	OAA         []int                  `json:"oaa"`
-	Additional  model.Pokers           `json:"pocket"`
+	Universals  []int                  `json:"universals"`
+	Additional  model.Pokers           `json:"additional"`
 	Multiple    int                    `json:"multiple"`
 	FirstPlayer int64                  `json:"firstPlayer"`
 	LastPlayer  int64                  `json:"lastPlayer"`
@@ -226,6 +261,31 @@ type Game struct {
 	LastFaces   *model.Faces           `json:"lastFaces"`
 	LastPokers  model.Pokers           `json:"lastPokers"`
 	Mnemonic    map[int]int            `json:"mnemonic"`
+}
+
+func (g Game) Model() model.Game {
+	modelPokers := map[int64]int{}
+	for id, pokers := range g.Pokers {
+		modelPokers[id] = len(pokers)
+	}
+	modelLastPokers := make([]int, 0)
+	if len(g.LastPokers) > 0 {
+		modelLastPokers = g.LastPokers.Keys()
+	}
+	modelAdditional := make([]int, 0)
+	if len(g.Additional) > 0 {
+		modelAdditional = g.Additional.Keys()
+	}
+	return model.Game{
+		Players:    g.Players,
+		Pokers:     modelPokers,
+		Groups:     g.Groups,
+		Mnemonic:   g.Mnemonic,
+		LastPokers: modelLastPokers,
+		LastPlayer: g.LastPlayer,
+		Universals: g.Universals,
+		Additional: modelAdditional,
+	}
 }
 
 func (g Game) NextPlayer(curr int64) int64 {

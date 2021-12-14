@@ -300,7 +300,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 func InitGame(room *database.Room) (*database.Game, error) {
 	distributes, sets := poker.Distribute(room.Players, rules)
 	players := make([]int64, 0)
-	roomPlayers := database.RoomPlayers(room.ID)
+	roomPlayers := database.GetRoomPlayers(room.ID)
 	for playerId := range roomPlayers {
 		players = append(players, playerId)
 	}

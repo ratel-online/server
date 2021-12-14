@@ -3,28 +3,16 @@ package render
 import (
 	"bytes"
 	"fmt"
-	constx "github.com/ratel-online/core/consts"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 )
-
-func Welcome(player *database.Player) error {
-	return player.WriteObject(model.Data{
-		Code: constx.CodeWelcome,
-		Msg:  fmt.Sprintf("Hi %s, Welcome to ratel online! \n", player.Name),
-	})
-}
 
 func HomeOptions(player *database.Player) error {
 	buf := bytes.Buffer{}
 	buf.WriteString("1.Join\n")
 	buf.WriteString("2.New\n")
 	return player.WriteObject(model.Options{
-		Data: model.Data{
-			Code: constx.CodeHomeOptions,
-			Msg:  buf.String(),
-		},
 		Options: []model.Option{
 			{ID: 1, Name: "Join"},
 			{ID: 2, Name: "New"},
@@ -41,10 +29,6 @@ func GameTypeOptions(player *database.Player) error {
 		options = append(options, model.Option{ID: id, Name: consts.GameTypes[id]})
 	}
 	return player.WriteObject(model.Options{
-		Data: model.Data{
-			Code: constx.CodeGameTypeOptions,
-			Msg:  buf.String(),
-		},
 		Options: options,
 	})
 }
@@ -60,10 +44,6 @@ func RoomList(player *database.Player) error {
 		modelRooms = append(modelRooms, room.Model())
 	}
 	return player.WriteObject(model.RoomList{
-		Data: model.Data{
-			Code: constx.CodeRoomList,
-			Msg:  buf.String(),
-		},
 		Rooms: modelRooms,
 	})
 }
@@ -71,7 +51,7 @@ func RoomList(player *database.Player) error {
 func RoomInfo(player *database.Player, room *database.Room) error {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
-	for playerId := range database.RoomPlayers(room.ID) {
+	for playerId := range database.GetRoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"
@@ -88,10 +68,6 @@ func Error(player *database.Player, err error) error {
 
 func Join(player *database.Player, room *database.Room) {
 	database.BroadcastObject(room.ID, model.RoomEvent{
-		Data: model.Data{
-			Code: constx.CodeRoomEventJoin,
-			Msg:  fmt.Sprintf("%s joined room! room current has %d players\n", player.Name, room.Players),
-		},
 		Room:   room.Model(),
 		Player: player.Model(),
 	})
@@ -99,10 +75,6 @@ func Join(player *database.Player, room *database.Room) {
 
 func Exit(player *database.Player, room *database.Room) {
 	database.BroadcastObject(room.ID, model.RoomEvent{
-		Data: model.Data{
-			Code: constx.CodeRoomEventExit,
-			Msg:  fmt.Sprintf("%s exited room! room current has %d players\n", player.Name, room.Players),
-		},
 		Room:   room.Model(),
 		Player: player.Model(),
 	})
@@ -110,10 +82,6 @@ func Exit(player *database.Player, room *database.Room) {
 
 func Offline(player *database.Player, room *database.Room) {
 	database.BroadcastObject(room.ID, model.RoomEvent{
-		Data: model.Data{
-			Code: constx.CodeRoomEventOffline,
-			Msg:  fmt.Sprintf("%s lost connection", player.Name),
-		},
 		Room:   room.Model(),
 		Player: player.Model(),
 	})
@@ -121,10 +89,6 @@ func Offline(player *database.Player, room *database.Room) {
 
 func OwnerChange(player *database.Player, room *database.Room) {
 	database.BroadcastObject(room.ID, model.RoomEvent{
-		Data: model.Data{
-			Code: constx.CodeRoomEventOwnerChange,
-			Msg:  fmt.Sprintf("%s become new owner\n", player.Name),
-		},
 		Room:   room.Model(),
 		Player: player.Model(),
 	})

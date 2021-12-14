@@ -70,12 +70,12 @@ func (s *LaiZi) Next(player *database.Player) (consts.StateID, error) {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
 	game := room.Game
-	game.Pokers[player.ID].SetOaa(game.OAA[0])
+	game.Pokers[player.ID].SetOaa(game.Universals[0])
 	game.Pokers[player.ID].SortByOaaValue()
 
 	buf := bytes.Buffer{}
 	buf.WriteString("Game starting!\n")
-	buf.WriteString(fmt.Sprintf("The first universal poker is: %s\n", poker.GetDesc(game.OAA[0])))
+	buf.WriteString(fmt.Sprintf("The first universal poker is: %s\n", poker.GetDesc(game.Universals[0])))
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].OaaString()))
 	err := player.WriteString(buf.String())
 	if err != nil {
@@ -131,7 +131,7 @@ func handleRob(player *database.Player, game *database.Game) error {
 			}
 		} else if game.FirstRob == game.LastRob {
 			landlord := database.GetPlayer(game.LastRob)
-			lastOaa := poker.Random(14, 15, game.OAA[0])
+			lastOaa := poker.Random(14, 15, game.Universals[0])
 			buf := bytes.Buffer{}
 			buf.WriteString(fmt.Sprintf("%s become landlord, got more pokers: %s\n", landlord.Name, game.Additional.String()))
 			buf.WriteString(fmt.Sprintf("The last universal poker is: %s\n", poker.GetDesc(lastOaa)))
@@ -140,9 +140,9 @@ func handleRob(player *database.Player, game *database.Game) error {
 			game.LastPlayer = landlord.ID
 			game.Groups[landlord.ID] = 1
 			game.Pokers[landlord.ID] = append(game.Pokers[landlord.ID], game.Additional...)
-			game.OAA = append(game.OAA, lastOaa)
+			game.Universals = append(game.Universals, lastOaa)
 			for _, pokers := range game.Pokers {
-				pokers.SetOaa(game.OAA...)
+				pokers.SetOaa(game.Universals...)
 				pokers.SortByOaaValue()
 			}
 			game.States[landlord.ID] <- statePlay
@@ -325,7 +325,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 func InitGame(room *database.Room) (*database.Game, error) {
 	distributes, sets := poker.Distribute(room.Players, rules)
 	players := make([]int64, 0)
-	roomPlayers := database.RoomPlayers(room.ID)
+	roomPlayers := database.GetRoomPlayers(room.ID)
 	for playerId := range roomPlayers {
 		players = append(players, playerId)
 	}
@@ -356,7 +356,7 @@ func InitGame(room *database.Room) (*database.Game, error) {
 		Pokers:     pokers,
 		Additional: distributes[len(distributes)-1],
 		Multiple:   1,
-		OAA:        []int{poker.Random(14, 15)},
+		Universals: []int{poker.Random(14, 15)},
 		Mnemonic:   mnemonic,
 	}, nil
 }
@@ -384,7 +384,7 @@ func resetGame(game *database.Game) error {
 	game.LastRob = 0
 	game.FinalRob = false
 	game.Multiple = 1
-	game.OAA = []int{poker.Random(14, 15)}
+	game.Universals = []int{poker.Random(14, 15)}
 	game.Mnemonic = mnemonic
 	return nil
 }
@@ -420,7 +420,7 @@ func viewGame(game *database.Game, currPlayer *database.Player) {
 		}
 	}
 	buf.WriteString("\nThe Universal pokers are: ")
-	for _, key := range game.OAA {
+	for _, key := range game.Universals {
 		buf.WriteString(poker.GetDesc(key) + " ")
 	}
 	buf.WriteString("\n")
