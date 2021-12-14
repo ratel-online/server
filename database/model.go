@@ -35,11 +35,26 @@ func (p *Player) Write(bytes []byte) error {
 	})
 }
 
+func (p *Player) Offline() {
+	p.online = false
+	_ = p.conn.Close()
+	close(p.data)
+	room := getRoom(p.RoomID)
+	if room != nil {
+		room.Lock()
+		defer room.Unlock()
+		Broadcast(room.ID, fmt.Sprintf("%s lost connection!\n", p.Name))
+		if room.State == consts.RoomStateWaiting {
+			leaveRoom(room, p)
+		}
+		roomCancel(room)
+	}
+}
+
 func (p *Player) Listening() error {
 	for {
 		pack, err := p.conn.Read()
 		if err != nil {
-			p.online = false
 			log.Error(err)
 			return err
 		}

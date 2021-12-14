@@ -44,11 +44,11 @@ func Run(player *database.Player) {
 		stateId, err := state.Next(player)
 		if err != nil {
 			if err1, ok := err.(consts.Error); ok {
-				log.Error(err1)
 				if err1.Exit {
 					stateId = state.Exit(player)
 				}
 			} else {
+				log.Error(err)
 				state.Exit(player)
 				break
 			}

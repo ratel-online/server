@@ -1,14 +1,16 @@
 package database
 
 import (
-	"fmt"
 	"github.com/awesome-cap/hashmap"
+	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
+	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/server/consts"
 	"sort"
 	"sync/atomic"
+	"time"
 )
 
 var roomIds int64 = 0
@@ -17,14 +19,16 @@ var connPlayers = hashmap.New()
 var rooms = hashmap.New()
 var roomPlayers = hashmap.New()
 
-//func init() {
-//	async.Async(func() {
-//		for {
-//			time.Sleep(10 * time.Second)
-//			log.Infof("current conn %d\n", len(connPlayers))
-//		}
-//	})
-//}
+func init() {
+	async.Async(func() {
+		for {
+			time.Sleep(1 * time.Minute)
+			rooms.Foreach(func(e *hashmap.Entry) {
+				roomCancel(e.Value().(*Room))
+			})
+		}
+	})
+}
 
 func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	player := &Player{
@@ -36,17 +40,6 @@ func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	players.Set(info.ID, player)
 	connPlayers.Set(conn.ID(), player)
 	return player
-}
-
-func Disconnected(conn *network.Conn) {
-	if v, ok := connPlayers.Get(conn.ID()); ok {
-		player := v.(*Player)
-		roomId := player.RoomID
-		close(player.data)
-		offline(roomId, player.ID)
-		Broadcast(roomId, fmt.Sprintf("%s lost connection!\n", player.Name))
-	}
-	connPlayers.Del(conn.ID())
 }
 
 func CreateRoom(creator int64) *Room {
@@ -130,9 +123,9 @@ func JoinRoom(roomId, playerId int64) error {
 	if room.Players >= consts.MaxPlayers {
 		return consts.ErrorsRoomPlayersIsFull
 	}
-	players := getRoomPlayers(roomId)
-	if players != nil {
-		players[playerId] = true
+	playersIds := getRoomPlayers(roomId)
+	if playersIds != nil {
+		playersIds[playerId] = true
 		room.Players++
 		player.RoomID = roomId
 	}
@@ -152,19 +145,19 @@ func leaveRoom(room *Room, player *Player) {
 	if room == nil || player == nil {
 		return
 	}
-	roomPlayers := getRoomPlayers(room.ID)
-	if _, ok := roomPlayers[player.ID]; ok {
+	playersIds := getRoomPlayers(room.ID)
+	if _, ok := playersIds[player.ID]; ok {
 		room.Players--
 		player.RoomID = 0
-		delete(roomPlayers, player.ID)
-		if len(roomPlayers) > 0 && room.Creator == player.ID {
-			for k := range roomPlayers {
+		delete(playersIds, player.ID)
+		if len(playersIds) > 0 && room.Creator == player.ID {
+			for k := range playersIds {
 				room.Creator = k
 				break
 			}
 		}
 	}
-	if len(roomPlayers) == 0 {
+	if len(playersIds) == 0 {
 		deleteRoom(room)
 	}
 	return
@@ -178,17 +171,22 @@ func offline(roomId, playerId int64) {
 		if room.State == consts.RoomStateWaiting {
 			leaveRoom(room, getPlayer(playerId))
 		}
-		living := false
-		roomPlayers := getRoomPlayers(room.ID)
-		for id := range roomPlayers {
-			if getPlayer(id).online {
-				living = true
-				break
-			}
+		roomCancel(room)
+	}
+}
+
+func roomCancel(room *Room) {
+	living := false
+	playerIds := getRoomPlayers(room.ID)
+	for id := range playerIds {
+		if getPlayer(id).online {
+			living = true
+			break
 		}
-		if !living {
-			deleteRoom(room)
-		}
+	}
+	if !living {
+		log.Infof("room %d is not living, removed.\n", room.ID)
+		deleteRoom(room)
 	}
 }
 
@@ -223,8 +221,8 @@ func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {
 		excludeSet[exc] = true
 	}
 	msg := json.Marshal(object)
-	roomPlayers := getRoomPlayers(roomId)
-	for playerId := range roomPlayers {
+	playerIds := getRoomPlayers(roomId)
+	for playerId := range playerIds {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
 			_ = player.WriteString(string(msg))
 		}
