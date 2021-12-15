@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/service"
 	"github.com/ratel-online/server/state/classics"
 	"github.com/ratel-online/server/state/laizi"
 	"strings"
@@ -13,8 +13,8 @@ import (
 
 type waiting struct{}
 
-func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
-	room := database.GetRoom(player.RoomID)
+func (s *waiting) Next(player *service.Player) (consts.StateID, error) {
+	room := service.GetRoom(player.RoomID)
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
@@ -32,21 +32,21 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	return s.Exit(player), nil
 }
 
-func (*waiting) Exit(player *database.Player) consts.StateID {
-	room := database.GetRoom(player.RoomID)
+func (*waiting) Exit(player *service.Player) consts.StateID {
+	room := service.GetRoom(player.RoomID)
 	if room != nil {
 		isOwner := room.Creator == player.ID
-		database.LeaveRoom(room.ID, player.ID)
-		database.Broadcast(room.ID, fmt.Sprintf("%s exited room! room current has %d players\n", player.Name, room.Players))
+		service.leaveRoom(room.ID, player.ID)
+		service.broadcast(room.ID, fmt.Sprintf("%s exited room! room current has %d players\n", player.Name, room.Players))
 		if isOwner {
-			newOwner := database.GetPlayer(room.Creator)
-			database.Broadcast(room.ID, fmt.Sprintf("%s become new owner\n", newOwner.Name))
+			newOwner := service.GetPlayer(room.Creator)
+			service.broadcast(room.ID, fmt.Sprintf("%s become new owner\n", newOwner.Name))
 		}
 	}
 	return consts.StateHome
 }
 
-func waitingForStart(player *database.Player, room *database.Room) (bool, error) {
+func waitingForStart(player *service.Player, room *service.Room) (bool, error) {
 	access := false
 	player.StartTransaction()
 	defer player.StopTransaction()
@@ -77,21 +77,21 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 	return access, nil
 }
 
-func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
+func viewRoomPlayers(room *service.Room, currPlayer *service.Player) {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
-	for playerId := range database.GetRoomPlayers(room.ID) {
+	for playerId := range service.GetRoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"
 		}
-		player := database.GetPlayer(playerId)
+		player := service.GetPlayer(playerId)
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
 	_ = currPlayer.WriteString(buf.String())
 }
 
-func initGame(room *database.Room) (*database.Game, error) {
+func initGame(room *service.Room) (*service.Game, error) {
 	if room.Type == consts.GameTypeClassic {
 		return classics.InitGame(room)
 	} else if room.Type == consts.GameTypeLaiZi {

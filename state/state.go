@@ -4,7 +4,7 @@ import (
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/service"
 	"github.com/ratel-online/server/state/classics"
 	"github.com/ratel-online/server/state/laizi"
 	"strings"
@@ -27,11 +27,11 @@ func register(id consts.StateID, state State) {
 }
 
 type State interface {
-	Next(player *database.Player) (consts.StateID, error)
-	Exit(player *database.Player) consts.StateID
+	Next(player *service.Player) (consts.StateID, error)
+	Exit(player *service.Player) consts.StateID
 }
 
-func Run(player *database.Player) {
+func Run(player *service.Player) {
 	player.State(consts.StateWelcome)
 	defer func() {
 		if err := recover(); err != nil {

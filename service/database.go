@@ -1,8 +1,9 @@
-package database
+package service
 
 import (
 	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/core/log"
+	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/server/consts"
@@ -28,7 +29,7 @@ func init() {
 	})
 }
 
-func CreateRoom(creator int64) *Room {
+func createRoom(creator int64) *Room {
 	room := &Room{
 		ID:      atomic.AddInt64(&roomIds, 1),
 		Type:    consts.GameTypeClassic,
@@ -37,6 +38,7 @@ func CreateRoom(creator int64) *Room {
 	}
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
+	_ = joinRoom(room.ID, creator)
 	return room
 }
 
@@ -92,7 +94,7 @@ func getRoomPlayers(roomId int64) map[int64]bool {
 	return nil
 }
 
-func JoinRoom(roomId, playerId int64) error {
+func joinRoom(roomId, playerId int64) error {
 	player := getPlayer(playerId)
 	if player == nil {
 		return consts.ErrorsExist
@@ -118,21 +120,23 @@ func JoinRoom(roomId, playerId int64) error {
 	return nil
 }
 
-func LeaveRoom(roomId, playerId int64) {
+func leaveRoom(roomId, playerId int64) bool {
 	room := getRoom(roomId)
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
-		leaveRoom(room, getPlayer(playerId))
+		return _leaveRoom(room, getPlayer(playerId))
 	}
+	return false
 }
 
-func leaveRoom(room *Room, player *Player) {
+func _leaveRoom(room *Room, player *Player) bool {
 	if room == nil || player == nil {
-		return
+		return false
 	}
 	playersIds := getRoomPlayers(room.ID)
-	if _, ok := playersIds[player.ID]; ok {
+	_, ok := playersIds[player.ID]
+	if ok {
 		room.Players--
 		player.RoomID = 0
 		delete(playersIds, player.ID)
@@ -146,7 +150,7 @@ func leaveRoom(room *Room, player *Player) {
 	if len(playersIds) == 0 {
 		deleteRoom(room)
 	}
-	return
+	return ok
 }
 
 func offline(roomId, playerId int64) {
@@ -155,7 +159,7 @@ func offline(roomId, playerId int64) {
 		room.Lock()
 		defer room.Unlock()
 		if room.State == consts.RoomStateWaiting {
-			leaveRoom(room, getPlayer(playerId))
+			_leaveRoom(room, getPlayer(playerId))
 		}
 		roomCancel(room)
 	}
@@ -180,7 +184,7 @@ func GetRoomPlayers(roomId int64) map[int64]bool {
 	return getRoomPlayers(roomId)
 }
 
-func Broadcast(roomId int64, msg string, exclude ...int64) {
+func broadcast(roomId int64, code int, object interface{}, exclude ...int64) {
 	room := getRoom(roomId)
 	if room == nil {
 		return
@@ -189,24 +193,7 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	for _, exc := range exclude {
 		excludeSet[exc] = true
 	}
-	roomPlayers := getRoomPlayers(roomId)
-	for playerId := range roomPlayers {
-		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
-			_ = player.WriteString(msg)
-		}
-	}
-}
-
-func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {
-	room := getRoom(roomId)
-	if room == nil {
-		return
-	}
-	excludeSet := map[int64]bool{}
-	for _, exc := range exclude {
-		excludeSet[exc] = true
-	}
-	msg := json.Marshal(object)
+	msg := json.Marshal(model.SucBroadcast(code, object))
 	playerIds := getRoomPlayers(roomId)
 	for playerId := range playerIds {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {

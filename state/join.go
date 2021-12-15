@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/service"
 	"strconv"
 )
 
 type join struct{}
 
-func (s *join) Next(player *database.Player) (consts.StateID, error) {
+func (s *join) Next(player *service.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
-	rooms := database.GetRooms()
+	rooms := service.GetRooms()
 	buf.WriteString(fmt.Sprintf("%-10s%-10s%-10s%-10s\n", "ID", "Type", "Players", "State"))
 	for _, room := range rooms {
 		buf.WriteString(fmt.Sprintf("%-10d%-10s%-10d%-10s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
@@ -35,18 +35,18 @@ func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	if err != nil {
 		return 0, player.WriteError(consts.ErrorsRoomInvalid)
 	}
-	room := database.GetRoom(roomId)
+	room := service.GetRoom(roomId)
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsRoomInvalid)
 	}
-	err = database.JoinRoom(roomId, player.ID)
+	err = service.joinRoom(roomId, player.ID)
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	database.Broadcast(roomId, fmt.Sprintf("%s joined room! room current has %d players\n", player.Name, room.Players))
+	service.broadcast(roomId, fmt.Sprintf("%s joined room! room current has %d players\n", player.Name, room.Players))
 	return consts.StateWaiting, nil
 }
 
-func (*join) Exit(player *database.Player) consts.StateID {
+func (*join) Exit(player *service.Player) consts.StateID {
 	return consts.StateHome
 }

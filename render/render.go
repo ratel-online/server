@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/service"
 )
 
-func HomeOptions(player *database.Player) error {
+func HomeOptions(player *service.Player) error {
 	buf := bytes.Buffer{}
 	buf.WriteString("1.Join\n")
 	buf.WriteString("2.New\n")
@@ -20,7 +20,7 @@ func HomeOptions(player *database.Player) error {
 	})
 }
 
-func GameTypeOptions(player *database.Player) error {
+func GameTypeOptions(player *service.Player) error {
 	buf := bytes.Buffer{}
 	buf.WriteString("Please select game type\n")
 	options := make([]model.Option, 0)
@@ -33,14 +33,14 @@ func GameTypeOptions(player *database.Player) error {
 	})
 }
 
-func RoomList(player *database.Player) error {
+func RoomList(player *service.Player) error {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%-10s%-10s%-10s%-10s\n", "ID", "Type", "Players", "State"))
-	for _, room := range database.GetRooms() {
+	for _, room := range service.GetRooms() {
 		buf.WriteString(fmt.Sprintf("%-10d%-10s%-10d%-10s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
 	}
 	modelRooms := make([]model.Room, 0)
-	for _, room := range database.GetRooms() {
+	for _, room := range service.GetRooms() {
 		modelRooms = append(modelRooms, room.Model())
 	}
 	return player.WriteObject(model.RoomList{
@@ -48,47 +48,47 @@ func RoomList(player *database.Player) error {
 	})
 }
 
-func RoomInfo(player *database.Player, room *database.Room) error {
+func RoomInfo(player *service.Player, room *service.Room) error {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
-	for playerId := range database.GetRoomPlayers(room.ID) {
+	for playerId := range service.GetRoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"
 		}
-		info := database.GetPlayer(playerId)
+		info := service.GetPlayer(playerId)
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", info.Name, info.Score, title))
 	}
 	return player.WriteString(buf.String())
 }
 
-func Error(player *database.Player, err error) error {
+func Error(player *service.Player, err error) error {
 	return player.WriteError(err)
 }
 
-func Join(player *database.Player, room *database.Room) {
-	database.BroadcastObject(room.ID, model.RoomEvent{
+func Join(player *service.Player, room *service.Room) {
+	service.BroadcastObject(room.ID, model.RoomEvent{
 		Room:   room.Model(),
 		Player: player.Model(),
 	})
 }
 
-func Exit(player *database.Player, room *database.Room) {
-	database.BroadcastObject(room.ID, model.RoomEvent{
+func Exit(player *service.Player, room *service.Room) {
+	service.BroadcastObject(room.ID, model.RoomEvent{
 		Room:   room.Model(),
 		Player: player.Model(),
 	})
 }
 
-func Offline(player *database.Player, room *database.Room) {
-	database.BroadcastObject(room.ID, model.RoomEvent{
+func Offline(player *service.Player, room *service.Room) {
+	service.BroadcastObject(room.ID, model.RoomEvent{
 		Room:   room.Model(),
 		Player: player.Model(),
 	})
 }
 
-func OwnerChange(player *database.Player, room *database.Room) {
-	database.BroadcastObject(room.ID, model.RoomEvent{
+func OwnerChange(player *service.Player, room *service.Room) {
+	service.BroadcastObject(room.ID, model.RoomEvent{
 		Room:   room.Model(),
 		Player: player.Model(),
 	})

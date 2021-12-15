@@ -7,7 +7,7 @@ import (
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/service"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -64,8 +64,8 @@ func (c _rules) Reserved() bool {
 	return true
 }
 
-func (s *LaiZi) Next(player *database.Player) (consts.StateID, error) {
-	room := database.GetRoom(player.RoomID)
+func (s *LaiZi) Next(player *service.Player) (consts.StateID, error) {
+	room := service.GetRoom(player.RoomID)
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
@@ -113,11 +113,11 @@ func (s *LaiZi) Next(player *database.Player) (consts.StateID, error) {
 	}
 }
 
-func (*LaiZi) Exit(player *database.Player) consts.StateID {
+func (*LaiZi) Exit(player *service.Player) consts.StateID {
 	return consts.StateHome
 }
 
-func handleRob(player *database.Player, game *database.Game) error {
+func handleRob(player *service.Player, game *service.Game) error {
 	if game.FirstPlayer == player.ID && !game.FinalRob {
 		if game.FirstRob == 0 {
 			err := resetGame(game)
@@ -125,17 +125,17 @@ func handleRob(player *database.Player, game *database.Game) error {
 				log.Error(err)
 				return err
 			}
-			database.Broadcast(player.RoomID, "All players have give up the landlord. Game restart.\n")
+			service.broadcast(player.RoomID, "All players have give up the landlord. Game restart.\n")
 			for _, playerId := range game.Players {
 				game.States[playerId] <- stateReset
 			}
 		} else if game.FirstRob == game.LastRob {
-			landlord := database.GetPlayer(game.LastRob)
+			landlord := service.GetPlayer(game.LastRob)
 			lastOaa := poker.Random(14, 15, game.Universals[0])
 			buf := bytes.Buffer{}
 			buf.WriteString(fmt.Sprintf("%s become landlord, got more pokers: %s\n", landlord.Name, game.Additional.String()))
 			buf.WriteString(fmt.Sprintf("The last universal poker is: %s\n", poker.GetDesc(lastOaa)))
-			database.Broadcast(player.RoomID, buf.String())
+			service.broadcast(player.RoomID, buf.String())
 			game.FirstPlayer = landlord.ID
 			game.LastPlayer = landlord.ID
 			game.Groups[landlord.ID] = 1
@@ -155,7 +155,7 @@ func handleRob(player *database.Player, game *database.Game) error {
 	if game.FirstPlayer == 0 {
 		game.FirstPlayer = player.ID
 	}
-	database.Broadcast(player.RoomID, fmt.Sprintf("Please waiting from %s confirm whether to be a landlord. \n", player.Name))
+	service.broadcast(player.RoomID, fmt.Sprintf("Please waiting from %s confirm whether to be a landlord. \n", player.Name))
 	_ = player.WriteString("Would you like to be a landlord: (y or n)\n")
 	ans, err := player.AskForString(consts.LaiZiRobTimeout)
 	if err != nil {
@@ -167,9 +167,9 @@ func handleRob(player *database.Player, game *database.Game) error {
 		}
 		game.LastRob = player.ID
 		game.Multiple *= 2
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s rob landlord\n", player.Name))
+		service.broadcast(player.RoomID, fmt.Sprintf("%s rob landlord\n", player.Name))
 	} else {
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob landlord\n", player.Name))
+		service.broadcast(player.RoomID, fmt.Sprintf("%s don't rob landlord\n", player.Name))
 	}
 	if game.FinalRob {
 		game.FinalRob = false
@@ -181,7 +181,7 @@ func handleRob(player *database.Player, game *database.Game) error {
 	return nil
 }
 
-func handlePlay(player *database.Player, game *database.Game) error {
+func handlePlay(player *service.Player, game *service.Game) error {
 	timeout := consts.LaiZiPlayTimeout
 	master := player.ID == game.LastPlayer || game.LastPlayer == 0
 	for {
@@ -192,7 +192,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 			if !game.IsLandlord(game.LastPlayer) {
 				flag = "peasant"
 			}
-			buf.WriteString(fmt.Sprintf("Last player is %s: %s, sells: %s\n", flag, database.GetPlayer(game.LastPlayer).Name, game.LastPokers.OaaString()))
+			buf.WriteString(fmt.Sprintf("Last player is %s: %s, sells: %s\n", flag, service.GetPlayer(game.LastPlayer).Name, game.LastPokers.OaaString()))
 		}
 		buf.WriteString(fmt.Sprintf("Timeout: %ds, it's your turn to play \n", int(timeout.Seconds())))
 		buf.WriteString(fmt.Sprintf("Pokers: %s\n", game.Pokers[player.ID].OaaString()))
@@ -221,8 +221,8 @@ func handlePlay(player *database.Player, game *database.Game) error {
 				_ = player.WriteError(consts.ErrorsHaveToPlay)
 				continue
 			} else {
-				nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
-				database.Broadcast(player.RoomID, fmt.Sprintf("%s passed, next player is %s \n", player.Name, nextPlayer.Name))
+				nextPlayer := service.GetPlayer(game.NextPlayer(player.ID))
+				service.broadcast(player.RoomID, fmt.Sprintf("%s passed, next player is %s \n", player.Name, nextPlayer.Name))
 				game.States[nextPlayer.ID] <- statePlay
 				return nil
 			}
@@ -302,8 +302,8 @@ func handlePlay(player *database.Player, game *database.Game) error {
 		game.LastFaces = lastFaces
 		game.LastPokers = sells
 		if len(pokers) == 0 {
-			database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, win the game! \n", player.Name, sells.OaaString()))
-			room := database.GetRoom(player.RoomID)
+			service.broadcast(player.RoomID, fmt.Sprintf("%s played %s, win the game! \n", player.Name, sells.OaaString()))
+			room := service.GetRoom(player.RoomID)
 			if room != nil {
 				room.Lock()
 				room.Game = nil
@@ -315,17 +315,17 @@ func handlePlay(player *database.Player, game *database.Game) error {
 			}
 			return nil
 		}
-		nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, next player is %s \n", player.Name, sells.OaaString(), nextPlayer.Name))
+		nextPlayer := service.GetPlayer(game.NextPlayer(player.ID))
+		service.broadcast(player.RoomID, fmt.Sprintf("%s played %s, next player is %s \n", player.Name, sells.OaaString(), nextPlayer.Name))
 		game.States[nextPlayer.ID] <- statePlay
 		return nil
 	}
 }
 
-func InitGame(room *database.Room) (*database.Game, error) {
+func InitGame(room *service.Room) (*service.Game, error) {
 	distributes, sets := poker.Distribute(room.Players, rules)
 	players := make([]int64, 0)
-	roomPlayers := database.GetRoomPlayers(room.ID)
+	roomPlayers := service.GetRoomPlayers(room.ID)
 	for playerId := range roomPlayers {
 		players = append(players, playerId)
 	}
@@ -349,7 +349,7 @@ func InitGame(room *database.Room) (*database.Game, error) {
 	}
 	rand.Seed(time.Now().UnixNano())
 	states[players[rand.Intn(len(states))]] <- stateRob
-	return &database.Game{
+	return &service.Game{
 		States:     states,
 		Players:    players,
 		Groups:     groups,
@@ -361,7 +361,7 @@ func InitGame(room *database.Room) (*database.Game, error) {
 	}, nil
 }
 
-func resetGame(game *database.Game) error {
+func resetGame(game *service.Game) error {
 	distributes, sets := poker.Distribute(len(game.Players), rules)
 	if len(distributes) != len(game.Players)+1 {
 		return consts.ErrorsGamePlayersInvalid
@@ -389,11 +389,11 @@ func resetGame(game *database.Game) error {
 	return nil
 }
 
-func viewGame(game *database.Game, currPlayer *database.Player) {
+func viewGame(game *service.Game, currPlayer *service.Player) {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name v", "Pokers", "Identity"))
 	for _, id := range game.Players {
-		player := database.GetPlayer(id)
+		player := service.GetPlayer(id)
 		flag := ""
 		if id == currPlayer.ID {
 			flag = "*"

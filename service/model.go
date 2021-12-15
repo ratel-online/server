@@ -1,4 +1,4 @@
-package database
+package service
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ import (
 type Player struct {
 	conn     *network.Conn
 	online   bool
-	channels map[int]chan *protocol.Packet
+	channels map[int]chan *model.Req
 
 	ID     int64  `json:"id"`
 	Name   string `json:"name"`
@@ -33,9 +33,9 @@ func NewPlayer(conn *network.Conn) *Player {
 	player := &Player{}
 	player.conn = conn
 	player.online = true
-	player.channels = map[int]chan *protocol.Packet{}
+	player.channels = map[int]chan *model.Req{}
 	for i := 1; i <= 3; i++ {
-		player.channels[i] = make(chan *protocol.Packet, 10)
+		player.channels[i] = make(chan *model.Req, 10)
 	}
 	connPlayers.Set(conn.ID(), player)
 	return player
@@ -86,29 +86,41 @@ func (p *Player) Offline() {
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
-		Broadcast(room.ID, fmt.Sprintf("%s lost connection!\n", p.Name))
+		broadcast(room.ID, fmt.Sprintf("%s lost connection!\n", p.Name))
 		if room.State == consts.RoomStateWaiting {
-			leaveRoom(room, p)
+			_leaveRoom(room, p)
 		}
 		roomCancel(room)
 	}
 }
 
 func (p *Player) Listening() error {
+	async.Async(func() {
+		var req *model.Req
+		for {
+			req = <-p.channels[constx.Service]
+			if req == nil {
+				break
+			}
+			_ = p.WriteObject(servlets.handle(p, *req))
+		}
+	})
 	for {
 		packet, err := p.conn.Read()
 		if err != nil {
 			log.Error(err)
 			return err
 		}
-		req := model.Req{}
-		err = packet.Unmarshal(&req)
+		req := &model.Req{}
+		err = packet.Unmarshal(req)
 		if err != nil {
 			log.Error(err)
 			return err
 		}
 		if c, ok := p.channels[req.Type]; ok {
-			c <- packet
+			if len(c) < cap(c) {
+				c <- req
+			}
 		}
 	}
 }
@@ -141,24 +153,25 @@ func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error
 }
 
 func (p *Player) askForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
-	var packet *protocol.Packet
+	var req *model.Req
 	if len(timeout) > 0 {
 		select {
-		case packet = <-p.channels[constx.Instruct]:
+		case req = <-p.channels[constx.Instruct]:
 		case <-time.After(timeout[0]):
 			return nil, consts.ErrorsTimeout
 		}
 	} else {
-		packet = <-p.channels[constx.Instruct]
+		req = <-p.channels[constx.Instruct]
 	}
-	if packet == nil {
+	if req == nil {
 		return nil, consts.ErrorsChanClosed
 	}
-	single := strings.ToLower(packet.String())
+	single := strings.ToLower(string(req.Data))
 	if single == "exit" || single == "e" {
 		return nil, consts.ErrorsExist
 	}
-	return packet, nil
+	panic("todo")
+	return nil, nil
 }
 
 func (p *Player) AskForInt(timeout ...time.Duration) (int, error) {
