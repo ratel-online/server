@@ -145,12 +145,12 @@ func handleRob(player *database.Player, game *database.Game) error {
 	}
 	if game.FirstPlayer == 0 {
 		game.FirstPlayer = player.ID
+		database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn to rob\n", player.Name), player.ID)
 	}
-	database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn\n", player.Name), player.ID)
 	_ = player.WriteString("Are you want to become landlord? (y or n)\n")
 	ans, err := player.AskForString(consts.ClassicsRobTimeout)
 	if err != nil {
-		ans = "n"
+		ans = "y"
 	}
 	if strings.ToLower(ans) != "n" {
 		if game.FirstRob == 0 {

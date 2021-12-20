@@ -34,10 +34,10 @@ const (
 	GameTypeRunFast = 3
 
 	ClassicsRobTimeout  = 20 * time.Second
-	ClassicsPlayTimeout = 30 * time.Second
+	ClassicsPlayTimeout = 45 * time.Second
 
 	LaiZiRobTimeout  = 20 * time.Second
-	LaiZiPlayTimeout = 30 * time.Second
+	LaiZiPlayTimeout = 45 * time.Second
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
