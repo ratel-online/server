@@ -20,8 +20,8 @@ const (
 )
 
 const (
-	IsStart = consts.IS_START
-	IsStop  = consts.IS_STOP
+	IsStart = consts.IsStart
+	IsStop  = consts.IsStop
 
 	MinPlayers = 3
 	MaxPlayers = 6
@@ -73,7 +73,7 @@ var (
 	GameTypes = map[int]string{
 		GameTypeClassic: "Classic",
 		GameTypeLaiZi:   "LaiZi",
-		GameTypeRunFast: "RunFast",
+		//GameTypeRunFast: "RunFast",
 	}
 	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{

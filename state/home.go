@@ -24,8 +24,6 @@ func (*home) Next(player *database.Player) (consts.StateID, error) {
 		return consts.StateJoin, nil
 	} else if selected == 2 {
 		return consts.StateNew, nil
-	} else if selected == 3 {
-		return consts.StateSetting, nil
 	}
 	return 0, player.WriteError(consts.ErrorsInputInvalid)
 }

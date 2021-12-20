@@ -65,6 +65,7 @@ func (p *Player) Listening() error {
 }
 
 func (p *Player) WriteString(data string) error {
+	time.Sleep(30 * time.Millisecond)
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(data),
 	})
@@ -215,7 +216,8 @@ type Game struct {
 	Groups      map[int64]int          `json:"groups"`
 	States      map[int64]chan int     `json:"states"`
 	Pokers      map[int64]model.Pokers `json:"pokers"`
-	OAA         []int                  `json:"oaa"`
+	Universals  []int                  `json:"universals"`
+	Decks       int                    `json:"decks"`
 	Additional  model.Pokers           `json:"pocket"`
 	Multiple    int                    `json:"multiple"`
 	FirstPlayer int64                  `json:"firstPlayer"`
