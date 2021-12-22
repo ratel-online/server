@@ -222,6 +222,7 @@ type Game struct {
 	Multiple    int                    `json:"multiple"`
 	FirstPlayer int64                  `json:"firstPlayer"`
 	LastPlayer  int64                  `json:"lastPlayer"`
+	Robs        []int64                `json:"robs"`
 	FirstRob    int64                  `json:"firstRob"`
 	LastRob     int64                  `json:"lastRob"`
 	FinalRob    bool                   `json:"finalRob"`

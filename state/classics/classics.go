@@ -73,10 +73,7 @@ func (s *Classics) Next(player *database.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	buf.WriteString("Game starting!\n")
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
-	err := player.WriteString(buf.String())
-	if err != nil {
-		return 0, player.WriteError(err)
-	}
+	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {
 			return consts.StateWaiting, nil
@@ -147,20 +144,31 @@ func handleRob(player *database.Player, game *database.Game) error {
 		game.FirstPlayer = player.ID
 		database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn to rob\n", player.Name), player.ID)
 	}
-	_ = player.WriteString("Are you want to become landlord? (y or n)\n")
-	ans, err := player.AskForString(consts.ClassicsRobTimeout)
-	if err != nil {
-		ans = "y"
-	}
-	if strings.ToLower(ans) != "n" {
-		if game.FirstRob == 0 {
-			game.FirstRob = player.ID
+	timeout := consts.LaiZiPlayTimeout
+	for {
+		before := time.Now().Unix()
+		_ = player.WriteString("Are you want to become landlord? (y or n)\n")
+		ans, err := player.AskForString(timeout)
+		if err != nil && err != consts.ErrorsExist {
+			ans = "n"
 		}
-		game.LastRob = player.ID
-		game.Multiple *= 2
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s rob\n", player.Name))
-	} else {
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob\n", player.Name))
+		timeout -= time.Second * time.Duration(time.Now().Unix()-before)
+		ans = strings.ToLower(ans)
+		if ans == "y" {
+			if game.FirstRob == 0 {
+				game.FirstRob = player.ID
+			}
+			game.LastRob = player.ID
+			game.Multiple *= 2
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s rob\n", player.Name))
+			break
+		} else if ans == "n" {
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob\n", player.Name))
+			break
+		} else {
+			_ = player.WriteError(consts.ErrorsInputInvalid)
+			continue
+		}
 	}
 	if game.FinalRob {
 		game.FinalRob = false

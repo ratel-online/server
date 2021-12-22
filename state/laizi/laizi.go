@@ -76,10 +76,7 @@ func (s *LaiZi) Next(player *database.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("Game starting! First universal: %s\n", poker.GetDesc(game.Universals[0])))
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].OaaString()))
-	err := player.WriteString(buf.String())
-	if err != nil {
-		return 0, player.WriteError(err)
-	}
+	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {
 			return consts.StateWaiting, nil
@@ -155,20 +152,32 @@ func handleRob(player *database.Player, game *database.Game) error {
 		game.FirstPlayer = player.ID
 		database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn to rob\n", player.Name), player.ID)
 	}
-	_ = player.WriteString("Are you want to become landlord? (y or n)\n")
-	ans, err := player.AskForString(consts.LaiZiRobTimeout)
-	if err != nil {
-		ans = "y"
-	}
-	if strings.ToLower(ans) != "n" {
-		if game.FirstRob == 0 {
-			game.FirstRob = player.ID
+
+	timeout := consts.LaiZiPlayTimeout
+	for {
+		before := time.Now().Unix()
+		_ = player.WriteString("Are you want to become landlord? (y or n)\n")
+		ans, err := player.AskForString(timeout)
+		if err != nil && err != consts.ErrorsExist {
+			ans = "n"
 		}
-		game.LastRob = player.ID
-		game.Multiple *= 2
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s rob\n", player.Name))
-	} else {
-		database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob\n", player.Name))
+		timeout -= time.Second * time.Duration(time.Now().Unix()-before)
+		ans = strings.ToLower(ans)
+		if ans == "y" {
+			if game.FirstRob == 0 {
+				game.FirstRob = player.ID
+			}
+			game.LastRob = player.ID
+			game.Multiple *= 2
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s rob\n", player.Name))
+			break
+		} else if ans == "n" {
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob\n", player.Name))
+			break
+		} else {
+			_ = player.WriteError(consts.ErrorsInputInvalid)
+			continue
+		}
 	}
 	if game.FinalRob {
 		game.FinalRob = false
@@ -237,14 +246,17 @@ func handlePlay(player *database.Player, game *database.Game) error {
 		}
 		sells := make(modelx.Pokers, 0)
 		invalid := false
+		log.Infof("%s 出了 [%s], 当前牌 [%s]\n", player.Name, ans, pokers.OaaString())
 		for _, alias := range ans {
 			key := poker.GetKey(string(alias))
 			if key == 0 {
+				log.Infof("%s %d 缺失\n", player.Name, key)
 				invalid = true
 				break
 			}
 			if len(normalPokers[key]) == 0 {
 				if key == 14 || key == 15 || len(universalPokers) == 0 {
+					log.Infof("%s %d 缺失\n", player.Name, key)
 					invalid = true
 					break
 				}
@@ -266,6 +278,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 		}
 		facesArr := poker.ParseFaces(sells, rules)
 		if len(facesArr) == 0 {
+			log.Infof("%s 不合法 [%s]\n", player.Name, sells.String())
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 			continue
 		}
@@ -284,6 +297,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 				}
 			}
 			if !access {
+				log.Infof("打不过 [%s]\n", sells.String())
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 				continue
 			}

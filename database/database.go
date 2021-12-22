@@ -206,7 +206,7 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	roomPlayers := getRoomPlayers(roomId)
 	for playerId := range roomPlayers {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
-			_ = player.WriteString(msg)
+			_ = player.WriteString(">> " + msg)
 		}
 	}
 }
