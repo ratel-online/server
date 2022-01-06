@@ -246,17 +246,14 @@ func handlePlay(player *database.Player, game *database.Game) error {
 		}
 		sells := make(modelx.Pokers, 0)
 		invalid := false
-		log.Infof("%s 出了 [%s], 当前牌 [%s]\n", player.Name, ans, pokers.OaaString())
 		for _, alias := range ans {
 			key := poker.GetKey(string(alias))
 			if key == 0 {
-				log.Infof("%s %d 缺失\n", player.Name, key)
 				invalid = true
 				break
 			}
 			if len(normalPokers[key]) == 0 {
 				if key == 14 || key == 15 || len(universalPokers) == 0 {
-					log.Infof("%s %d 缺失\n", player.Name, key)
 					invalid = true
 					break
 				}
@@ -272,14 +269,12 @@ func handlePlay(player *database.Player, game *database.Game) error {
 				normalPokers[key] = normalPokers[key][:len(normalPokers[key])-1]
 			}
 		}
-		if invalid {
-			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
-			continue
-		}
 		facesArr := poker.ParseFaces(sells, rules)
 		if len(facesArr) == 0 {
-			log.Infof("%s 不合法 [%s]\n", player.Name, sells.String())
-			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
+			invalid = true
+		}
+		if invalid {
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s say: %s\n", player.Name, ans))
 			continue
 		}
 		lastFaces := game.LastFaces

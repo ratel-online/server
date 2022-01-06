@@ -246,13 +246,12 @@ func handlePlay(player *database.Player, game *database.Game) error {
 				currPokers[key] = currPokers[key][:len(currPokers[key])-1]
 			}
 		}
-		if invalid {
-			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
-			continue
-		}
 		facesArr := poker.ParseFaces(sells, rules)
 		if len(facesArr) == 0 {
-			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
+			invalid = true
+		}
+		if invalid {
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s say: %s\n", player.Name, ans))
 			continue
 		}
 		lastFaces := game.LastFaces
