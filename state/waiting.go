@@ -72,6 +72,8 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			room.State = consts.RoomStateRunning
 			room.Unlock()
 			break
+		} else if len(signal) > 0 {
+			database.Broadcast(player.RoomID, fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		}
 	}
 	return access, nil
@@ -79,6 +81,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("Room ID: %d\n", room.ID))
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
 	for playerId := range database.RoomPlayers(room.ID) {
 		title := "player"
