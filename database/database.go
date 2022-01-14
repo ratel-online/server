@@ -128,6 +128,9 @@ func JoinRoom(roomId, playerId int64) error {
 		playersIds[playerId] = true
 		room.Players++
 		player.RoomID = roomId
+	} else {
+		deleteRoom(room)
+		return consts.ErrorsRoomInvalid
 	}
 	return nil
 }
