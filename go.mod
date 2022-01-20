@@ -15,4 +15,4 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 )
 
-replace github.com/ratel-online/core => D:\workspace\ratel\core
+replace github.com/ratel-online/core => D:\workspace-ratel\core

@@ -251,7 +251,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 			invalid = true
 		}
 		if invalid {
-			database.Broadcast(player.RoomID, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
 			continue
 		}
 		lastFaces := game.LastFaces

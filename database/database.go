@@ -7,8 +7,10 @@ import (
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/core/util/json"
+	"github.com/ratel-online/core/util/strings"
 	"github.com/ratel-online/server/consts"
 	"sort"
+	stringx "strings"
 	"sync/atomic"
 	"time"
 )
@@ -33,7 +35,8 @@ func init() {
 func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	player := &Player{
 		ID:    info.ID,
-		Name:  info.Name,
+		IP:    conn.IP(),
+		Name:  strings.Desensitize(info.Name),
 		Score: info.Score,
 	}
 	player.Conn(conn)
@@ -212,6 +215,11 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 			_ = player.WriteString(">> " + msg)
 		}
 	}
+}
+
+func BroadcastChat(player *Player, msg string, exclude ...int64) {
+	log.Infof("chat msg, player %s[%d] %s say: %s\n", player.Name, player.ID, player.IP, stringx.TrimSpace(msg))
+	Broadcast(player.RoomID, strings.Desensitize(msg), exclude...)
 }
 
 func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {

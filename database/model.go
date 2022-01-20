@@ -16,6 +16,7 @@ import (
 
 type Player struct {
 	ID     int64  `json:"id"`
+	IP     string `json:"ip"`
 	Name   string `json:"name"`
 	Score  int64  `json:"score"`
 	Mode   int    `json:"mode"`

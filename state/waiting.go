@@ -73,7 +73,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			room.Unlock()
 			break
 		} else if len(signal) > 0 {
-			database.Broadcast(player.RoomID, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		}
 	}
 	return access, nil
