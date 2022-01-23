@@ -374,7 +374,7 @@ func viewGame(game *database.Game, currPlayer *database.Player) {
 			flag = "*"
 		}
 		identity := "landlord"
-		if game.IsLandlord(id) {
+		if !game.IsLandlord(id) {
 			identity = "peasant"
 		}
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name+flag, len(game.Pokers[id]), identity))
