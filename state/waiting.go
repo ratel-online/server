@@ -72,6 +72,13 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			room.State = consts.RoomStateRunning
 			room.Unlock()
 			break
+		} else if strings.HasPrefix(signal, "set ") {
+			tags := strings.Split(signal, " ")
+			if len(tags) == 3 {
+				room.Properties[tags[1]] = tags[2] == "on"
+				continue
+			}
+			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		} else if len(signal) > 0 {
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		}
