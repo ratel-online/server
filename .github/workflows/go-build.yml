@@ -31,11 +31,11 @@ jobs:
       with:
         name: server-${{ matrix.os }}
         path: server.exe
-        if: ${{ matrix.os }} == 'windows-latest'
+        if: ${{ matrix.os  == 'windows-latest' }}
         
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2.3.1
       with:
         name: server-${{ matrix.os }}
         path: server
-        if: ${{ matrix.os }} != 'windows-latest'
+        if: ${{ matrix.os != 'windows-latest' }}
