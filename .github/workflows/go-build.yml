@@ -22,6 +22,7 @@ jobs:
 
     - name: Go-build
       run: |
+          go mod tidy
           go fmt
           go build -x -v
       
