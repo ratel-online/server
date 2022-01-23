@@ -305,7 +305,11 @@ func handlePlay(player *database.Player, game *database.Game) error {
 }
 
 func InitGame(room *database.Room) (*database.Game, error) {
-	distributes, decks := poker.Distribute(room.Players, rules)
+	n := 0
+	if room.Properties[consts.RoomPropsDotShuffle] {
+		n = poker.Sets(room.Players) * 36
+	}
+	distributes, decks := poker.Distribute(room.Players, n, rules)
 	players := make([]int64, 0)
 	roomPlayers := database.RoomPlayers(room.ID)
 	for playerId := range roomPlayers {
@@ -340,11 +344,16 @@ func InitGame(room *database.Room) (*database.Game, error) {
 		Multiple:   1,
 		Mnemonic:   mnemonic,
 		Decks:      decks,
+		Properties: room.Properties,
 	}, nil
 }
 
 func resetGame(game *database.Game) error {
-	distributes, decks := poker.Distribute(len(game.Players), rules)
+	n := 0
+	if game.Properties[consts.RoomPropsDotShuffle] {
+		n = poker.Sets(len(game.Players)) * 36
+	}
+	distributes, decks := poker.Distribute(len(game.Players), n, rules)
 	if len(distributes) != len(game.Players)+1 {
 		return consts.ErrorsGamePlayersInvalid
 	}

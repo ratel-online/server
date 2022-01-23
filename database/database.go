@@ -47,10 +47,12 @@ func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 
 func CreateRoom(creator int64) *Room {
 	room := &Room{
-		ID:      atomic.AddInt64(&roomIds, 1),
-		Type:    consts.GameTypeClassic,
-		State:   consts.RoomStateWaiting,
-		Creator: creator,
+		ID:         atomic.AddInt64(&roomIds, 1),
+		Type:       consts.GameTypeClassic,
+		State:      consts.RoomStateWaiting,
+		Creator:    creator,
+		ActiveTime: time.Now(),
+		Properties: map[string]bool{},
 	}
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
@@ -120,6 +122,7 @@ func JoinRoom(roomId, playerId int64) error {
 	}
 	room.Lock()
 	defer room.Unlock()
+	room.ActiveTime = time.Now()
 	if room.State == consts.RoomStateRunning {
 		return consts.ErrorsJoinFailForRoomRunning
 	}
@@ -151,6 +154,7 @@ func leaveRoom(room *Room, player *Player) {
 	if room == nil || player == nil {
 		return
 	}
+	room.ActiveTime = time.Now()
 	playersIds := getRoomPlayers(room.ID)
 	if _, ok := playersIds[player.ID]; ok {
 		room.Players--
@@ -182,6 +186,11 @@ func offline(roomId, playerId int64) {
 }
 
 func roomCancel(room *Room) {
+	if room.ActiveTime.Add(24 * time.Hour).Before(time.Now()) {
+		log.Infof("room %d is timeout 24 hours, removed.\n", room.ID)
+		deleteRoom(room)
+		return
+	}
 	living := false
 	playerIds := getRoomPlayers(room.ID)
 	for id := range playerIds {
@@ -205,6 +214,7 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	if room == nil {
 		return
 	}
+	room.ActiveTime = time.Now()
 	excludeSet := map[int64]bool{}
 	for _, exc := range exclude {
 		excludeSet[exc] = true

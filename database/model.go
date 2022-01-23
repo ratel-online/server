@@ -191,13 +191,15 @@ func (p Player) String() string {
 type Room struct {
 	sync.Mutex
 
-	ID      int64 `json:"id"`
-	Type    int   `json:"type"`
-	Game    *Game `json:"gameId"`
-	State   int   `json:"state"`
-	Players int   `json:"players"`
-	Robots  int   `json:"robots"`
-	Creator int64 `json:"creator"`
+	ID         int64           `json:"id"`
+	Type       int             `json:"type"`
+	Game       *Game           `json:"gameId"`
+	State      int             `json:"state"`
+	Players    int             `json:"players"`
+	Robots     int             `json:"robots"`
+	Creator    int64           `json:"creator"`
+	ActiveTime time.Time       `json:"activeTime"`
+	Properties map[string]bool `json:"properties"`
 }
 
 func (r Room) Model() model.Room {
@@ -230,6 +232,7 @@ type Game struct {
 	LastFaces   *model.Faces           `json:"lastFaces"`
 	LastPokers  model.Pokers           `json:"lastPokers"`
 	Mnemonic    map[int]int            `json:"mnemonic"`
+	Properties  map[string]bool        `json:"properties"`
 }
 
 func (g Game) NextPlayer(curr int64) int64 {

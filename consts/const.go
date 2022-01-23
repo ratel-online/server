@@ -40,6 +40,11 @@ const (
 	LaiZiPlayTimeout = 40 * time.Second
 )
 
+// Room properties.
+const (
+	RoomPropsDotShuffle = "ds"
+)
+
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
 
 type Error struct {
