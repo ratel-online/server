@@ -45,11 +45,13 @@ func (WYSSSkill) Apply(player *database.Player, game *database.Game) {
 			continue
 		}
 		l := len(game.Pokers[id])
-		max := game.Pokers[id][l-1]
-		game.Pokers[id] = game.Pokers[id][:l-1]
-		game.Pokers[player.ID] = append(game.Pokers[player.ID], max)
-		game.Pokers[player.ID].SortByOaaValue()
-		buf.WriteString(fmt.Sprintf("%s 偷掉了 %s 的牌 %s\n", player.Name, database.GetPlayer(id).Name, model.Pokers{max}.OaaString()))
+		if l > 1 {
+			max := game.Pokers[id][l-1]
+			game.Pokers[id] = game.Pokers[id][:l-1]
+			game.Pokers[player.ID] = append(game.Pokers[player.ID], max)
+			game.Pokers[player.ID].SortByOaaValue()
+			buf.WriteString(fmt.Sprintf("%s 偷掉了 %s 的牌 %s\n", player.Name, database.GetPlayer(id).Name, model.Pokers{max}.OaaString()))
+		}
 	}
 	database.Broadcast(player.RoomID, buf.String())
 }
@@ -175,7 +177,7 @@ func (SKLFSkill) Name() string {
 }
 
 func (SKLFSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<时空裂缝>，其余玩家出牌时间缩短5秒", player.Name)
+	return fmt.Sprintf("%s 使用了技能<时空裂缝>，其余玩家出牌时间减半", player.Name)
 }
 
 func (SKLFSkill) Apply(player *database.Player, game *database.Game) {
@@ -183,8 +185,8 @@ func (SKLFSkill) Apply(player *database.Player, game *database.Game) {
 		if id == player.ID {
 			continue
 		}
-		if game.PlayTimeOut[id] > 5*time.Second {
-			game.PlayTimeOut[id] -= 5 * time.Second
+		if game.PlayTimeOut[id] > 3*time.Second {
+			game.PlayTimeOut[id] /= 2
 		}
 	}
 }
