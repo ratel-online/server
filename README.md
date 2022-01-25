@@ -8,8 +8,8 @@ The server for Ratel
 ```bash
 go run main.go -w 9999 -t 9998
 ```
-- `w` Websocket Server Port
-- `t` Tcp Server Port
+- `w` Websocket 端口(可省略,默认9998)
+- `t` TCP       端口(可省略,默认9999)
 
 ## 指令
 - `s`：开始游戏
