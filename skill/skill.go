@@ -23,11 +23,16 @@ var Skills = map[consts.SkillID]Skill{
 }
 
 type Skill interface {
+	Name() string
 	Desc(player *database.Player) string
 	Apply(player *database.Player, game *database.Game)
 }
 
 type WYSSSkill struct{}
+
+func (WYSSSkill) Name() string {
+	return "我要色色"
+}
 
 func (WYSSSkill) Desc(player *database.Player) string {
 	return fmt.Sprintf("%s 使用了技能<我要色色>，其余玩家沉迷其中，趁机偷掉了他们的最牛的牌", player.Name)
@@ -51,8 +56,12 @@ func (WYSSSkill) Apply(player *database.Player, game *database.Game) {
 
 type HYJJSkill struct{}
 
+func (HYJJSkill) Name() string {
+	return "火眼金睛"
+}
+
 func (HYJJSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<火眼金睛>，所有对手强制明牌", player.Name)
+	return fmt.Sprintf("%s 使用了技能<火眼金睛>，看穿了对手的牌", player.Name)
 }
 
 func (HYJJSkill) Apply(player *database.Player, game *database.Game) {
@@ -61,12 +70,16 @@ func (HYJJSkill) Apply(player *database.Player, game *database.Game) {
 		if id == player.ID {
 			continue
 		}
-		buf.WriteString(fmt.Sprintf("%s 明牌 %s\n", database.GetPlayer(id).Name, game.Pokers[id].OaaString()))
+		buf.WriteString(fmt.Sprintf("%s: %s\n", database.GetPlayer(id).Name, game.Pokers[id].OaaString()))
 	}
-	database.Broadcast(player.RoomID, buf.String())
+	_ = player.WriteString(buf.String())
 }
 
 type GHJMSkill struct{}
+
+func (GHJMSkill) Name() string {
+	return "改换家门"
+}
 
 func (GHJMSkill) Desc(player *database.Player) string {
 	return fmt.Sprintf("%s 使用了技能<改换家门>，手牌重新分配", player.Name)
@@ -82,6 +95,10 @@ func (GHJMSkill) Apply(player *database.Player, game *database.Game) {
 }
 
 type PFCZSkill struct{}
+
+func (PFCZSkill) Name() string {
+	return "破斧沉舟"
+}
 
 func (PFCZSkill) Desc(player *database.Player) string {
 	return fmt.Sprintf("%s 使用了技能<破斧沉舟>，只留下一张最小的牌和一张最大的牌", player.Name)
@@ -101,6 +118,10 @@ func (PFCZSkill) Apply(player *database.Player, game *database.Game) {
 
 type DHXJSkill struct{}
 
+func (DHXJSkill) Name() string {
+	return "大幻想家"
+}
+
 func (DHXJSkill) Desc(player *database.Player) string {
 	return fmt.Sprintf("%s 使用了技能<大幻想家>，最小的一张牌变成了癞子", player.Name)
 }
@@ -112,6 +133,10 @@ func (DHXJSkill) Apply(player *database.Player, game *database.Game) {
 }
 
 type LJFZSkill struct{}
+
+func (LJFZSkill) Name() string {
+	return "两极反转"
+}
 
 func (LJFZSkill) Desc(player *database.Player) string {
 	return fmt.Sprintf("%s 使用了技能<两极反转>，随机与一名玩家调换手牌", player.Name)
@@ -131,6 +156,10 @@ func (LJFZSkill) Apply(player *database.Player, game *database.Game) {
 
 type ZWZBSkill struct{}
 
+func (ZWZBSkill) Name() string {
+	return "追亡逐北"
+}
+
 func (ZWZBSkill) Desc(player *database.Player) string {
 	return fmt.Sprintf("%s 使用了技能<追亡逐北>，多获得一次出牌机会", player.Name)
 }
@@ -140,6 +169,10 @@ func (ZWZBSkill) Apply(player *database.Player, game *database.Game) {
 }
 
 type SKLFSkill struct{}
+
+func (SKLFSkill) Name() string {
+	return "时空裂缝"
+}
 
 func (SKLFSkill) Desc(player *database.Player) string {
 	return fmt.Sprintf("%s 使用了技能<时空裂缝>，其余玩家出牌时间缩短5秒", player.Name)

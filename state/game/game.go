@@ -38,6 +38,9 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 	} else {
 		buf.WriteString(fmt.Sprintf("Game starting!\n"))
 	}
+	if game.Properties[consts.RoomPropsSkill] {
+		buf.WriteString(fmt.Sprintf("Got skill %s\n", skill.Skills[consts.SkillID(game.Skills[player.ID])].Name()))
+	}
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
 	_ = player.WriteString(buf.String())
 	for {

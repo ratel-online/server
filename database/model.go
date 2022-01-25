@@ -261,7 +261,7 @@ func (g Game) IsLandlord(playerId int64) bool {
 
 func (g Game) Team(playerId int64) string {
 	if g.Properties[consts.RoomPropsSkill] {
-		return strconv.Itoa(g.Groups[playerId]) + "team"
+		return "team" + strconv.Itoa(g.Groups[playerId])
 	} else {
 		if !g.IsLandlord(playerId) {
 			return "peasant"
