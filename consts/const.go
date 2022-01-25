@@ -18,6 +18,20 @@ const (
 	StateGame
 )
 
+type SkillID int
+
+const (
+	_ SkillID = iota - 1
+	SkillWYSS
+	SkillHYJJ
+	SkillGHJM
+	SkillPFCZ
+	SkillDHXJ
+	SkillLJFZ
+	SkillZWZB
+	SkillSKLF
+)
+
 const (
 	IsStart = consts.IsStart
 	IsStop  = consts.IsStop
@@ -32,17 +46,15 @@ const (
 	GameTypeLaiZi   = 2
 	GameTypeRunFast = 3
 
-	ClassicsRobTimeout  = 20 * time.Second
-	ClassicsPlayTimeout = 40 * time.Second
-
-	LaiZiRobTimeout  = 20 * time.Second
-	LaiZiPlayTimeout = 40 * time.Second
+	RobTimeout  = 20 * time.Second
+	PlayTimeout = 40 * time.Second
 )
 
 // Room properties.
 const (
 	RoomPropsDotShuffle = "ds"
-	RoomPropsModeLz     = "lz"
+	RoomPropsLaiZi      = "lz"
+	RoomPropsSkill      = "sk"
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}

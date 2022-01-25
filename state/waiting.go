@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/rule"
 	"github.com/ratel-online/server/state/game"
 	"strings"
 	"time"
@@ -93,12 +94,23 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		player := database.GetPlayer(playerId)
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
+	buf.WriteString("Properties: ")
+	for k, v := range room.Properties {
+		if v {
+			buf.WriteString(k + " ")
+		}
+	}
+	buf.WriteString("\n")
 	_ = currPlayer.WriteString(buf.String())
 }
 
 func initGame(room *database.Room) (*database.Game, error) {
 	if room.Type == consts.GameTypeLaiZi {
-		room.Properties[consts.RoomPropsModeLz] = true
+		room.Properties[consts.RoomPropsLaiZi] = true
 	}
-	return game.InitGame(room)
+	rules := rule.LandlordRules
+	if room.Properties[consts.RoomPropsSkill] {
+		rules = rule.TeamRules
+	}
+	return game.InitGame(room, rules)
 }

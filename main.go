@@ -17,7 +17,7 @@ func main() {
 	flag.IntVar(&Wsport, "w", 9998, "WebsocketServer Port")
 	flag.IntVar(&Tcpport, "t", 9999, "TcpServer Port")
 	flag.Parse()
-	
+
 	async.Async(func() {
 		wsServer := network.NewWebsocketServer(":" + strconv.Itoa(Wsport))
 		log.Panic(wsServer.Serve())
