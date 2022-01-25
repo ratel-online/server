@@ -15,8 +15,7 @@ const (
 	StateNew
 	StateSetting
 	StateWaiting
-	StateClassics
-	StateLaiZi
+	StateGame
 )
 
 const (
@@ -43,6 +42,7 @@ const (
 // Room properties.
 const (
 	RoomPropsDotShuffle = "ds"
+	RoomPropsModeLz     = "lz"
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}

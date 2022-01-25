@@ -5,8 +5,7 @@ import (
 	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
-	"github.com/ratel-online/server/state/classics"
-	"github.com/ratel-online/server/state/laizi"
+	"github.com/ratel-online/server/state/game"
 	"strings"
 )
 
@@ -18,8 +17,7 @@ func init() {
 	register(consts.StateJoin, &join{})
 	register(consts.StateNew, &new{})
 	register(consts.StateWaiting, &waiting{})
-	register(consts.StateClassics, &classics.Classics{})
-	register(consts.StateLaiZi, &laizi.LaiZi{})
+	register(consts.StateGame, &game.Game{})
 }
 
 func register(id consts.StateID, state State) {

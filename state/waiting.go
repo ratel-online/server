@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
-	"github.com/ratel-online/server/state/classics"
-	"github.com/ratel-online/server/state/laizi"
+	"github.com/ratel-online/server/state/game"
 	"strings"
 	"time"
 )
@@ -23,11 +22,7 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, err
 	}
 	if access {
-		if room.Type == consts.GameTypeClassic {
-			return consts.StateClassics, nil
-		} else if room.Type == consts.GameTypeLaiZi {
-			return consts.StateLaiZi, nil
-		}
+		return consts.StateGame, nil
 	}
 	return s.Exit(player), nil
 }
@@ -102,10 +97,8 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 }
 
 func initGame(room *database.Room) (*database.Game, error) {
-	if room.Type == consts.GameTypeClassic {
-		return classics.InitGame(room)
-	} else if room.Type == consts.GameTypeLaiZi {
-		return laizi.InitGame(room)
+	if room.Type == consts.GameTypeLaiZi {
+		room.Properties[consts.RoomPropsModeLz] = true
 	}
-	return nil, nil
+	return game.InitGame(room)
 }
