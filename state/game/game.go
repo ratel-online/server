@@ -167,9 +167,8 @@ func handleRob(player *database.Player, game *database.Game) error {
 	return nil
 }
 
-func playing(player *database.Player, game *database.Game, master bool) error {
+func playing(player *database.Player, game *database.Game, master bool, playTimes int) error {
 	timeout := game.PlayTimeOut[player.ID]
-	playTimes := game.PlayTimes[player.ID]
 	for {
 		buf := bytes.Buffer{}
 		buf.WriteString("\n")
@@ -303,7 +302,7 @@ func playing(player *database.Player, game *database.Game, master bool) error {
 			playTimes--
 			if playTimes > 0 {
 				database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s\n", player.Name, sells.OaaString()))
-				return playing(player, game, master)
+				return playing(player, game, master, playTimes)
 			}
 		}
 		nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
@@ -321,7 +320,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 		database.Broadcast(player.RoomID, fmt.Sprintf("%s \n", sk.Desc(player)))
 		sk.Apply(player, game)
 	}
-	return playing(player, game, master)
+	return playing(player, game, master, game.PlayTimes[player.ID])
 }
 
 func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
