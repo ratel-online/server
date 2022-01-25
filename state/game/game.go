@@ -302,6 +302,7 @@ func playing(player *database.Player, game *database.Game, master bool) error {
 		if master {
 			playTimes--
 			if playTimes > 0 {
+				database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s\n", player.Name, sells.OaaString()))
 				return playing(player, game, master)
 			}
 		}
