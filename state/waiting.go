@@ -63,6 +63,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			room.Lock()
 			room.Game, err = initGame(room)
 			if err != nil {
+				_ = player.WriteError(err)
 				return access, err
 			}
 			room.State = consts.RoomStateRunning

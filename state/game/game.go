@@ -327,9 +327,6 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 	for playerId := range roomPlayers {
 		players = append(players, playerId)
 	}
-	if len(distributes) != len(players)+1 {
-		return nil, consts.ErrorsGamePlayersInvalid
-	}
 	states := map[int64]chan int{}
 	groups := map[int64]int{}
 	pokers := map[int64]modelx.Pokers{}
