@@ -69,7 +69,7 @@ func (HYJJSkill) Apply(player *database.Player, game *database.Game) {
 type GHJMSkill struct{}
 
 func (GHJMSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<改换家门>，手牌被重新分配", player.Name)
+	return fmt.Sprintf("%s 使用了技能<改换家门>，手牌重新分配", player.Name)
 }
 
 func (GHJMSkill) Apply(player *database.Player, game *database.Game) {
