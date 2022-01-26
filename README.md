@@ -1,14 +1,23 @@
 # Ratel-Online
 [![Go Reference](https://pkg.go.dev/badge/github.com/ratel-online/server.svg)](https://pkg.go.dev/github.com/ratel-online/server)
 
-## 体验地址
-[http://rtol.isnico.com/](http://rtol.isnico.com/)
+命令行在线多人斗地主！支持癞子，大招，不洗牌等模式！
+## 客户端
+- 浏览器在线：[http://rtol.isnico.com/](http://rtol.isnico.com/)
+- 客户端下载：[https://github.com/ratel-online/client/releases](https://github.com/ratel-online/client/releases)
 
+## 社区
+- QQ群：[948365095](https://jq.qq.com/?_wv=1027&k=OhGYB1EC)
 ## 玩法介绍
+### 模式
+- **Classic**: 经典版斗地主模式
+- **LaiZi**: 癞子版斗地主模式
+- **Skill**: 癞子版技能大招模式
+
 ### 规则
 游戏人数2~6人不等，超过3人2副牌，超过5人3副牌，规则参考欢乐斗地主。
 
-直接输入想出的牌型，例如3~A顺子：`34567890jqka`，单10：`0`, 对2：`22`，王炸：`sx`
+出牌时，直接输入想出的牌型，例如3~A顺子：`34567890jqka`，单10：`0`, 对2：`22`，王炸：`sx`。
 
 癞子模式下同样，缺失的牌会自动使用癞子牌代替，例如当前牌型是``*7 6 6 5``，输入``6665``时会自动使用癞子牌``*7``来代替缺失的6。
 
@@ -18,11 +27,6 @@
 - 3~A顺子：`34567890jqka`
 - 3带1：`3334`
 - 飞机：`jjjqqq34`
-
-### 模式
-- **Classic**: 经典版斗地主模式
-- **LaiZi**: 癞子版斗地主模式
-- **Skill**: 癞子版技能大招模式
 
 ### 指令 
 全局指令：
@@ -44,7 +48,7 @@
 - 其余的会转为聊天内容
 
 ## 技能大招
-开启技能模式以后，玩家会随机被分配以下技能中的一个，主回合触发：
+开启技能模式以后，玩家会随机被分配以下技能中的一个，**主回合**触发：
 - **我要色色**：其余玩家沉迷其中，趁机偷掉了他们的最牛的牌
 - **火眼金睛**：看穿对手的手牌
 - **改换家门**：手牌重新分配
