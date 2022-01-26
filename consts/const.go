@@ -30,6 +30,8 @@ const (
 	SkillLJFZ
 	SkillZWZB
 	SkillSKLF
+	Skill996
+	SkillTZJW
 )
 
 const (

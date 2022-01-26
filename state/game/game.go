@@ -284,6 +284,7 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 		game.LastPlayer = player.ID
 		game.LastFaces = lastFaces
 		game.LastPokers = sells
+		game.Discards = append(game.Discards, sells...)
 		if len(pokers) == 0 {
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, won the game! \n", player.Name, sells.OaaString()))
 			room := database.GetRoom(player.RoomID)
@@ -343,6 +344,7 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 	for i := 1; i <= 13; i++ {
 		mnemonic[i] = 4 * decks
 	}
+	rand.Seed(time.Now().UnixNano())
 	for i := range players {
 		states[players[i]] = make(chan int, 1)
 		groups[players[i]] = 0
@@ -368,6 +370,7 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 		PlayTimes:   playTimes,
 		PlayTimeOut: playTimeout,
 		Rules:       rules,
+		Discards:    modelx.Pokers{},
 	}, nil
 }
 
@@ -380,6 +383,7 @@ func resetGame(game *database.Game) error {
 	skills := map[int64]int{}
 	playTimes := map[int64]int{}
 	playTimeout := map[int64]time.Duration{}
+	rand.Seed(time.Now().UnixNano())
 	for i := range players {
 		game.Pokers[players[i]] = distributes[i]
 		skills[players[i]] = rand.Intn(len(skill.Skills))
@@ -399,6 +403,7 @@ func resetGame(game *database.Game) error {
 	game.Skills = skills
 	game.PlayTimes = playTimes
 	game.PlayTimeOut = playTimeout
+	game.Discards = modelx.Pokers{}
 	return nil
 }
 

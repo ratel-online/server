@@ -20,6 +20,8 @@ var Skills = map[consts.SkillID]Skill{
 	consts.SkillLJFZ: LJFZSkill{},
 	consts.SkillZWZB: ZWZBSkill{},
 	consts.SkillSKLF: SKLFSkill{},
+	consts.Skill996:  N996Skill{},
+	consts.SkillTZJW: TZJWSkill{},
 }
 
 type Skill interface {
@@ -35,7 +37,7 @@ func (WYSSSkill) Name() string {
 }
 
 func (WYSSSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<我要色色>，其余玩家沉迷其中，趁机偷掉了他们的最牛的牌", player.Name)
+	return fmt.Sprintf("%s 触发技能<我要色色>，其余玩家沉迷其中，趁机偷掉了他们的最牛的牌", player.Name)
 }
 
 func (WYSSSkill) Apply(player *database.Player, game *database.Game) {
@@ -63,7 +65,7 @@ func (HYJJSkill) Name() string {
 }
 
 func (HYJJSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<火眼金睛>，看穿了对手的牌", player.Name)
+	return fmt.Sprintf("%s 触发技能<火眼金睛>，看穿了对手的牌", player.Name)
 }
 
 func (HYJJSkill) Apply(player *database.Player, game *database.Game) {
@@ -84,7 +86,7 @@ func (GHJMSkill) Name() string {
 }
 
 func (GHJMSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<改换家门>，手牌重新分配", player.Name)
+	return fmt.Sprintf("%s 触发技能<改换家门>，手牌重新分配", player.Name)
 }
 
 func (GHJMSkill) Apply(player *database.Player, game *database.Game) {
@@ -103,19 +105,17 @@ func (PFCZSkill) Name() string {
 }
 
 func (PFCZSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<破斧沉舟>，只留下一张最小的牌和一张最大的牌", player.Name)
+	return fmt.Sprintf("%s 触发技能<破斧沉舟>，只留下5张最强的牌", player.Name)
 }
 
 func (PFCZSkill) Apply(player *database.Player, game *database.Game) {
 	pokers := game.Pokers[player.ID]
 	pokers.SortByValue()
 	l := len(pokers)
-	if l > 2 {
-		min := pokers[0]
-		max := pokers[l-1]
-		game.Pokers[player.ID] = model.Pokers{min, max}
-		game.Pokers[player.ID].SortByOaaValue()
+	if l > 5 {
+		game.Pokers[player.ID] = pokers[l-5:]
 	}
+	game.Pokers[player.ID].SortByOaaValue()
 }
 
 type DHXJSkill struct{}
@@ -125,7 +125,7 @@ func (DHXJSkill) Name() string {
 }
 
 func (DHXJSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<大幻想家>，最小的一张牌变成了癞子", player.Name)
+	return fmt.Sprintf("%s 触发技能<大幻想家>，最小的一张牌变成了癞子", player.Name)
 }
 
 func (DHXJSkill) Apply(player *database.Player, game *database.Game) {
@@ -141,13 +141,13 @@ func (LJFZSkill) Name() string {
 }
 
 func (LJFZSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<两极反转>，随机与一名玩家调换手牌", player.Name)
+	return fmt.Sprintf("%s 触发技能<两极反转>，随机与一名玩家调换手牌", player.Name)
 }
 
 func (LJFZSkill) Apply(player *database.Player, game *database.Game) {
 	var targetPlayerId int64 = 0
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for targetPlayerId == int64(0) {
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 		p := game.Players[r.Intn(len(game.Players))]
 		if p != player.ID {
 			targetPlayerId = p
@@ -163,7 +163,7 @@ func (ZWZBSkill) Name() string {
 }
 
 func (ZWZBSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<追亡逐北>，多获得一次出牌机会", player.Name)
+	return fmt.Sprintf("%s 触发技能<追亡逐北>，多获得一次出牌机会", player.Name)
 }
 
 func (ZWZBSkill) Apply(player *database.Player, game *database.Game) {
@@ -177,7 +177,7 @@ func (SKLFSkill) Name() string {
 }
 
 func (SKLFSkill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 使用了技能<时空裂缝>，其余玩家出牌时间减半", player.Name)
+	return fmt.Sprintf("%s 触发技能<时空裂缝>，其余玩家出牌时间减半", player.Name)
 }
 
 func (SKLFSkill) Apply(player *database.Player, game *database.Game) {
@@ -189,4 +189,67 @@ func (SKLFSkill) Apply(player *database.Player, game *database.Game) {
 			game.PlayTimeOut[id] /= 2
 		}
 	}
+}
+
+type N996Skill struct{}
+
+func (N996Skill) Name() string {
+	return "996"
+}
+
+func (N996Skill) Desc(player *database.Player) string {
+	return fmt.Sprintf("%s 触发技能<996>，获得了9,9,6三张牌", player.Name)
+}
+
+func (N996Skill) Apply(player *database.Player, game *database.Game) {
+	pokers := poker.GetPokers(9, 9, 6)
+	for i := range pokers {
+		pokers[i].Val = game.Rules.Value(pokers[i].Key)
+	}
+	pokers.SetOaa(game.Universals...)
+	game.Pokers[player.ID] = append(game.Pokers[player.ID], pokers...)
+	game.Pokers[player.ID].SortByOaaValue()
+}
+
+type TZJWSkill struct{}
+
+func (TZJWSkill) Name() string {
+	return "添砖加瓦"
+}
+
+func (TZJWSkill) Desc(player *database.Player) string {
+	return fmt.Sprintf("%s 触发技能<添砖加瓦>，从弃牌池中随机抽取两张牌返还给所有对手", player.Name)
+}
+
+func (TZJWSkill) Apply(player *database.Player, game *database.Game) {
+	buf := bytes.Buffer{}
+	pks := model.Pokers{}
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	l := len(game.Discards)
+	for i := 0; i < Min(2, l); i++ {
+		target := r.Intn(len(game.Discards))
+		pks = append(pks, game.Discards[target])
+		game.Discards = append(game.Discards[:target], game.Discards[target+1:]...)
+	}
+	if len(pks) > 0 {
+		for _, id := range game.Players {
+			if id == player.ID {
+				continue
+			}
+			game.Pokers[id] = append(game.Pokers[id], pks...)
+			game.Pokers[id].SortByOaaValue()
+			buf.WriteString(database.GetPlayer(id).Name + ",")
+		}
+		buf.Truncate(buf.Len() - 1)
+		buf.WriteString("获得了" + pks.OaaString())
+		buf.WriteString("\n")
+		database.Broadcast(player.RoomID, buf.String())
+	}
+}
+
+func Min(i, j int) int {
+	if i < j {
+		return i
+	}
+	return j
 }

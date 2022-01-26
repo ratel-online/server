@@ -239,6 +239,7 @@ type Game struct {
 	PlayTimes   map[int64]int           `json:"playTimes"`
 	PlayTimeOut map[int64]time.Duration `json:"playTimeOut"`
 	Rules       poker.Rules             `json:"rules"`
+	Discards    model.Pokers            `json:"discards"`
 }
 
 func (g Game) NextPlayer(curr int64) int64 {
