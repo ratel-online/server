@@ -32,9 +32,14 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 	game := room.Game
 	buf := bytes.Buffer{}
 	if game.Properties[consts.RoomPropsLaiZi] {
-		game.Pokers[player.ID].SetOaa(game.Universals[0])
+		if game.Properties[consts.RoomPropsSkill] {
+			game.Pokers[player.ID].SetOaa(game.Universals...)
+			buf.WriteString(fmt.Sprintf("Game starting! Universals: %s %s\n", poker.GetDesc(game.Universals[0]), poker.GetDesc(game.Universals[1])))
+		} else {
+			game.Pokers[player.ID].SetOaa(game.Universals[0])
+			buf.WriteString(fmt.Sprintf("Game starting! First universal: %s\n", poker.GetDesc(game.Universals[0])))
+		}
 		game.Pokers[player.ID].SortByOaaValue()
-		buf.WriteString(fmt.Sprintf("Game starting! First universal: %s\n", poker.GetDesc(game.Universals[0])))
 	} else {
 		buf.WriteString(fmt.Sprintf("Game starting!\n"))
 	}
@@ -103,9 +108,7 @@ func handleRob(player *database.Player, game *database.Game) error {
 			landlord := database.GetPlayer(game.LastRob)
 			buf := bytes.Buffer{}
 			if game.Properties[consts.RoomPropsLaiZi] {
-				lastOaa := poker.Random(14, 15, game.Universals[0])
-				buf.WriteString(fmt.Sprintf("%s became landlord, got pokers: %s, last universal: %s\n", landlord.Name, game.Additional.String(), poker.GetDesc(lastOaa)))
-				game.Universals = append(game.Universals, lastOaa)
+				buf.WriteString(fmt.Sprintf("%s became landlord, got pokers: %s, last universal: %s\n", landlord.Name, game.Additional.String(), poker.GetDesc(game.Universals[1])))
 				for _, pokers := range game.Pokers {
 					pokers.SetOaa(game.Universals...)
 					pokers.SortByOaaValue()
@@ -331,6 +334,8 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 	for playerId := range roomPlayers {
 		players = append(players, playerId)
 	}
+	firstOaa := poker.Random(14, 15)
+	lastOaa := poker.Random(14, 15, firstOaa)
 	states := map[int64]chan int{}
 	groups := map[int64]int{}
 	pokers := map[int64]modelx.Pokers{}
@@ -362,7 +367,7 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 		Pokers:      pokers,
 		Additional:  distributes[len(distributes)-1],
 		Multiple:    1,
-		Universals:  []int{poker.Random(14, 15)},
+		Universals:  []int{firstOaa, lastOaa},
 		Mnemonic:    mnemonic,
 		Decks:       decks,
 		Properties:  room.Properties,
@@ -383,6 +388,8 @@ func resetGame(game *database.Game) error {
 	skills := map[int64]int{}
 	playTimes := map[int64]int{}
 	playTimeout := map[int64]time.Duration{}
+	firstOaa := poker.Random(14, 15)
+	lastOaa := poker.Random(14, 15, firstOaa)
 	rand.Seed(time.Now().UnixNano())
 	for i := range players {
 		game.Pokers[players[i]] = distributes[i]
@@ -398,7 +405,7 @@ func resetGame(game *database.Game) error {
 	game.Additional = distributes[len(distributes)-1]
 	game.FinalRob = false
 	game.Multiple = 1
-	game.Universals = []int{poker.Random(14, 15)}
+	game.Universals = []int{firstOaa, lastOaa}
 	game.Decks = decks
 	game.Skills = skills
 	game.PlayTimes = playTimes

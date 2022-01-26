@@ -198,7 +198,7 @@ func (N996Skill) Name() string {
 }
 
 func (N996Skill) Desc(player *database.Player) string {
-	return fmt.Sprintf("%s 触发技能<996>，获得了9,9,6三张牌", player.Name)
+	return fmt.Sprintf("%s 触发技能<996>，所有对手强制获得9,9,6三张牌", player.Name)
 }
 
 func (N996Skill) Apply(player *database.Player, game *database.Game) {
@@ -207,8 +207,13 @@ func (N996Skill) Apply(player *database.Player, game *database.Game) {
 		pokers[i].Val = game.Rules.Value(pokers[i].Key)
 	}
 	pokers.SetOaa(game.Universals...)
-	game.Pokers[player.ID] = append(game.Pokers[player.ID], pokers...)
-	game.Pokers[player.ID].SortByOaaValue()
+	for _, id := range game.Players {
+		if id == player.ID {
+			continue
+		}
+		game.Pokers[id] = append(game.Pokers[id], pokers...)
+		game.Pokers[id].SortByOaaValue()
+	}
 }
 
 type TZJWSkill struct{}
