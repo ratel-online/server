@@ -91,8 +91,11 @@ func (GHJMSkill) Desc(player *database.Player) string {
 
 func (GHJMSkill) Apply(player *database.Player, game *database.Game) {
 	l := len(game.Pokers[player.ID])
-	pokersArr, _ := poker.Distribute(1, true, game.Rules)
-	pokers := pokersArr[0][:l]
+	keys := poker.RandomN(l)
+	pokers := poker.GetPokers(keys...)
+	for i := range pokers {
+		pokers[i].Val = game.Rules.Value(pokers[i].Key)
+	}
 	pokers.SetOaa(game.Universals...)
 	pokers.SortByOaaValue()
 	game.Pokers[player.ID] = pokers
