@@ -18,6 +18,13 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
+	if room.Type == consts.GameTypeLaiZi {
+		room.Properties[consts.RoomPropsLaiZi] = true
+	} else if room.Type == consts.GameTypeSkill {
+		room.Properties[consts.RoomPropsLaiZi] = true
+		room.Properties[consts.RoomPropsDotShuffle] = true
+		room.Properties[consts.RoomPropsSkill] = true
+	}
 	access, err := waitingForStart(player, room)
 	if err != nil {
 		return 0, err
@@ -106,9 +113,6 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 }
 
 func initGame(room *database.Room) (*database.Game, error) {
-	if room.Type == consts.GameTypeLaiZi {
-		room.Properties[consts.RoomPropsLaiZi] = true
-	}
 	rules := rule.LandlordRules
 	if room.Properties[consts.RoomPropsSkill] {
 		rules = rule.TeamRules

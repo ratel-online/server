@@ -46,7 +46,7 @@ const (
 
 	GameTypeClassic = 1
 	GameTypeLaiZi   = 2
-	GameTypeRunFast = 3
+	GameTypeSkill   = 3
 
 	RobTimeout  = 20 * time.Second
 	PlayTimeout = 40 * time.Second
@@ -92,9 +92,10 @@ var (
 	GameTypes = map[int]string{
 		GameTypeClassic: "Classic",
 		GameTypeLaiZi:   "LaiZi",
+		GameTypeSkill:   "Skill",
 		//GameTypeRunFast: "RunFast",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi} // GameTypeLaiZi, GameTypeRunFast
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",
