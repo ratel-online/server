@@ -19,11 +19,11 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, consts.ErrorsExist
 	}
 	if room.Type == consts.GameTypeLaiZi {
-		room.Properties[consts.RoomPropsLaiZi] = true
+		room.SetProperties(consts.RoomPropsLaiZi, true)
 	} else if room.Type == consts.GameTypeSkill {
-		room.Properties[consts.RoomPropsLaiZi] = true
-		room.Properties[consts.RoomPropsDotShuffle] = true
-		room.Properties[consts.RoomPropsSkill] = true
+		room.SetProperties(consts.RoomPropsLaiZi, true)
+		room.SetProperties(consts.RoomPropsDotShuffle, true)
+		room.SetProperties(consts.RoomPropsSkill, true)
 	}
 	access, err := waitingForStart(player, room)
 	if err != nil {
@@ -79,7 +79,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
-				room.Properties[tags[1]] = tags[2] == "on"
+				room.SetProperties(tags[1], tags[2] == "on")
 				continue
 			}
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))

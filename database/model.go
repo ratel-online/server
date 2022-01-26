@@ -216,6 +216,12 @@ func (r Room) Model() model.Room {
 	}
 }
 
+func (r Room) SetProperties(key string, v bool) {
+	r.Lock()
+	defer r.Unlock()
+	r.Properties[key] = v
+}
+
 type Game struct {
 	Players     []int64                 `json:"players"`
 	Groups      map[int64]int           `json:"groups"`
