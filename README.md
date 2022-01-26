@@ -29,8 +29,9 @@
 - 飞机：`jjjqqq34`
 
 ### 演示
-![demo](demo.gif)
+视频教程：[https://www.bilibili.com/video/BV16Y411b7BD](https://www.bilibili.com/video/BV16Y411b7BD)
 
+![demo](demo.gif)
 ### 指令 
 全局指令：
 - `v`：刷新可用房间列表/查看房间成员/查看其它玩家游戏状态
