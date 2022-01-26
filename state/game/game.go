@@ -59,6 +59,8 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 				// reset all players group
 				for i, id := range game.Players {
 					game.Groups[id] = i
+					game.Pokers[id].SetOaa(game.Universals...)
+					game.Pokers[id].SortByOaaValue()
 				}
 				game.States[player.ID] <- statePlay
 			} else {
@@ -106,6 +108,12 @@ func handleRob(player *database.Player, game *database.Game) error {
 			}
 		} else if game.FirstRob == game.LastRob {
 			landlord := database.GetPlayer(game.LastRob)
+			game.FirstPlayer = landlord.ID
+			game.LastPlayer = landlord.ID
+			game.Groups[landlord.ID] = 1
+			game.Pokers[landlord.ID] = append(game.Pokers[landlord.ID], game.Additional...)
+			game.Pokers[landlord.ID].SortByOaaValue()
+
 			buf := bytes.Buffer{}
 			if game.Properties[consts.RoomPropsLaiZi] {
 				buf.WriteString(fmt.Sprintf("%s became landlord, got pokers: %s, last universal: %s\n", landlord.Name, game.Additional.String(), poker.GetDesc(game.Universals[1])))
@@ -117,11 +125,6 @@ func handleRob(player *database.Player, game *database.Game) error {
 				buf.WriteString(fmt.Sprintf("%s became landlord, got pokers: %s\n", landlord.Name, game.Additional.String()))
 			}
 			database.Broadcast(player.RoomID, buf.String())
-			game.FirstPlayer = landlord.ID
-			game.LastPlayer = landlord.ID
-			game.Groups[landlord.ID] = 1
-			game.Pokers[landlord.ID] = append(game.Pokers[landlord.ID], game.Additional...)
-			game.Pokers[landlord.ID].SortByOaaValue()
 			game.States[landlord.ID] <- statePlay
 		} else {
 			game.FinalRob = true
