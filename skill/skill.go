@@ -188,8 +188,10 @@ func (SKLFSkill) Apply(player *database.Player, game *database.Game) {
 		if id == player.ID {
 			continue
 		}
-		if game.PlayTimeOut[id] > 3*time.Second {
+		if game.PlayTimeOut[id] >= 10*time.Second {
 			game.PlayTimeOut[id] /= 2
+		} else {
+			game.PlayTimeOut[id] = 5 * time.Second
 		}
 	}
 }
