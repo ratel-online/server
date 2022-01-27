@@ -331,7 +331,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 }
 
 func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
-	distributes, decks := poker.Distribute(room.Players, room.Properties[consts.RoomPropsDotShuffle], rules)
+	distributes, decks := poker.Distribute(room.Players, room.GetProperty(consts.RoomPropsDotShuffle), rules)
 	players := make([]int64, 0)
 	roomPlayers := database.RoomPlayers(room.ID)
 	for playerId := range roomPlayers {
@@ -373,7 +373,7 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 		Universals:  []int{firstOaa, lastOaa},
 		Mnemonic:    mnemonic,
 		Decks:       decks,
-		Properties:  room.Properties,
+		Properties:  room.GetProperties(),
 		Skills:      skills,
 		PlayTimes:   playTimes,
 		PlayTimeOut: playTimeout,

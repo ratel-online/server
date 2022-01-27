@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
@@ -193,15 +194,35 @@ func (p Player) String() string {
 type Room struct {
 	sync.Mutex
 
-	ID         int64           `json:"id"`
-	Type       int             `json:"type"`
-	Game       *Game           `json:"gameId"`
-	State      int             `json:"state"`
-	Players    int             `json:"players"`
-	Robots     int             `json:"robots"`
-	Creator    int64           `json:"creator"`
-	ActiveTime time.Time       `json:"activeTime"`
-	Properties map[string]bool `json:"properties"`
+	ID         int64            `json:"id"`
+	Type       int              `json:"type"`
+	Game       *Game            `json:"gameId"`
+	State      int              `json:"state"`
+	Players    int              `json:"players"`
+	Robots     int              `json:"robots"`
+	Creator    int64            `json:"creator"`
+	ActiveTime time.Time        `json:"activeTime"`
+	Properties *hashmap.HashMap `json:"properties"`
+}
+
+func (r Room) SetProperty(key string, v bool) {
+	r.Properties.Set(key, v)
+}
+
+func (r Room) GetProperty(key string) bool {
+	v, ok := r.Properties.Get(key)
+	if ok {
+		return v.(bool)
+	}
+	return false
+}
+
+func (r Room) GetProperties() map[string]bool {
+	props := map[string]bool{}
+	r.Properties.Foreach(func(e *hashmap.Entry) {
+		props[e.Key().(string)] = e.Value().(bool)
+	})
+	return props
 }
 
 func (r Room) Model() model.Room {
@@ -214,12 +235,6 @@ func (r Room) Model() model.Room {
 		StateDesc: consts.RoomStates[r.State],
 		Creator:   r.Creator,
 	}
-}
-
-func (r Room) SetProperties(key string, v bool) {
-	r.Lock()
-	defer r.Unlock()
-	r.Properties[key] = v
 }
 
 type Game struct {

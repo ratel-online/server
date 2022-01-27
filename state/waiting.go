@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"fmt"
+	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/rule"
@@ -19,11 +20,11 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, consts.ErrorsExist
 	}
 	if room.Type == consts.GameTypeLaiZi {
-		room.SetProperties(consts.RoomPropsLaiZi, true)
+		room.SetProperty(consts.RoomPropsLaiZi, true)
 	} else if room.Type == consts.GameTypeSkill {
-		room.SetProperties(consts.RoomPropsLaiZi, true)
-		room.SetProperties(consts.RoomPropsDotShuffle, true)
-		room.SetProperties(consts.RoomPropsSkill, true)
+		room.SetProperty(consts.RoomPropsLaiZi, true)
+		room.SetProperty(consts.RoomPropsDotShuffle, true)
+		room.SetProperty(consts.RoomPropsSkill, true)
 	}
 	access, err := waitingForStart(player, room)
 	if err != nil {
@@ -79,7 +80,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
-				room.SetProperties(tags[1], tags[2] == "on")
+				room.SetProperty(tags[1], tags[2] == "on")
 				continue
 			}
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
@@ -103,18 +104,18 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
 	buf.WriteString("Properties: ")
-	for k, v := range room.Properties {
-		if v {
-			buf.WriteString(k + " ")
+	room.Properties.Foreach(func(e *hashmap.Entry) {
+		if e.Value().(bool) {
+			buf.WriteString(e.Key().(string) + " ")
 		}
-	}
+	})
 	buf.WriteString("\n")
 	_ = currPlayer.WriteString(buf.String())
 }
 
 func initGame(room *database.Room) (*database.Game, error) {
 	rules := rule.LandlordRules
-	if room.Properties[consts.RoomPropsSkill] {
+	if room.GetProperty(consts.RoomPropsSkill) {
 		rules = rule.TeamRules
 	}
 	return game.InitGame(room, rules)

@@ -52,7 +52,7 @@ func CreateRoom(creator int64) *Room {
 		State:      consts.RoomStateWaiting,
 		Creator:    creator,
 		ActiveTime: time.Now(),
-		Properties: map[string]bool{},
+		Properties: hashmap.New(),
 	}
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
