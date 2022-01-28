@@ -209,7 +209,10 @@ type Room struct {
 }
 
 func (r Room) SetProperty(key string, v bool) {
-	r.Properties.Set(key, v)
+	// 必须是合法的key才允许设置，不然客户端可以恶意提交，占满服务器内存
+	if _, ok := consts.RoomPropsKeys[key]; ok {
+		r.Properties.Set(key, v)
+	}
 }
 
 func (r Room) GetProperty(key string) bool {
@@ -237,8 +240,6 @@ func (r Room) Model() model.Room {
 		State:     r.State,
 		StateDesc: consts.RoomStates[r.State],
 		Creator:   r.Creator,
-		MaxPlayer: r.MaxPlayer,
-		Password:  r.Password,
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/protocol"
 	"github.com/ratel-online/core/util/async"
-	"github.com/ratel-online/server/config"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/state"
@@ -60,10 +59,6 @@ func loginAuth(c *network.Conn) (*model.AuthInfo, error) {
 	})
 	select {
 	case authInfo := <-authChan:
-		// 验签的时候校验客户端版本，过低不允许连接
-		if authInfo.ClientVersion < config.ALLOW_CLIENT_MIN_VERSION {
-			return nil, consts.ErrorsVersion
-		}
 		return authInfo, nil
 	case <-time.After(3 * time.Second):
 		return nil, consts.ErrorsAuthFail

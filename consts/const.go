@@ -1,9 +1,7 @@
 package consts
 
 import (
-	"fmt"
 	"github.com/ratel-online/core/consts"
-	"github.com/ratel-online/server/config"
 	"time"
 )
 
@@ -41,7 +39,7 @@ const (
 	IsStop  = consts.IsStop
 
 	MinPlayers = 3
-	MaxPlayers = config.ALLOW_ROOM_PLAYER_NUM
+	MaxPlayers = 6
 
 	RoomStateWaiting = 1
 	RoomStateRunning = 2
@@ -59,7 +57,17 @@ const (
 	RoomPropsDotShuffle = "ds"
 	RoomPropsLaiZi      = "lz"
 	RoomPropsSkill      = "sk"
+	RoomPropsPassword   = "pwd"
+	RoomPropsPlayerNum  = "pn"
 )
+
+var RoomPropsKeys map[string]string = map[string]string{
+	RoomPropsSkill:      "技能模式",
+	RoomPropsLaiZi:      "癞子模式",
+	RoomPropsDotShuffle: "不洗牌模式",
+	RoomPropsPassword:   "房间密码",
+	RoomPropsPlayerNum:  "房间人数",
+}
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
 
@@ -83,12 +91,8 @@ var (
 	ErrorsTimeout                = NewErr(1, false, "Timeout. ")
 	ErrorsInputInvalid           = NewErr(1, false, "Input invalid. ")
 	ErrorsAuthFail               = NewErr(1, true, "Auth fail. ")
-	ErrorsVersion                = NewErr(1, true, "client version is too low.You must update your client. ")
 	ErrorsRoomInvalid            = NewErr(1, true, "Room invalid. ")
 	ErrorsGameTypeInvalid        = NewErr(1, false, "Game type invalid. ")
-	ErrorsPasswordTooLong        = NewErr(1, false, "Your password is too long, must less 10 charts. ")
-	ErrorsPlayerTooMany          = NewErr(1, false, fmt.Sprintf("Too many players.Must less than %d. ", config.ALLOW_ROOM_PLAYER_NUM))
-	ErrorsPlayerTooLittle        = NewErr(1, false, "Too little players.Must greater than 1. ")
 	ErrorsRoomPlayersIsFull      = NewErr(1, false, "Room players is fill. ")
 	ErrorsRoomPassword           = NewErr(1, false, "Room password error. ")
 	ErrorsJoinFailForRoomRunning = NewErr(1, false, "Join fail, room is running. ")
