@@ -8,6 +8,7 @@ import (
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/rule"
 	"github.com/ratel-online/server/state/game"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -80,7 +81,27 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
-				room.SetProperty(tags[1], tags[2] == "on")
+				switch strings.TrimSpace(tags[1]) {
+				case consts.RoomPropsPassword:
+					pwd := strings.TrimSpace(tags[2])
+
+					// 不允许10位以上的密码，防止恶意输入超长文本占满服务器资源
+					if len(pwd) > 10 {
+						pwd = ""
+						buf := bytes.Buffer{}
+						buf.WriteString("Your password is too long, must less 10 charts.  \n")
+						_ = player.WriteString(buf.String())
+					}
+
+					room.Password = pwd
+				case consts.RoomPropsPlayerNum:
+					playerNum, err := strconv.Atoi(strings.TrimSpace(tags[2]))
+					if err == nil && playerNum > 1 && playerNum <= consts.MaxPlayers {
+						room.MaxPlayer = playerNum
+					}
+				default:
+					room.SetProperty(tags[1], tags[2] == "on")
+				}
 				continue
 			}
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))

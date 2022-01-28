@@ -18,6 +18,7 @@ type Network interface {
 }
 
 func handle(rwc protocol.ReadWriteCloser) error {
+	// 给新进入的用户分配资源
 	c := network.Wrapper(rwc)
 	defer func() {
 		err := c.Close()
@@ -28,8 +29,8 @@ func handle(rwc protocol.ReadWriteCloser) error {
 	log.Info("new player connected! ")
 	authInfo, err := loginAuth(c)
 	if err != nil || authInfo.ID == 0 {
-		_ = c.Write(protocol.ErrorPacket(consts.ErrorsAuthFail))
-		return consts.ErrorsAuthFail
+		_ = c.Write(protocol.ErrorPacket(err))
+		return err
 	}
 	player := database.Connected(c, authInfo)
 	log.Infof("player auth accessed, ip %s, %d:%s\n", player.IP, authInfo.ID, authInfo.Name)
@@ -38,6 +39,7 @@ func handle(rwc protocol.ReadWriteCloser) error {
 	return player.Listening()
 }
 
+// 登陆验签
 func loginAuth(c *network.Conn) (*model.AuthInfo, error) {
 	authChan := make(chan *model.AuthInfo)
 	defer close(authChan)

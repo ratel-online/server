@@ -16,7 +16,7 @@ import (
 )
 
 var roomIds int64 = 0
-var players = hashmap.New()
+var players = hashmap.New() // 存储连接过服务器的全部用户
 var connPlayers = hashmap.New()
 var rooms = hashmap.New()
 var roomPlayers = hashmap.New()
@@ -39,13 +39,13 @@ func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 		Name:  strings.Desensitize(info.Name),
 		Score: info.Score,
 	}
-	player.Conn(conn)
-	players.Set(info.ID, player)
-	connPlayers.Set(conn.ID(), player)
+	player.Conn(conn)                  // 初始化play对象
+	players.Set(info.ID, player)       // 写入用户池
+	connPlayers.Set(conn.ID(), player) // 写入连接用户池
 	return player
 }
 
-func CreateRoom(creator int64) *Room {
+func CreateRoom(creator int64, password string, playerNum int) *Room {
 	room := &Room{
 		ID:         atomic.AddInt64(&roomIds, 1),
 		Type:       consts.GameTypeClassic,
@@ -53,6 +53,8 @@ func CreateRoom(creator int64) *Room {
 		Creator:    creator,
 		ActiveTime: time.Now(),
 		Properties: hashmap.New(),
+		MaxPlayer:  playerNum,
+		Password:   password,
 	}
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
@@ -111,7 +113,10 @@ func getRoomPlayers(roomId int64) map[int64]bool {
 	return nil
 }
 
-func JoinRoom(roomId, playerId int64) error {
+// 加入房间
+func JoinRoom(roomId, playerId int64, password string) error {
+
+	// 资源检查
 	player := getPlayer(playerId)
 	if player == nil {
 		return consts.ErrorsExist
@@ -120,15 +125,28 @@ func JoinRoom(roomId, playerId int64) error {
 	if room == nil {
 		return consts.ErrorsRoomInvalid
 	}
+
+	// 加锁防止并发异常
 	room.Lock()
 	defer room.Unlock()
+
 	room.ActiveTime = time.Now()
+
+	// 房间状态检查
 	if room.State == consts.RoomStateRunning {
 		return consts.ErrorsJoinFailForRoomRunning
 	}
-	if room.Players >= consts.MaxPlayers {
+
+	//房间人数检查
+	if room.Players >= room.MaxPlayer {
 		return consts.ErrorsRoomPlayersIsFull
 	}
+
+	// 房间密码检查
+	if room.Password != password {
+		return consts.ErrorsRoomPassword
+	}
+
 	playersIds := getRoomPlayers(roomId)
 	if playersIds != nil {
 		playersIds[playerId] = true
