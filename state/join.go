@@ -15,7 +15,18 @@ func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	rooms := database.GetRooms()
 	buf.WriteString(fmt.Sprintf("%-10s%-10s%-10s%-10s\n", "ID", "Type", "Players", "State"))
 	for _, room := range rooms {
-		buf.WriteString(fmt.Sprintf("%-10d%-10s%-10d%-10s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
+
+		// 游戏进行中或者已经满了就不展示在房间列表里面了
+		if room.Players >= room.MaxPlayer || room.State == consts.RoomStateRunning {
+			continue
+		}
+
+		// 密码房id前面加星号
+		if room.Password != "" {
+			buf.WriteString(fmt.Sprintf("*%-10d%-10s%-10d%-10s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
+		} else {
+			buf.WriteString(fmt.Sprintf("%-10d%-10s%-10d%-10s\n", room.ID, consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
+		}
 	}
 	err := player.WriteString(buf.String())
 	if err != nil {
@@ -39,7 +50,36 @@ func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsRoomInvalid)
 	}
-	err = database.JoinRoom(roomId, player.ID)
+
+	//房间存在密码，要求输入密码
+	if room.Password != "" {
+		buf = bytes.Buffer{}
+		buf.WriteString("Please input room password. \n")
+		err = player.WriteString(buf.String())
+
+		if err != nil {
+			return 0, player.WriteError(err)
+		}
+
+		password, err := player.AskForString()
+		if err != nil {
+			return 0, player.WriteError(err)
+		}
+
+		if password != room.Password {
+			buf = bytes.Buffer{}
+			buf.WriteString("sorry! password incorrect. \n")
+			err = player.WriteString(buf.String())
+			if err != nil {
+				return 0, player.WriteError(err)
+			}
+
+			return 0, consts.ErrorsRoomPassword
+		}
+
+	}
+
+	err = database.JoinRoom(roomId, player.ID, room.Password)
 	if err != nil {
 		return 0, player.WriteError(err)
 	}

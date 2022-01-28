@@ -1,7 +1,9 @@
 package consts
 
 import (
+	"fmt"
 	"github.com/ratel-online/core/consts"
+	"github.com/ratel-online/server/config"
 	"time"
 )
 
@@ -39,7 +41,7 @@ const (
 	IsStop  = consts.IsStop
 
 	MinPlayers = 3
-	MaxPlayers = 6
+	MaxPlayers = config.ALLOW_ROOM_PLAYER_NUM
 
 	RoomStateWaiting = 1
 	RoomStateRunning = 2
@@ -81,9 +83,14 @@ var (
 	ErrorsTimeout                = NewErr(1, false, "Timeout. ")
 	ErrorsInputInvalid           = NewErr(1, false, "Input invalid. ")
 	ErrorsAuthFail               = NewErr(1, true, "Auth fail. ")
+	ErrorsVersion                = NewErr(1, true, "client version is too low.You must update your client. ")
 	ErrorsRoomInvalid            = NewErr(1, true, "Room invalid. ")
 	ErrorsGameTypeInvalid        = NewErr(1, false, "Game type invalid. ")
+	ErrorsPasswordTooLong        = NewErr(1, false, "Your password is too long, must less 10 charts. ")
+	ErrorsPlayerTooMany          = NewErr(1, false, fmt.Sprintf("Too many players.Must less than %d. ", config.ALLOW_ROOM_PLAYER_NUM))
+	ErrorsPlayerTooLittle        = NewErr(1, false, "Too little players.Must greater than 1. ")
 	ErrorsRoomPlayersIsFull      = NewErr(1, false, "Room players is fill. ")
+	ErrorsRoomPassword           = NewErr(1, false, "Room password error. ")
 	ErrorsJoinFailForRoomRunning = NewErr(1, false, "Join fail, room is running. ")
 	ErrorsGamePlayersInvalid     = NewErr(1, false, "Game players invalid. ")
 	ErrorsPokersFacesInvalid     = NewErr(1, false, "Pokers faces invalid. ")

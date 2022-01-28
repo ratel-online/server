@@ -68,6 +68,7 @@ func (p *Player) Listening() error {
 	}
 }
 
+// 向客户端发生消息
 func (p *Player) WriteString(data string) error {
 	time.Sleep(30 * time.Millisecond)
 	return p.conn.Write(protocol.Packet{
@@ -194,15 +195,17 @@ func (p Player) String() string {
 type Room struct {
 	sync.Mutex
 
-	ID         int64            `json:"id"`
-	Type       int              `json:"type"`
-	Game       *Game            `json:"gameId"`
-	State      int              `json:"state"`
-	Players    int              `json:"players"`
+	ID         int64            `json:"id"`      // 房间id
+	Type       int              `json:"type"`    //游戏类型
+	Game       *Game            `json:"gameId"`  //
+	State      int              `json:"state"`   // 状态
+	Players    int              `json:"players"` // 玩家数
 	Robots     int              `json:"robots"`
-	Creator    int64            `json:"creator"`
+	Creator    int64            `json:"creator"` //创建者
 	ActiveTime time.Time        `json:"activeTime"`
 	Properties *hashmap.HashMap `json:"properties"`
+	MaxPlayer  int              `json:"maxPlayer"` // 该房间允许的最大人数 0无限制
+	Password   string           `json:"password"`  // 房间密码 默认空 ， 最多10位
 }
 
 func (r Room) SetProperty(key string, v bool) {
@@ -234,6 +237,8 @@ func (r Room) Model() model.Room {
 		State:     r.State,
 		StateDesc: consts.RoomStates[r.State],
 		Creator:   r.Creator,
+		MaxPlayer: r.MaxPlayer,
+		Password:  r.Password,
 	}
 }
 
