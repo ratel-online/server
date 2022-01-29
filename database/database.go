@@ -10,6 +10,7 @@ import (
 	"github.com/ratel-online/core/util/strings"
 	"github.com/ratel-online/server/consts"
 	"sort"
+	"strconv"
 	stringx "strings"
 	"sync/atomic"
 	"time"
@@ -20,6 +21,32 @@ var players = hashmap.New() // 存储连接过服务器的全部用户
 var connPlayers = hashmap.New()
 var rooms = hashmap.New()
 var roomPlayers = hashmap.New()
+var roomPropsSetter = map[string]func(r *Room, v string){
+	consts.RoomPropsSkill: func(r *Room, v string) {
+		r.EnableSkill = v == "on"
+		r.EnableLandlord = !r.EnableSkill
+	},
+	consts.RoomPropsLaiZi: func(r *Room, v string) {
+		r.EnableLaiZi = v == "on"
+	},
+	consts.RoomPropsDotShuffle: func(r *Room, v string) {
+		r.EnableDontShuffle = v == "on"
+	},
+	consts.RoomPropsPassword: func(r *Room, v string) {
+		if v == "off" {
+			r.Password = ""
+		} else {
+			r.Password = v
+		}
+	},
+	consts.RoomPropsPlayerNum: func(r *Room, v string) {
+		n, _ := strconv.Atoi(v)
+		if n < 2 || n > 50 {
+			n = consts.MaxPlayers
+		}
+		r.MaxPlayers = n
+	},
+}
 
 func init() {
 	async.Async(func() {
@@ -45,16 +72,23 @@ func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	return player
 }
 
-func CreateRoom(creator int64, password string, playerNum int) *Room {
+func CreateRoom(creator int64, t int) *Room {
 	room := &Room{
-		ID:         atomic.AddInt64(&roomIds, 1),
-		Type:       consts.GameTypeClassic,
-		State:      consts.RoomStateWaiting,
-		Creator:    creator,
-		ActiveTime: time.Now(),
-		Properties: hashmap.New(),
-		MaxPlayer:  playerNum,
-		Password:   password,
+		ID:             atomic.AddInt64(&roomIds, 1),
+		Type:           t,
+		State:          consts.RoomStateWaiting,
+		Creator:        creator,
+		ActiveTime:     time.Now(),
+		MaxPlayers:     consts.MaxPlayers,
+		EnableLandlord: true,
+	}
+	if room.Type == consts.GameTypeLaiZi {
+		room.EnableLaiZi = true
+	} else if room.Type == consts.GameTypeSkill {
+		room.EnableLaiZi = true
+		room.EnableDontShuffle = true
+		room.EnableSkill = true
+		room.EnableLandlord = false
 	}
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
@@ -106,6 +140,12 @@ func getPlayer(playerId int64) *Player {
 	return nil
 }
 
+func SetRoomProps(room *Room, k, v string) {
+	if setter, ok := roomPropsSetter[k]; ok {
+		setter(room, v)
+	}
+}
+
 func getRoomPlayers(roomId int64) map[int64]bool {
 	if v, ok := roomPlayers.Get(roomId); ok {
 		return v.(map[int64]bool)
@@ -114,8 +154,7 @@ func getRoomPlayers(roomId int64) map[int64]bool {
 }
 
 // 加入房间
-func JoinRoom(roomId, playerId int64, password string) error {
-
+func JoinRoom(roomId, playerId int64) error {
 	// 资源检查
 	player := getPlayer(playerId)
 	if player == nil {
@@ -138,13 +177,8 @@ func JoinRoom(roomId, playerId int64, password string) error {
 	}
 
 	//房间人数检查
-	if room.Players >= room.MaxPlayer {
+	if room.Players >= room.MaxPlayers {
 		return consts.ErrorsRoomPlayersIsFull
-	}
-
-	// 房间密码检查
-	if room.Password != password {
-		return consts.ErrorsRoomPassword
 	}
 
 	playersIds := getRoomPlayers(roomId)

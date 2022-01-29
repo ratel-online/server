@@ -15,7 +15,7 @@ func init() {
 	register(consts.StateWelcome, &welcome{})
 	register(consts.StateHome, &home{})
 	register(consts.StateJoin, &join{})
-	register(consts.StateNew, &new{})
+	register(consts.StateCreate, &create{})
 	register(consts.StateWaiting, &waiting{})
 	register(consts.StateGame, &game.Game{})
 }

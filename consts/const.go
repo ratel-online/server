@@ -12,8 +12,7 @@ const (
 	StateWelcome
 	StateHome
 	StateJoin
-	StateNew
-	StateSetting
+	StateCreate
 	StateWaiting
 	StateGame
 )
@@ -61,14 +60,6 @@ const (
 	RoomPropsPlayerNum  = "pn"
 )
 
-var RoomPropsKeys map[string]string = map[string]string{
-	RoomPropsSkill:      "技能模式",
-	RoomPropsLaiZi:      "癞子模式",
-	RoomPropsDotShuffle: "不洗牌模式",
-	RoomPropsPassword:   "房间密码",
-	RoomPropsPlayerNum:  "房间人数",
-}
-
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
 
 type Error struct {
@@ -94,7 +85,7 @@ var (
 	ErrorsRoomInvalid            = NewErr(1, true, "Room invalid. ")
 	ErrorsGameTypeInvalid        = NewErr(1, false, "Game type invalid. ")
 	ErrorsRoomPlayersIsFull      = NewErr(1, false, "Room players is fill. ")
-	ErrorsRoomPassword           = NewErr(1, false, "Room password error. ")
+	ErrorsRoomPassword           = NewErr(1, false, "Sorry! Password incorrect! ")
 	ErrorsJoinFailForRoomRunning = NewErr(1, false, "Join fail, room is running. ")
 	ErrorsGamePlayersInvalid     = NewErr(1, false, "Game players invalid. ")
 	ErrorsPokersFacesInvalid     = NewErr(1, false, "Pokers faces invalid. ")

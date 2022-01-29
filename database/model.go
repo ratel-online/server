@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
@@ -195,40 +194,20 @@ func (p Player) String() string {
 type Room struct {
 	sync.Mutex
 
-	ID         int64            `json:"id"`      // 房间id
-	Type       int              `json:"type"`    //游戏类型
-	Game       *Game            `json:"gameId"`  //
-	State      int              `json:"state"`   // 状态
-	Players    int              `json:"players"` // 玩家数
-	Robots     int              `json:"robots"`
-	Creator    int64            `json:"creator"` //创建者
-	ActiveTime time.Time        `json:"activeTime"`
-	Properties *hashmap.HashMap `json:"properties"`
-	MaxPlayer  int              `json:"maxPlayer"` // 该房间允许的最大人数 0无限制
-	Password   string           `json:"password"`  // 房间密码 默认空 ， 最多10位
-}
-
-func (r Room) SetProperty(key string, v bool) {
-	// 必须是合法的key才允许设置，不然客户端可以恶意提交，占满服务器内存
-	if _, ok := consts.RoomPropsKeys[key]; ok {
-		r.Properties.Set(key, v)
-	}
-}
-
-func (r Room) GetProperty(key string) bool {
-	v, ok := r.Properties.Get(key)
-	if ok {
-		return v.(bool)
-	}
-	return false
-}
-
-func (r Room) GetProperties() map[string]bool {
-	props := map[string]bool{}
-	r.Properties.Foreach(func(e *hashmap.Entry) {
-		props[e.Key().(string)] = e.Value().(bool)
-	})
-	return props
+	ID                int64     `json:"id"`
+	Type              int       `json:"type"`
+	Game              *Game     `json:"gameId"`
+	State             int       `json:"state"`
+	Players           int       `json:"players"`
+	Robots            int       `json:"robots"`
+	Creator           int64     `json:"creator"`
+	ActiveTime        time.Time `json:"activeTime"`
+	MaxPlayers        int       `json:"maxPlayers"`
+	Password          string    `json:"password"`
+	EnableLaiZi       bool      `json:"enableLaiZi"`
+	EnableSkill       bool      `json:"enableSkill"`
+	EnableLandlord    bool      `json:"enableLandlord"`
+	EnableDontShuffle bool      `json:"enableDontShuffle"`
 }
 
 func (r Room) Model() model.Room {
@@ -244,6 +223,7 @@ func (r Room) Model() model.Room {
 }
 
 type Game struct {
+	Room        *Room                   `json:"room"`
 	Players     []int64                 `json:"players"`
 	Groups      map[int64]int           `json:"groups"`
 	States      map[int64]chan int      `json:"states"`
@@ -261,7 +241,6 @@ type Game struct {
 	LastFaces   *model.Faces            `json:"lastFaces"`
 	LastPokers  model.Pokers            `json:"lastPokers"`
 	Mnemonic    map[int]int             `json:"mnemonic"`
-	Properties  map[string]bool         `json:"properties"`
 	Skills      map[int64]int           `json:"skills"`
 	PlayTimes   map[int64]int           `json:"playTimes"`
 	PlayTimeOut map[int64]time.Duration `json:"playTimeOut"`
@@ -288,7 +267,7 @@ func (g Game) IsLandlord(playerId int64) bool {
 }
 
 func (g Game) Team(playerId int64) string {
-	if g.Properties[consts.RoomPropsSkill] {
+	if !g.Room.EnableLandlord {
 		return "team" + strconv.Itoa(g.Groups[playerId])
 	} else {
 		if !g.IsLandlord(playerId) {

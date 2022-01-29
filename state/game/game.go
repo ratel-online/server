@@ -31,8 +31,8 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 	}
 	game := room.Game
 	buf := bytes.Buffer{}
-	if game.Properties[consts.RoomPropsLaiZi] {
-		if game.Properties[consts.RoomPropsSkill] {
+	if game.Room.EnableLaiZi {
+		if game.Room.EnableSkill {
 			game.Pokers[player.ID].SetOaa(game.Universals...)
 			buf.WriteString(fmt.Sprintf("Game starting! Universals: %s %s\n", poker.GetDesc(game.Universals[0]), poker.GetDesc(game.Universals[1])))
 		} else {
@@ -43,7 +43,7 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 	} else {
 		buf.WriteString(fmt.Sprintf("Game starting!\n"))
 	}
-	if game.Properties[consts.RoomPropsSkill] {
+	if game.Room.EnableSkill {
 		buf.WriteString(fmt.Sprintf("Got skill %s\n", skill.Skills[consts.SkillID(game.Skills[player.ID])].Name()))
 	}
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
@@ -55,7 +55,7 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 		state := <-game.States[player.ID]
 		switch state {
 		case stateRob:
-			if game.Properties[consts.RoomPropsSkill] {
+			if !game.Room.EnableLandlord {
 				// reset all players group
 				for i, id := range game.Players {
 					game.Groups[id] = i
@@ -115,7 +115,7 @@ func handleRob(player *database.Player, game *database.Game) error {
 			game.Pokers[landlord.ID].SortByOaaValue()
 
 			buf := bytes.Buffer{}
-			if game.Properties[consts.RoomPropsLaiZi] {
+			if game.Room.EnableLaiZi {
 				buf.WriteString(fmt.Sprintf("%s became landlord, got pokers: %s, last universal: %s\n", landlord.Name, game.Additional.String(), poker.GetDesc(game.Universals[1])))
 				for _, pokers := range game.Pokers {
 					pokers.SetOaa(game.Universals...)
@@ -322,7 +322,7 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 func handlePlay(player *database.Player, game *database.Game) error {
 	master := player.ID == game.LastPlayer || game.LastPlayer == 0
 	database.Broadcast(player.RoomID, fmt.Sprintf("%s turn to play\n", player.Name))
-	if master && game.Properties[consts.RoomPropsSkill] {
+	if master && game.Room.EnableSkill {
 		sk := skill.Skills[consts.SkillID(game.Skills[player.ID])]
 		database.Broadcast(player.RoomID, fmt.Sprintf("%s \n", sk.Desc(player)))
 		sk.Apply(player, game)
@@ -331,7 +331,7 @@ func handlePlay(player *database.Player, game *database.Game) error {
 }
 
 func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
-	distributes, decks := poker.Distribute(room.Players, room.GetProperty(consts.RoomPropsDotShuffle), rules)
+	distributes, decks := poker.Distribute(room.Players, room.EnableDontShuffle, rules)
 	players := make([]int64, 0)
 	roomPlayers := database.RoomPlayers(room.ID)
 	for playerId := range roomPlayers {
@@ -364,6 +364,7 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 	rand.Seed(time.Now().UnixNano())
 	states[players[rand.Intn(len(states))]] <- stateRob
 	return &database.Game{
+		Room:        room,
 		States:      states,
 		Players:     players,
 		Groups:      groups,
@@ -373,7 +374,6 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 		Universals:  []int{firstOaa, lastOaa},
 		Mnemonic:    mnemonic,
 		Decks:       decks,
-		Properties:  room.GetProperties(),
 		Skills:      skills,
 		PlayTimes:   playTimes,
 		PlayTimeOut: playTimeout,
@@ -383,7 +383,7 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 }
 
 func resetGame(game *database.Game) error {
-	distributes, decks := poker.Distribute(len(game.Players), game.Properties[consts.RoomPropsDotShuffle], game.Rules)
+	distributes, decks := poker.Distribute(len(game.Players), game.Room.EnableDontShuffle, game.Rules)
 	if len(distributes) != len(game.Players)+1 {
 		return consts.ErrorsGamePlayersInvalid
 	}
@@ -443,7 +443,7 @@ func viewGame(game *database.Game, currPlayer *database.Player) {
 			buf.WriteString(" ")
 		}
 	}
-	if game.Properties[consts.RoomPropsLaiZi] {
+	if game.Room.EnableLaiZi {
 		buf.WriteString("\nThe Universal pokers are: ")
 		for _, key := range game.Universals {
 			buf.WriteString(poker.GetDesc(key) + " ")

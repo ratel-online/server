@@ -3,12 +3,10 @@ package state
 import (
 	"bytes"
 	"fmt"
-	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/rule"
 	"github.com/ratel-online/server/state/game"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -19,13 +17,6 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	room := database.GetRoom(player.RoomID)
 	if room == nil {
 		return 0, consts.ErrorsExist
-	}
-	if room.Type == consts.GameTypeLaiZi {
-		room.SetProperty(consts.RoomPropsLaiZi, true)
-	} else if room.Type == consts.GameTypeSkill {
-		room.SetProperty(consts.RoomPropsLaiZi, true)
-		room.SetProperty(consts.RoomPropsDotShuffle, true)
-		room.SetProperty(consts.RoomPropsSkill, true)
 	}
 	access, err := waitingForStart(player, room)
 	if err != nil {
@@ -81,27 +72,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
-				switch strings.TrimSpace(tags[1]) {
-				case consts.RoomPropsPassword:
-					pwd := strings.TrimSpace(tags[2])
-
-					// 不允许10位以上的密码，防止恶意输入超长文本占满服务器资源
-					if len(pwd) > 10 {
-						pwd = ""
-						buf := bytes.Buffer{}
-						buf.WriteString("Your password is too long, must less 10 charts.  \n")
-						_ = player.WriteString(buf.String())
-					}
-
-					room.Password = pwd
-				case consts.RoomPropsPlayerNum:
-					playerNum, err := strconv.Atoi(strings.TrimSpace(tags[2]))
-					if err == nil && playerNum > 1 && playerNum <= consts.MaxPlayers {
-						room.MaxPlayer = playerNum
-					}
-				default:
-					room.SetProperty(tags[1], tags[2] == "on")
-				}
+				database.SetRoomProps(room, tags[1], tags[2])
 				continue
 			}
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
@@ -114,6 +85,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
+
 	buf.WriteString(fmt.Sprintf("Room ID: %d\n", room.ID))
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
 	for playerId := range database.RoomPlayers(room.ID) {
@@ -124,20 +96,32 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		player := database.GetPlayer(playerId)
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
-	buf.WriteString("Properties: ")
-	room.Properties.Foreach(func(e *hashmap.Entry) {
-		if e.Value().(bool) {
-			buf.WriteString(e.Key().(string) + " ")
+	buf.WriteString("\nSettings:\n")
+	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
+	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
+	pwd := room.Password
+	if pwd != "" {
+		if room.Creator != currPlayer.ID {
+			pwd = "********"
 		}
-	})
-	buf.WriteString("\n")
+	} else {
+		pwd = "off"
+	}
+	buf.WriteString(fmt.Sprintf("%-5s%-20v\n", "pwd", pwd))
 	_ = currPlayer.WriteString(buf.String())
 }
 
 func initGame(room *database.Room) (*database.Game, error) {
 	rules := rule.LandlordRules
-	if room.GetProperty(consts.RoomPropsSkill) {
+	if !room.EnableLandlord {
 		rules = rule.TeamRules
 	}
 	return game.InitGame(room, rules)
+}
+
+func sprintPropsState(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
 }

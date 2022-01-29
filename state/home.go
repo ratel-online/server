@@ -23,7 +23,7 @@ func (*home) Next(player *database.Player) (consts.StateID, error) {
 	if selected == 1 {
 		return consts.StateJoin, nil
 	} else if selected == 2 {
-		return consts.StateNew, nil
+		return consts.StateCreate, nil
 	}
 	return 0, player.WriteError(consts.ErrorsInputInvalid)
 }

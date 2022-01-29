@@ -45,6 +45,9 @@
 - `set sk off`： 关闭技能模式
 - `set lz on`： 开启癞子模式
 - `set lz off`： 关闭癞子模式
+- `set pwd xxxx`：设置密码，例如密码为"xxxx"
+- `set pwd off`：取消密码
+- `set pn 6`: 设置房间人数上限，例如最大6个人
 - 其余的会转为聊天内容
 
 游戏指令：
