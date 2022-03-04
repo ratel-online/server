@@ -96,8 +96,10 @@ func (GHJMSkill) Apply(player *database.Player, game *database.Game) {
 	for i := range pokers {
 		pokers[i].Val = game.Rules.Value(pokers[i].Key)
 	}
-	pokers.SetOaa(game.Universals...)
-	pokers.SortByOaaValue()
+	if game.Room.EnableLaiZi {
+		pokers.SetOaa(game.Universals...)
+		pokers.SortByOaaValue()
+	}
 	game.Pokers[player.ID] = pokers
 }
 
@@ -211,7 +213,9 @@ func (N996Skill) Apply(player *database.Player, game *database.Game) {
 	for i := range pokers {
 		pokers[i].Val = game.Rules.Value(pokers[i].Key)
 	}
-	pokers.SetOaa(game.Universals...)
+	if game.Room.EnableLaiZi {
+		pokers.SetOaa(game.Universals...)
+	}
 	for _, id := range game.Players {
 		if id == player.ID {
 			continue

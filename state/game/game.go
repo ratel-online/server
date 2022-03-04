@@ -59,8 +59,10 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 				// reset all players group
 				for i, id := range game.Players {
 					game.Groups[id] = i
-					game.Pokers[id].SetOaa(game.Universals...)
-					game.Pokers[id].SortByOaaValue()
+					if game.Room.EnableLaiZi {
+						game.Pokers[id].SetOaa(game.Universals...)
+						game.Pokers[id].SortByOaaValue()
+					}
 				}
 				game.States[player.ID] <- statePlay
 			} else {
