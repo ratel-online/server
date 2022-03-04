@@ -266,6 +266,8 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	if room == nil {
 		return
 	}
+	room.Lock()
+	defer room.Unlock()
 	room.ActiveTime = time.Now()
 	excludeSet := map[int64]bool{}
 	for _, exc := range exclude {
@@ -289,6 +291,8 @@ func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {
 	if room == nil {
 		return
 	}
+	room.Lock()
+	defer room.Unlock()
 	excludeSet := map[int64]bool{}
 	for _, exc := range exclude {
 		excludeSet[exc] = true
