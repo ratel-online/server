@@ -46,7 +46,7 @@ func (p *Player) Offline() {
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
-		Broadcast(room.ID, fmt.Sprintf("%s lost connection!\n", p.Name))
+		broadcast(room, fmt.Sprintf("%s lost connection!\n", p.Name))
 		if room.State == consts.RoomStateWaiting {
 			leaveRoom(room, p)
 		}

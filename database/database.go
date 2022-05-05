@@ -261,6 +261,20 @@ func RoomPlayers(roomId int64) map[int64]bool {
 	return getRoomPlayers(roomId)
 }
 
+func broadcast(room *Room, msg string, exclude ...int64) {
+	room.ActiveTime = time.Now()
+	excludeSet := map[int64]bool{}
+	for _, exc := range exclude {
+		excludeSet[exc] = true
+	}
+	roomPlayers := getRoomPlayers(room.ID)
+	for playerId := range roomPlayers {
+		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
+			_ = player.WriteString(">> " + msg)
+		}
+	}
+}
+
 func Broadcast(roomId int64, msg string, exclude ...int64) {
 	room := getRoom(roomId)
 	if room == nil {
@@ -268,17 +282,7 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	}
 	room.Lock()
 	defer room.Unlock()
-	room.ActiveTime = time.Now()
-	excludeSet := map[int64]bool{}
-	for _, exc := range exclude {
-		excludeSet[exc] = true
-	}
-	roomPlayers := getRoomPlayers(roomId)
-	for playerId := range roomPlayers {
-		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
-			_ = player.WriteString(">> " + msg)
-		}
-	}
+	broadcast(room, msg, exclude...)
 }
 
 func BroadcastChat(player *Player, msg string, exclude ...int64) {
