@@ -86,7 +86,7 @@ var (
 	ErrorsChanClosed             = NewErr(1, true, "Chan closed. ")
 	ErrorsTimeout                = NewErr(1, false, "Timeout. ")
 	ErrorsInputInvalid           = NewErr(1, false, "Input invalid. ")
-	ErrorsChatUnopened           = NewErr(1, false, "Chat unopened. ")
+	ErrorsChatUnopened           = NewErr(1, false, "Chat disabled. ")
 	ErrorsAuthFail               = NewErr(1, true, "Auth fail. ")
 	ErrorsRoomInvalid            = NewErr(1, true, "Room invalid. ")
 	ErrorsGameTypeInvalid        = NewErr(1, false, "Game type invalid. ")
