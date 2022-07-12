@@ -8,6 +8,7 @@ import (
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/rule"
 	"github.com/ratel-online/server/skill"
 	"math/rand"
 	"strconv"
@@ -193,6 +194,17 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 				ans = poker.GetAlias(pokers[0].Key)
 			} else {
 				ans = "p"
+				if game.Room.Type == 4 && game.LastFaces != nil {
+					ans = ""
+					list := poker.RunFastComparativeFaces(*game.LastFaces, game.Pokers[player.ID], rule.RunFastRules)
+					if len(list) > 0 {
+						for i := range list[0].Keys {
+							ans += poker.GetAlias(list[0].Keys[i])
+						}
+					} else {
+						ans = "p"
+					}
+				}
 			}
 		} else {
 			timeout -= time.Second * time.Duration(time.Now().Unix()-before)
@@ -209,10 +221,24 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 				_ = player.WriteError(consts.ErrorsHaveToPlay)
 				continue
 			} else {
-				nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
-				database.Broadcast(player.RoomID, fmt.Sprintf("%s passed, next %s\n", player.Name, nextPlayer.Name))
-				game.States[nextPlayer.ID] <- statePlay
-				return nil
+				//跑得快必出機制
+				if game.Room.Type == 4 {
+					list := poker.RunFastComparativeFaces(*game.LastFaces, game.Pokers[player.ID], rule.RunFastRules)
+					if len(list) > 0 {
+						_ = player.WriteError(consts.ErrorsMustHaveToPlay)
+						continue
+					} else {
+						nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
+						database.Broadcast(player.RoomID, fmt.Sprintf("%s passed, next %s\n", player.Name, nextPlayer.Name))
+						game.States[nextPlayer.ID] <- statePlay
+						return nil
+					}
+				} else {
+					nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
+					database.Broadcast(player.RoomID, fmt.Sprintf("%s passed, next %s\n", player.Name, nextPlayer.Name))
+					game.States[nextPlayer.ID] <- statePlay
+					return nil
+				}
 			}
 		}
 		normalPokers := map[int]modelx.Pokers{}
@@ -250,23 +276,32 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 				normalPokers[key] = normalPokers[key][:len(normalPokers[key])-1]
 			}
 		}
-		facesArr := poker.ParseFaces(sells, game.Rules)
+		facesArr := poker.RunFastParseFaces(sells, game.Rules)
 		if len(facesArr) == 0 {
 			invalid = true
 		}
-		if invalid {
+		//聊天開啓才能說話
+		if invalid && game.Room.EnableChat {
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+			continue
+		} else {
+			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
 			continue
 		}
 		lastFaces := game.LastFaces
 		if !master && lastFaces != nil {
-			if isMax(game, *lastFaces) {
+			if isMax(game, *lastFaces) || (game.Room.Type == 4 && RunFastIsMax(*lastFaces)) {
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 				continue
 			}
 			access := false
 			for _, faces := range facesArr {
-				if isMax(game, faces) || faces.Compare(*lastFaces) {
+				//跑得快規則	非標準牌只能最後出
+				if game.Room.Type == 4 && (faces.Type == 10 || faces.Type == 12 || faces.Type == 14 || faces.Type == 16) && len(faces.Values) != len(pokers) {
+					_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsEndToPlay.Error()))
+					continue
+				}
+				if isMax(game, faces) || (game.Room.Type == 4 && RunFastIsMax(faces)) || faces.Compare(*lastFaces) || (game.Room.Type == 4 && RunFastFacesCompare(faces, *lastFaces)) {
 					access = true
 					lastFaces = &faces
 					break
@@ -277,7 +312,13 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 				continue
 			}
 		} else {
-			lastFaces = &facesArr[0]
+			//跑得快規則	非標準牌只能最後出
+			if game.Room.Type == 4 && (facesArr[0].Type == 10 || facesArr[0].Type == 12 || facesArr[0].Type == 14 || facesArr[0].Type == 16) && len(facesArr[0].Values) != len(pokers) {
+				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsEndToPlay.Error()))
+				continue
+			} else {
+				lastFaces = &facesArr[0]
+			}
 		}
 		for _, key := range realSellKeys {
 			game.Mnemonic[key]--
@@ -384,6 +425,75 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 	}, nil
 }
 
+func InitRunFastGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
+	distributes := poker.RunFastDistribute(room.EnableDontShuffle, rules)
+	players := make([]int64, 0)
+	roomPlayers := database.RoomPlayers(room.ID)
+	for playerId := range roomPlayers {
+		players = append(players, playerId)
+	}
+	states := map[int64]chan int{}
+	groups := map[int64]int{}
+	pokers := map[int64]modelx.Pokers{}
+	skills := map[int64]int{}
+	playTimes := map[int64]int{}
+	playTimeout := map[int64]time.Duration{}
+	mnemonic := map[int]int{}
+	for i := 1; i <= 13; i++ {
+		if i == 1 {
+			mnemonic[i] = 3
+		} else if i == 2 {
+			mnemonic[i] = 1
+		} else {
+			mnemonic[i] = 4
+		}
+	}
+	rand.Seed(time.Now().UnixNano())
+	for i := range players {
+		states[players[i]] = make(chan int, 1)
+		groups[players[i]] = 0
+		pokers[players[i]] = distributes[i]
+		skills[players[i]] = rand.Intn(len(skill.Skills))
+		playTimes[players[i]] = 1
+		playTimeout[players[i]] = consts.PlayTimeout
+	}
+	FirstPlayerIds := make([]int64, 0)
+
+	for k, v := range pokers {
+		if v[0].Key != 3 {
+			continue
+		} else {
+			FirstPlayerIds = append(FirstPlayerIds, k)
+		}
+	}
+	var FirstPlayerId int64
+	if len(FirstPlayerIds) == 1 {
+		FirstPlayerId = FirstPlayerIds[0]
+	} else {
+		FirstPlayerId = FirstPlayerIds[rand.Intn(len(FirstPlayerIds)-1)]
+	}
+	rand.Seed(time.Now().UnixNano())
+	states[players[rand.Intn(len(states))]] <- stateRob
+	return &database.Game{
+		FirstPlayer: FirstPlayerId,
+		Room:        room,
+		States:      states,
+		Players:     players,
+		Groups:      groups,
+		Pokers:      pokers,
+		Additional:  distributes[len(distributes)-1],
+		Multiple:    1,
+		Universals:  []int{},
+		Mnemonic:    mnemonic,
+		Decks:       1,
+		Skills:      skills,
+		PlayTimes:   playTimes,
+		PlayTimeOut: playTimeout,
+		Rules:       rules,
+		Discards:    modelx.Pokers{},
+	}, nil
+}
+
 func resetGame(game *database.Game) error {
 	distributes, decks := poker.Distribute(len(game.Players), game.Room.EnableDontShuffle, game.Rules)
 	if len(distributes) != len(game.Players)+1 {
@@ -434,15 +544,30 @@ func viewGame(game *database.Game, currPlayer *database.Player) {
 	for _, currPoker := range game.Pokers[currPlayer.ID] {
 		currKeys[currPoker.Key]++
 	}
-	buf.WriteString("Pokers  : ")
-	for _, i := range consts.MnemonicSorted {
-		buf.WriteString(poker.GetDesc(i) + "  ")
+	buf.WriteString("Pokers	: ")
+	if game.Room.Type == 4 {
+		for _, i := range consts.RunFastMnemonicSorted {
+			buf.WriteString(poker.GetDesc(i) + "  ")
+		}
+	} else {
+		for _, i := range consts.MnemonicSorted {
+			buf.WriteString(poker.GetDesc(i) + "  ")
+		}
 	}
 	buf.WriteString("\nSurplus : ")
-	for _, i := range consts.MnemonicSorted {
-		buf.WriteString(strconv.Itoa(game.Mnemonic[i]-currKeys[i]) + "  ")
-		if i == 10 {
-			buf.WriteString(" ")
+	if game.Room.Type == 4 {
+		for _, i := range consts.RunFastMnemonicSorted {
+			buf.WriteString(strconv.Itoa(game.Mnemonic[i]-currKeys[i]) + "  ")
+			if i == 10 {
+				buf.WriteString(" ")
+			}
+		}
+	} else {
+		for _, i := range consts.MnemonicSorted {
+			buf.WriteString(strconv.Itoa(game.Mnemonic[i]-currKeys[i]) + "  ")
+			if i == 10 {
+				buf.WriteString(" ")
+			}
 		}
 	}
 	if game.Room.EnableLaiZi {
@@ -462,4 +587,34 @@ func isMax(game *database.Game, faces modelx.Faces) bool {
 		}
 	}
 	return false
+}
+
+func RunFastIsMax(faces modelx.Faces) bool {
+	if len(faces.Keys) != 4 {
+		return false
+	}
+	return faces.Keys[0] == 13 && faces.Keys[1] == 13 && faces.Keys[2] == 13 && faces.Keys[3] == 13
+}
+
+func RunFastFacesCompare(faces modelx.Faces, lastFaces modelx.Faces) bool {
+	//炸彈直接比分
+	if faces.Type == 1 {
+		return faces.Score > lastFaces.Score
+	}
+	switch faces.Type {
+	//特殊牌型統一處理
+	case 5, 10, 11:
+		return faces.Score > lastFaces.Score && faces.Main == lastFaces.Main && faces.Extra == lastFaces.Extra
+	case 12, 13:
+		return faces.Score > lastFaces.Score && faces.Main == lastFaces.Main && faces.Extra == lastFaces.Extra
+	case 14, 15:
+		return faces.Score > lastFaces.Score && faces.Main == lastFaces.Main && faces.Extra == lastFaces.Extra
+	case 16, 17:
+		return faces.Score > lastFaces.Score && faces.Main == lastFaces.Main && faces.Extra == lastFaces.Extra
+
+	}
+	if faces.Type != lastFaces.Type {
+		return false
+	}
+	return faces.Score > lastFaces.Score && faces.Main == lastFaces.Main && faces.Extra == lastFaces.Extra
 }

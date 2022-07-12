@@ -38,7 +38,8 @@ const (
 	IsStop  = consts.IsStop
 
 	MinPlayers = 3
-	MaxPlayers = 6
+	// MaxPlayers https://github.com/ratel-online/server/issues/14 小鄧修改
+	MaxPlayers = 3
 
 	RoomStateWaiting = 1
 	RoomStateRunning = 2
@@ -46,6 +47,7 @@ const (
 	GameTypeClassic = 1
 	GameTypeLaiZi   = 2
 	GameTypeSkill   = 3
+	GameTypeRunFast = 4
 
 	RobTimeout  = 20 * time.Second
 	PlayTimeout = 40 * time.Second
@@ -58,9 +60,12 @@ const (
 	RoomPropsSkill      = "sk"
 	RoomPropsPassword   = "pwd"
 	RoomPropsPlayerNum  = "pn"
+	RoomPropsChat       = "ct"
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
+
+var RunFastMnemonicSorted = []int{2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
 
 type Error struct {
 	Code int
@@ -81,6 +86,7 @@ var (
 	ErrorsChanClosed             = NewErr(1, true, "Chan closed. ")
 	ErrorsTimeout                = NewErr(1, false, "Timeout. ")
 	ErrorsInputInvalid           = NewErr(1, false, "Input invalid. ")
+	ErrorsChatUnopened           = NewErr(1, false, "Chat unopened. ")
 	ErrorsAuthFail               = NewErr(1, true, "Auth fail. ")
 	ErrorsRoomInvalid            = NewErr(1, true, "Room invalid. ")
 	ErrorsGameTypeInvalid        = NewErr(1, false, "Game type invalid. ")
@@ -90,14 +96,16 @@ var (
 	ErrorsGamePlayersInvalid     = NewErr(1, false, "Game players invalid. ")
 	ErrorsPokersFacesInvalid     = NewErr(1, false, "Pokers faces invalid. ")
 	ErrorsHaveToPlay             = NewErr(1, false, "Have to play. ")
+	ErrorsMustHaveToPlay         = NewErr(1, false, "There is a hand that can be played and must be played. ")
+	ErrorsEndToPlay              = NewErr(1, false, "Can only come out at the end. ")
 
 	GameTypes = map[int]string{
 		GameTypeClassic: "Classic",
 		GameTypeLaiZi:   "LaiZi",
 		GameTypeSkill:   "Skill",
-		//GameTypeRunFast: "RunFast",
+		GameTypeRunFast: "RunFast",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill} // GameTypeLaiZi, GameTypeRunFast
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",

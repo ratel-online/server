@@ -59,6 +59,13 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		if signal == "ls" || signal == "v" {
 			viewRoomPlayers(room, player)
 		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
+			if room.Type == 4 && room.Players != 3 {
+				err := player.WriteError(consts.ErrorsGamePlayersInvalid)
+				if err != nil {
+					return false, err
+				}
+				continue
+			}
 			access = true
 			room.Lock()
 			room.Game, err = initGame(room)
@@ -73,7 +80,13 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
-				database.SetRoomProps(room, tags[1], tags[2])
+				if room.Type == 4 {
+					if tags[1] == "pwd" {
+						database.SetRoomProps(room, tags[1], tags[2])
+					}
+				} else {
+					database.SetRoomProps(room, tags[1], tags[2])
+				}
 				continue
 			}
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
@@ -100,6 +113,7 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf.WriteString("\nSettings:\n")
 	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
 	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
+	buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)))
 	pwd := room.Password
 	if pwd != "" {
 		if room.Creator != currPlayer.ID {
@@ -117,6 +131,11 @@ func initGame(room *database.Room) (*database.Game, error) {
 	if !room.EnableLandlord {
 		rules = rule.TeamRules
 	}
+
+	if room.Type == 4 {
+		return game.InitRunFastGame(room, rule.RunFastRules)
+	}
+
 	return game.InitGame(room, rules)
 }
 
