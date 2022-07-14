@@ -59,6 +59,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		if signal == "ls" || signal == "v" {
 			viewRoomPlayers(room, player)
 		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
+			//跑得快限制必须三人
 			if room.Type == 4 && room.Players != 3 {
 				err := player.WriteError(consts.ErrorsGamePlayersInvalid)
 				if err != nil {
@@ -80,8 +81,9 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
+				//跑得快只允许修改房间名和是否开启对局聊天
 				if room.Type == 4 {
-					if tags[1] == "pwd" {
+					if tags[1] == "pwd" || tags[1] == "ct" {
 						database.SetRoomProps(room, tags[1], tags[2])
 					}
 				} else {
@@ -131,7 +133,6 @@ func initGame(room *database.Room) (*database.Game, error) {
 	if !room.EnableLandlord {
 		rules = rule.TeamRules
 	}
-
 	if room.Type == 4 {
 		return game.InitRunFastGame(room, rule.RunFastRules)
 	}
