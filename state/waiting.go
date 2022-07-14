@@ -18,6 +18,7 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
+	//_type 对接类别
 	_type, access, err := waitingForStart(player, room)
 	if err != nil {
 		return 0, err
@@ -72,6 +73,7 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			access = true
 			room.Lock()
 			room.Game, err = initGame(room)
+			//修改对接类别为跑得快
 			if room.Type == 4 {
 				_type = consts.StateRunFastGame
 			}
