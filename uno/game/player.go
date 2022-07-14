@@ -6,8 +6,8 @@ import (
 )
 
 type Player interface {
-	ID() int64
-	Name() string
+	PlayerID() int64
+	NickName() string
 	PickColor(gameState State) color.Color
 	Play(playableCards []card.Card, gameState State) card.Card
 	NotifyCardsDrawn(drawnCards []card.Card)

@@ -10,11 +10,11 @@ type basicPlayer struct {
 	id   int64
 }
 
-func (p basicPlayer) ID() int64 {
+func (p basicPlayer) PlayerID() int64 {
 	return p.id
 }
 
-func (p basicPlayer) Name() string {
+func (p basicPlayer) NickName() string {
 	return p.name
 }
 

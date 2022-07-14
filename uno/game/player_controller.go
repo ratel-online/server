@@ -28,11 +28,11 @@ func (c *playerController) Hand() []card.Card {
 }
 
 func (c *playerController) Name() string {
-	return c.player.Name()
+	return c.player.NickName()
 }
 
 func (c *playerController) ID() int64 {
-	return c.player.ID()
+	return c.player.PlayerID()
 }
 func (c *playerController) NoCards() bool {
 	return c.hand.Empty()
@@ -53,7 +53,7 @@ func (c *playerController) Play(gameState State, deck *Deck) card.Card {
 	for {
 		selectedCard := c.player.Play(playableCards, gameState)
 		if !contains(playableCards, selectedCard) {
-			ui.Printfln("Cheat detected! Card %s is not in %s's hand!", selectedCard, c.player.Name())
+			ui.Printfln("Cheat detected! Card %s is not in %s's hand!", selectedCard, c.player.NickName())
 			continue
 		}
 		c.hand.RemoveCard(selectedCard)

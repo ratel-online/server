@@ -17,7 +17,7 @@ func newPlayerIterator(players []Player) *PlayerIterator {
 	var playerNames []string
 	playerMap := make(map[string]*playerController, len(players))
 	for _, player := range players {
-		playerName := player.Name()
+		playerName := player.NickName()
 		playerNames = append(playerNames, playerName)
 		playerMap[playerName] = newPlayerController(player)
 	}

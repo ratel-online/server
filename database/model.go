@@ -1,6 +1,7 @@
 package database
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,6 +16,10 @@ import (
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
+	"github.com/ratel-online/server/uno/card"
+	"github.com/ratel-online/server/uno/card/color"
+	"github.com/ratel-online/server/uno/event"
+	"github.com/ratel-online/server/uno/game"
 )
 
 type Player struct {
@@ -31,6 +36,96 @@ type Player struct {
 	read   bool
 	state  consts.StateID
 	online bool
+}
+
+func (p *Player) GamePlayer() game.Player {
+	return p
+}
+
+func (p *Player) PlayerID() int64 {
+	return p.ID
+}
+
+func (p *Player) NickName() string {
+	return p.Name
+}
+
+func (p *Player) PickColor(gameState game.State) color.Color {
+	p.WriteString(fmt.Sprintf(
+		"Select a color: '%s', '%s', '%s' or '%s'?",
+		color.Red,
+		color.Yellow,
+		color.Green,
+		color.Blue,
+	))
+	for {
+		colorName, err := p.AskForString(consts.PlayTimeout)
+		if err != nil {
+			p.WriteString(fmt.Sprintf("Unknown color '%s'", colorName))
+			continue
+		}
+		chosenColor, err := color.ByName(colorName)
+		if err != nil {
+			p.WriteString(fmt.Sprintf("Unknown color '%s'", colorName))
+			continue
+		}
+		return chosenColor
+	}
+}
+
+func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card {
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("It's your turn, %s!", p.Name))
+	buf.WriteString(gameState.String())
+	p.WriteString(buf.String())
+	runeSequence := runeSequence{}
+	cardOptions := make(map[string]card.Card)
+	for _, card := range playableCards {
+		label := string(runeSequence.next())
+		cardOptions[label] = card
+	}
+	cardSelectionLines := []string{"Select a card to play:"}
+	for label, card := range cardOptions {
+		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s (enter %s)", card, label))
+	}
+	cardSelectionMessage := strings.Join(cardSelectionLines, "\n")
+	for {
+		p.WriteString(cardSelectionMessage)
+		selectedLabel, _ := p.AskForString(consts.PlayTimeout)
+		selectedCard, found := cardOptions[selectedLabel]
+		if !found {
+			p.WriteString(fmt.Sprintf("No card assigned to '%s'", selectedLabel))
+			continue
+		}
+		return selectedCard
+	}
+}
+
+func (p *Player) OnFirstCardPlayed(payload event.FirstCardPlayedPayload) {
+	p.WriteString(fmt.Sprintf("First card is %s", payload.Card))
+}
+
+func (p *Player) OnCardPlayed(payload event.CardPlayedPayload) {
+	p.WriteString(fmt.Sprintf("%s played %s!", payload.PlayerName, payload.Card))
+}
+
+func (p *Player) OnColorPicked(payload event.ColorPickedPayload) {
+	p.WriteString(fmt.Sprintf("%s picked color %s!", payload.PlayerName, payload.Color))
+}
+
+func (p *Player) OnPlayerPassed(payload event.PlayerPassedPayload) {
+	p.WriteString(fmt.Sprintf("%s passed!", payload.PlayerName))
+}
+
+func (p *Player) NotifyCardsDrawn(cards []card.Card) {
+	p.WriteString(fmt.Sprintf("You drew %s!", cards))
+}
+
+func (p *Player) NotifyNoMatchingCardsInHand(lastPlayedCard card.Card, hand []card.Card) {
+	bff := bytes.Buffer{}
+	bff.WriteString(fmt.Sprintf("%s, none of your cards match %s!", p.Name, lastPlayedCard))
+	bff.WriteString(fmt.Sprintf("Your hand is %s", hand))
+	p.WriteString(bff.String())
 }
 
 func (p *Player) Write(bytes []byte) error {
