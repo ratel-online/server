@@ -3,16 +3,17 @@ package game
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/skill"
-	"math/rand"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type Game struct{}

@@ -3,12 +3,13 @@ package state
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/rule"
 	"github.com/ratel-online/server/state/game"
-	"strings"
-	"time"
 )
 
 type waiting struct{}
@@ -98,8 +99,10 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
 	buf.WriteString("\nSettings:\n")
-	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
-	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
+	if room.Type != consts.GameTypeUno {
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
+	}
 	pwd := room.Password
 	if pwd != "" {
 		if room.Creator != currPlayer.ID {
