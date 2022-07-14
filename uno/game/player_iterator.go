@@ -1,7 +1,7 @@
 package game
 
 import (
-	"github.com/ratel-online/server/uno/msg"
+	"fmt"
 )
 
 type PlayerIterator struct {
@@ -42,12 +42,14 @@ func (i *PlayerIterator) Next() *playerController {
 	return i.players[i.cycler.Next()]
 }
 
-func (i *PlayerIterator) Reverse() string {
+func (i *PlayerIterator) Reverse() {
 	i.cycler.Reverse()
-	return msg.Message.TurnOrderReversed()
+	//todo
+	fmt.Println("Turn order has been reversed!")
 }
 
-func (i *PlayerIterator) Skip() string {
+func (i *PlayerIterator) Skip() {
 	skippedPlayer := i.Next()
-	return msg.Message.PlayerTurnSkipped(skippedPlayer.Name())
+	//todo
+	fmt.Printf("%s's turn skipped!", skippedPlayer.Name())
 }

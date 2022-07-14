@@ -3,7 +3,6 @@ package game
 import (
 	"github.com/ratel-online/server/uno/card"
 	"github.com/ratel-online/server/uno/card/color"
-	"github.com/ratel-online/server/uno/ui"
 )
 
 type playerController struct {
@@ -52,10 +51,6 @@ func (c *playerController) Play(gameState State, deck *Deck) card.Card {
 
 	for {
 		selectedCard := c.player.Play(playableCards, gameState)
-		if !contains(playableCards, selectedCard) {
-			ui.Printfln("Cheat detected! Card %s is not in %s's hand!", selectedCard, c.player.NickName())
-			continue
-		}
 		c.hand.RemoveCard(selectedCard)
 		return selectedCard
 	}
@@ -69,13 +64,4 @@ func (c *playerController) tryTopDecking(gameState State, deck *Deck) card.Card 
 		return extraCard
 	}
 	return nil
-}
-
-func contains(cards []card.Card, searchedCard card.Card) bool {
-	for _, card := range cards {
-		if card.Equal(searchedCard) {
-			return true
-		}
-	}
-	return false
 }

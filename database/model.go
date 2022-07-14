@@ -97,8 +97,21 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 			p.WriteString(fmt.Sprintf("No card assigned to '%s'", selectedLabel))
 			continue
 		}
+		if !contains(playableCards, selectedCard) {
+			p.WriteString(fmt.Sprintf("Cheat detected! Card %s is not in %s's hand!", selectedCard, p.NickName()))
+			continue
+		}
 		return selectedCard
 	}
+}
+
+func contains(cards []card.Card, searchedCard card.Card) bool {
+	for _, card := range cards {
+		if card.Equal(searchedCard) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Player) OnFirstCardPlayed(payload event.FirstCardPlayedPayload) {
@@ -307,7 +320,7 @@ type Room struct {
 	EnableDontShuffle bool      `json:"enableDontShuffle"`
 }
 
-func (r Room) Model() model.Room {
+func (r *Room) Model() model.Room {
 	return model.Room{
 		ID:        r.ID,
 		Type:      r.Type,

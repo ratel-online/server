@@ -1,6 +1,12 @@
 package database
 
 import (
+	"sort"
+	"strconv"
+	stringx "strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
@@ -9,11 +15,6 @@ import (
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/core/util/strings"
 	"github.com/ratel-online/server/consts"
-	"sort"
-	"strconv"
-	stringx "strings"
-	"sync/atomic"
-	"time"
 )
 
 var roomIds int64 = 0
@@ -222,7 +223,6 @@ func leaveRoom(room *Room, player *Player) {
 	if len(playersIds) == 0 {
 		deleteRoom(room)
 	}
-	return
 }
 
 func offline(roomId, playerId int64) {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/uno/card/color"
 	"github.com/ratel-online/server/uno/game"
-	"github.com/ratel-online/server/uno/msg"
 )
 
 var UnoGame = &game.Game{}
@@ -23,7 +23,12 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 	}
 	game := room.UnoGame
 	buf := bytes.Buffer{}
-	buf.WriteString(msg.Message.Welcome())
+	buf.WriteString(fmt.Sprintf(
+		"WELCOME TO %s%s%s",
+		color.Red.Paint("U"),
+		color.Yellow.Paint("N"),
+		color.Blue.Paint("O"),
+	))
 	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", UnoGame.GetPlayerCards(player.Name)))
 	_ = player.WriteString(buf.String())
 	for {
