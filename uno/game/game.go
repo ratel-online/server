@@ -7,7 +7,7 @@ import (
 )
 
 type Game struct {
-	players *playerIterator
+	players *PlayerIterator
 	deck    *Deck
 	pile    *Pile
 }
@@ -18,6 +18,10 @@ func New(players []Player) *Game {
 		deck:    NewDeck(),
 		pile:    NewPile(),
 	}
+}
+
+func (g *Game) GetPlayerCards(name string) []card.Card {
+	return g.players.GetPlayerController(name).Hand()
 }
 
 func (g *Game) Play() Player {

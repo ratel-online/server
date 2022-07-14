@@ -24,6 +24,9 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, err
 	}
 	if access {
+		if room.Type == consts.GameTypeUno {
+			return consts.StateUnoGame, nil
+		}
 		return consts.StateGame, nil
 	}
 	return s.Exit(player), nil
@@ -63,6 +66,9 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			access = true
 			room.Lock()
 			room.Game, err = initGame(room)
+			if room.Type == consts.GameTypeUno {
+				room.UnoGame, err = game.InitUnoGame(room)
+			}
 			if err != nil {
 				room.Unlock()
 				_ = player.WriteError(err)

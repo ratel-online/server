@@ -1,13 +1,19 @@
 package game
 
-import "github.com/ratel-online/server/uno/ui"
+import (
+	"github.com/ratel-online/server/uno/ui"
+)
 
-type playerIterator struct {
+type PlayerIterator struct {
 	players map[string]*playerController
 	cycler  *Cycler
 }
 
-func newPlayerIterator(players []Player) *playerIterator {
+func (i *PlayerIterator) GetPlayerController(name string) *playerController {
+	return i.players[name]
+}
+
+func newPlayerIterator(players []Player) *PlayerIterator {
 	var playerNames []string
 	playerMap := make(map[string]*playerController, len(players))
 	for _, player := range players {
@@ -15,33 +21,33 @@ func newPlayerIterator(players []Player) *playerIterator {
 		playerNames = append(playerNames, playerName)
 		playerMap[playerName] = newPlayerController(player)
 	}
-	return &playerIterator{
+	return &PlayerIterator{
 		players: playerMap,
 		cycler:  NewCycler(playerNames),
 	}
 }
 
-func (i *playerIterator) Current() *playerController {
+func (i *PlayerIterator) Current() *playerController {
 	return i.players[i.cycler.Current()]
 }
 
-func (i *playerIterator) ForEach(function func(player *playerController)) {
+func (i *PlayerIterator) ForEach(function func(player *playerController)) {
 	for range i.players {
 		function(i.Current())
 		i.Next()
 	}
 }
 
-func (i *playerIterator) Next() *playerController {
+func (i *PlayerIterator) Next() *playerController {
 	return i.players[i.cycler.Next()]
 }
 
-func (i *playerIterator) Reverse() {
+func (i *PlayerIterator) Reverse() {
 	i.cycler.Reverse()
 	ui.Message.TurnOrderReversed()
 }
 
-func (i *playerIterator) Skip() {
+func (i *PlayerIterator) Skip() {
 	skippedPlayer := i.Next()
 	ui.Message.PlayerTurnSkipped(skippedPlayer.Name())
 }

@@ -2,6 +2,11 @@ package database
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
@@ -10,10 +15,7 @@ import (
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
+	"github.com/ratel-online/server/uno/card"
 )
 
 type Player struct {
@@ -197,6 +199,7 @@ type Room struct {
 	ID                int64     `json:"id"`
 	Type              int       `json:"type"`
 	Game              *Game     `json:"gameId"`
+	UnoGame           *UnoGame  `json:"unoGame"`
 	State             int       `json:"state"`
 	Players           int       `json:"players"`
 	Robots            int       `json:"robots"`
@@ -276,4 +279,13 @@ func (g Game) Team(playerId int64) string {
 			return "landlord"
 		}
 	}
+}
+
+type Cards []card.Card
+
+type UnoGame struct {
+	Room    *Room              `json:"room"`
+	Players []int64            `json:"players"`
+	States  map[int64]chan int `json:"states"`
+	Cards   map[int64]Cards    `json:"cards"`
 }

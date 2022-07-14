@@ -16,6 +16,7 @@ const (
 	StateCreate
 	StateWaiting
 	StateGame
+	StateUnoGame
 )
 
 type SkillID int
