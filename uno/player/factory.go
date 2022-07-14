@@ -18,7 +18,7 @@ var botNames = []string{
 
 func CreatePlayers(numberOfPlayers int, humanPlayerName string) []game.Player {
 	players := make([]game.Player, 0, numberOfPlayers)
-	players = append(players, NewHumanPlayer(humanPlayerName))
+	players = append(players, NewHumanPlayer(1, humanPlayerName))
 	players = append(players, generateBots(numberOfPlayers-1)...)
 	return players
 }

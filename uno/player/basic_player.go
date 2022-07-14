@@ -7,6 +7,11 @@ import (
 
 type basicPlayer struct {
 	name string
+	id   int64
+}
+
+func (p basicPlayer) ID() int64 {
+	return p.id
 }
 
 func (p basicPlayer) Name() string {

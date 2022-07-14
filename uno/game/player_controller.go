@@ -31,6 +31,9 @@ func (c *playerController) Name() string {
 	return c.player.Name()
 }
 
+func (c *playerController) ID() int64 {
+	return c.player.ID()
+}
 func (c *playerController) NoCards() bool {
 	return c.hand.Empty()
 }

@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/uno/game"
@@ -14,40 +13,36 @@ import (
 	"github.com/ratel-online/server/uno/player"
 )
 
-type Uno struct {
-	players *game.PlayerIterator
-	deck    *game.Deck
-	pile    *game.Pile
-}
+var UnoGame = &game.Game{}
+
+type Uno struct{}
 
 func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 	room := database.GetRoom(player.RoomID)
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	game := room.Game
-	unoGame := room.UnoGame
+	game := room.UnoGame
 	buf := bytes.Buffer{}
 	buf.WriteString(msg.Message.Welcome())
-	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", unoGame.GetPlayerCards(player.Name)))
+	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", UnoGame.GetPlayerCards(player.Name)))
 	_ = player.WriteString(buf.String())
-	if room.State == consts.RoomStateWaiting {
-		return consts.StateWaiting, nil
-	}
-	state := <-game.States[player.ID]
-	switch state {
-	case statePlay:
-		err := handlePlay(player, game)
-		if err != nil {
-			log.Error(err)
-			return 0, err
+	for {
+		if room.State == consts.RoomStateWaiting {
+			return consts.StateWaiting, nil
 		}
-	case stateWaiting:
-		return consts.StateWaiting, nil
-	default:
-		return 0, consts.ErrorsChanClosed
+		state := <-game.States[player.ID]
+		switch state {
+		case stateFirstCard:
+			UnoGame.PlayFirstCard()
+		case statePlay:
+
+		case stateWaiting:
+			return consts.StateWaiting, nil
+		default:
+			return 0, consts.ErrorsChanClosed
+		}
 	}
-	return consts.StateUnoGame, nil
 }
 
 func (g *Uno) Exit(player *database.Player) consts.StateID {
@@ -62,10 +57,13 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 	for playerId := range roomPlayers {
 		p := *database.GetPlayer(playerId)
 		players = append(players, p.ID)
-		unoPlayers = append(unoPlayers, player.NewHumanPlayer(p.Name))
+		unoPlayers = append(unoPlayers, player.NewHumanPlayer(p.ID, p.Name))
 		states[playerId] = make(chan int, 1)
 	}
 	rand.Seed(time.Now().UnixNano())
+	UnoGame = game.New(unoPlayers)
+	UnoGame.DealStartingCards()
+	states[players[UnoGame.Current().ID()]] <- stateFirstCard
 	return &database.UnoGame{
 		Room:    room,
 		Players: players,

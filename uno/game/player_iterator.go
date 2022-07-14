@@ -1,7 +1,7 @@
 package game
 
 import (
-	"github.com/ratel-online/server/uno/ui"
+	"github.com/ratel-online/server/uno/msg"
 )
 
 type PlayerIterator struct {
@@ -42,12 +42,12 @@ func (i *PlayerIterator) Next() *playerController {
 	return i.players[i.cycler.Next()]
 }
 
-func (i *PlayerIterator) Reverse() {
+func (i *PlayerIterator) Reverse() string {
 	i.cycler.Reverse()
-	ui.Message.TurnOrderReversed()
+	return msg.Message.TurnOrderReversed()
 }
 
-func (i *PlayerIterator) Skip() {
+func (i *PlayerIterator) Skip() string {
 	skippedPlayer := i.Next()
-	ui.Message.PlayerTurnSkipped(skippedPlayer.Name())
+	return msg.Message.PlayerTurnSkipped(skippedPlayer.Name())
 }

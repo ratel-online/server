@@ -12,8 +12,8 @@ type humanPlayer struct {
 	basicPlayer
 }
 
-func NewHumanPlayer(name string) game.Player {
-	player := humanPlayer{basicPlayer: basicPlayer{name: name}}
+func NewHumanPlayer(id int64, name string) game.Player {
+	player := humanPlayer{basicPlayer: basicPlayer{id: id, name: name}}
 	event.FirstCardPlayed.AddListener(player)
 	event.CardPlayed.AddListener(player)
 	event.ColorPicked.AddListener(player)

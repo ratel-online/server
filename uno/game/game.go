@@ -25,12 +25,12 @@ func (g *Game) GetPlayerCards(name string) []card.Card {
 }
 
 func (g *Game) Play() Player {
-	g.dealStartingCards()
-	g.playFirstCard()
+	g.DealStartingCards()
+	g.PlayFirstCard()
 
 	for {
 		player := g.players.Next()
-		gameState := g.extractState(player)
+		gameState := g.ExtractState(player)
 		card := player.Play(gameState, g.deck)
 		if card == nil {
 			event.PlayerPassed.Emit(event.PlayerPassedPayload{
@@ -43,30 +43,34 @@ func (g *Game) Play() Player {
 			PlayerName: player.Name(),
 			Card:       card,
 		})
-		g.performCardActions(card)
+		g.PerformCardActions(card)
 		if player.NoCards() {
 			return player.player
 		}
 	}
 }
 
-func (g *Game) dealStartingCards() {
+func (g *Game) DealStartingCards() {
 	g.players.ForEach(func(player *playerController) {
 		hand := g.deck.Draw(7)
 		player.AddCards(hand)
 	})
 }
 
-func (g *Game) playFirstCard() {
+func (g *Game) PlayFirstCard() {
 	firstCard := g.deck.DrawOne()
 	g.pile.Add(firstCard)
 	event.FirstCardPlayed.Emit(event.FirstCardPlayedPayload{
 		Card: firstCard,
 	})
-	g.performCardActions(firstCard)
+	g.PerformCardActions(firstCard)
 }
 
-func (g *Game) performCardActions(playedCard card.Card) {
+func (g *Game) Current() *playerController {
+	return g.players.Current()
+}
+
+func (g *Game) PerformCardActions(playedCard card.Card) {
 	player := g.players.Current()
 	for _, cardAction := range playedCard.Actions() {
 		switch cardAction := cardAction.(type) {
@@ -78,7 +82,7 @@ func (g *Game) performCardActions(playedCard card.Card) {
 		case action.SkipTurnAction:
 			g.players.Skip()
 		case action.PickColorAction:
-			gameState := g.extractState(player)
+			gameState := g.ExtractState(player)
 			color := player.PickColor(gameState)
 			coloredCard := card.NewColoredCard(playedCard, color)
 			g.pile.ReplaceTop(coloredCard)
@@ -90,7 +94,7 @@ func (g *Game) performCardActions(playedCard card.Card) {
 	}
 }
 
-func (g Game) extractState(player *playerController) State {
+func (g Game) ExtractState(player *playerController) State {
 	playerSequence := make([]string, 0)
 	playerHandCounts := make(map[string]int)
 

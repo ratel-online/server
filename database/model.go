@@ -15,7 +15,6 @@ import (
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
-	"github.com/ratel-online/server/uno/card"
 )
 
 type Player struct {
@@ -281,11 +280,8 @@ func (g Game) Team(playerId int64) string {
 	}
 }
 
-type Cards []card.Card
-
 type UnoGame struct {
 	Room    *Room              `json:"room"`
 	Players []int64            `json:"players"`
 	States  map[int64]chan int `json:"states"`
-	Cards   map[int64]Cards    `json:"cards"`
 }
