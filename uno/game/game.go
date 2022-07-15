@@ -36,32 +36,6 @@ func (g *Game) GetPlayerCards(name string) []card.Card {
 	return g.players.GetPlayerController(name).Hand()
 }
 
-func (g *Game) Play() Player {
-	g.DealStartingCards()
-	g.PlayFirstCard()
-
-	for {
-		player := g.players.Next()
-		gameState := g.ExtractState(player)
-		card := player.Play(gameState, g.deck)
-		if card == nil {
-			event.PlayerPassed.Emit(event.PlayerPassedPayload{
-				PlayerName: player.Name(),
-			})
-			continue
-		}
-		g.pile.Add(card)
-		event.CardPlayed.Emit(event.CardPlayedPayload{
-			PlayerName: player.Name(),
-			Card:       card,
-		})
-		g.PerformCardActions(card)
-		if player.NoCards() {
-			return player.player
-		}
-	}
-}
-
 func (g *Game) DealStartingCards() {
 	g.players.ForEach(func(player *playerController) {
 		hand := g.deck.Draw(7)

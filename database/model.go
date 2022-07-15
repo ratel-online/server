@@ -90,7 +90,7 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 
 func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card {
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("It's your turn, %s!", p.Name))
+	buf.WriteString(fmt.Sprintf("It's your turn, %s!\n", p.Name))
 	buf.WriteString(gameState.String())
 	p.WriteString(buf.String())
 	runeSequence := runeSequence{}
@@ -104,8 +104,8 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s (enter %s)", card, label))
 	}
 	cardSelectionMessage := strings.Join(cardSelectionLines, "\n")
-	p = getPlayer(p.ID)
 	for {
+		p = getPlayer(p.ID)
 		p.WriteString(cardSelectionMessage)
 		selectedLabel, err := p.AskForString(consts.PlayTimeout)
 		if err != nil {
@@ -135,30 +135,30 @@ func contains(cards []card.Card, searchedCard card.Card) bool {
 }
 
 func (p *Player) OnFirstCardPlayed(payload event.FirstCardPlayedPayload) {
-	p.WriteString(fmt.Sprintf("First card is %s", payload.Card))
+	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("First card is %s", payload.Card))
 }
 
 func (p *Player) OnCardPlayed(payload event.CardPlayedPayload) {
-	p.WriteString(fmt.Sprintf("%s played %s!", payload.PlayerName, payload.Card))
+	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("%s played %s!", payload.PlayerName, payload.Card))
 }
 
 func (p *Player) OnColorPicked(payload event.ColorPickedPayload) {
-	p.WriteString(fmt.Sprintf("%s picked color %s!", payload.PlayerName, payload.Color))
+	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("%s picked color %s!", payload.PlayerName, payload.Color))
 }
 
 func (p *Player) OnPlayerPassed(payload event.PlayerPassedPayload) {
-	p.WriteString(fmt.Sprintf("%s passed!", payload.PlayerName))
+	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("%s passed!", payload.PlayerName))
 }
 
 func (p *Player) NotifyCardsDrawn(cards []card.Card) {
-	p.WriteString(fmt.Sprintf("You drew %s!", cards))
+	getPlayer(p.ID).WriteString(fmt.Sprintf("You drew %s!", cards))
 }
 
 func (p *Player) NotifyNoMatchingCardsInHand(lastPlayedCard card.Card, hand []card.Card) {
-	bff := bytes.Buffer{}
-	bff.WriteString(fmt.Sprintf("%s, none of your cards match %s!", p.Name, lastPlayedCard))
-	bff.WriteString(fmt.Sprintf("Your hand is %s", hand))
-	p.WriteString(bff.String())
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("%s, none of your cards match %s!", p.Name, lastPlayedCard))
+	buf.WriteString(fmt.Sprintf("Your hand is %s", hand))
+	getPlayer(p.ID).WriteString(buf.String())
 }
 
 func (p *Player) Write(bytes []byte) error {
