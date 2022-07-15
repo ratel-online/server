@@ -14,8 +14,6 @@ import (
 	"github.com/ratel-online/server/uno/game"
 )
 
-var UnoGame = &game.Game{}
-
 type Uno struct{}
 
 func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
@@ -31,7 +29,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 		color.Yellow.Paint("N"),
 		color.Blue.Paint("O"),
 	))
-	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", UnoGame.GetPlayerCards(player.Name)))
+	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", game.Game.GetPlayerCards(player.Name)))
 	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {
@@ -40,10 +38,10 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 		state := <-game.States[player.ID]
 		switch state {
 		case stateFirstCard:
-			if msg := UnoGame.PlayFirstCard(); msg != "" {
+			if msg := game.Game.PlayFirstCard(); msg != "" {
 				database.Broadcast(room.ID, msg)
 			}
-			pc := UnoGame.Players().Next()
+			pc := game.Game.Players().Next()
 			game.States[pc.ID()] <- statePlay
 		case statePlay:
 			err := handlePlayUno(room, player, game)
@@ -64,27 +62,27 @@ func (g *Uno) Exit(player *database.Player) consts.StateID {
 }
 
 func handlePlayUno(room *database.Room, player *database.Player, game *database.UnoGame) error {
-	p := UnoGame.Current()
+	p := game.Game.Current()
 	if p.ID() != player.ID {
 		game.States[p.ID()] <- statePlay
 		return nil
 	}
-	gameState := UnoGame.ExtractState(p)
-	car, _ := p.Play(gameState, UnoGame.Deck())
+	gameState := game.Game.ExtractState(p)
+	car, _ := p.Play(gameState, game.Game.Deck())
 	if car == nil {
 		event.PlayerPassed.Emit(event.PlayerPassedPayload{
 			PlayerName: p.Name(),
 		})
-		pc := UnoGame.Players().Next()
+		pc := game.Game.Players().Next()
 		game.States[pc.ID()] <- statePlay
 		return nil
 	}
-	UnoGame.Pile().Add(car)
+	game.Game.Pile().Add(car)
 	event.CardPlayed.Emit(event.CardPlayedPayload{
 		PlayerName: p.Name(),
 		Card:       car,
 	})
-	if msg := UnoGame.PerformCardActions(car); msg != "" {
+	if msg := game.Game.PerformCardActions(car); msg != "" {
 		database.Broadcast(room.ID, msg)
 	}
 	if p.NoCards() {
@@ -98,7 +96,7 @@ func handlePlayUno(room *database.Room, player *database.Player, game *database.
 		}
 		return nil
 	}
-	pc := UnoGame.Players().Next()
+	pc := game.Game.Players().Next()
 	game.States[pc.ID()] <- statePlay
 	return nil
 }
@@ -115,12 +113,13 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 		states[playerId] = make(chan int, 1)
 	}
 	rand.Seed(time.Now().UnixNano())
-	UnoGame = game.New(unoPlayers)
-	UnoGame.DealStartingCards()
-	states[UnoGame.Current().ID()] <- stateFirstCard
+	unoGame := game.New(unoPlayers)
+	unoGame.DealStartingCards()
+	states[unoGame.Current().ID()] <- stateFirstCard
 	return &database.UnoGame{
 		Room:    room,
 		Players: players,
 		States:  states,
+		Game:    unoGame,
 	}, nil
 }

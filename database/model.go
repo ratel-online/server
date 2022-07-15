@@ -419,4 +419,5 @@ type UnoGame struct {
 	Room    *Room              `json:"room"`
 	Players []int64            `json:"players"`
 	States  map[int64]chan int `json:"states"`
+	Game    *game.Game         `json:"game"`
 }
