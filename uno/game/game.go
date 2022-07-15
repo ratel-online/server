@@ -12,6 +12,18 @@ type Game struct {
 	pile    *Pile
 }
 
+func (g *Game) Players() *PlayerIterator {
+	return g.players
+}
+
+func (g *Game) Deck() *Deck {
+	return g.deck
+}
+
+func (g *Game) Pile() *Pile {
+	return g.pile
+}
+
 func New(players []Player) *Game {
 	return &Game{
 		players: newPlayerIterator(players),

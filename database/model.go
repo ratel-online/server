@@ -106,7 +106,11 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 	cardSelectionMessage := strings.Join(cardSelectionLines, "\n")
 	for {
 		p.WriteString(cardSelectionMessage)
-		selectedLabel, _ := p.AskForString(consts.PlayTimeout)
+		selectedLabel, err := p.AskForString(consts.PlayTimeout)
+		if err != nil {
+			p.WriteString(err.Error())
+			continue
+		}
 		selectedCard, found := cardOptions[selectedLabel]
 		if !found {
 			p.WriteString(fmt.Sprintf("No card assigned to '%s'", selectedLabel))
