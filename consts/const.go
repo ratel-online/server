@@ -98,7 +98,7 @@ var (
 		GameTypeClassic: "Classic",
 		GameTypeLaiZi:   "LaiZi",
 		GameTypeSkill:   "Skill",
-		GameTypeUno:     "uno",
+		GameTypeUno:     "Uno",
 	}
 	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeUno} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{

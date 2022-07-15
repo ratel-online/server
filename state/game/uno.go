@@ -49,6 +49,8 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 				log.Error(err)
 				return 0, err
 			}
+			pc := UnoGame.Players().Next()
+			game.States[pc.ID()] <- statePlay
 		case stateWaiting:
 			return consts.StateWaiting, nil
 		default:

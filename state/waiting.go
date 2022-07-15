@@ -65,8 +65,10 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
 			access = true
 			room.Lock()
-			room.Game, err = initGame(room)
-			if room.Type == consts.GameTypeUno {
+			switch room.Type {
+			default:
+				room.Game, err = initGame(room)
+			case consts.GameTypeUno:
 				room.UnoGame, err = game.InitUnoGame(room)
 			}
 			if err != nil {

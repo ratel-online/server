@@ -104,6 +104,7 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s (enter %s)", card, label))
 	}
 	cardSelectionMessage := strings.Join(cardSelectionLines, "\n")
+	p = getPlayer(p.ID)
 	for {
 		p.WriteString(cardSelectionMessage)
 		selectedLabel, err := p.AskForString(consts.PlayTimeout)
