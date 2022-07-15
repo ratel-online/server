@@ -2,12 +2,14 @@ package game
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/ratel-online/server/uno/card"
 	"github.com/ratel-online/server/uno/card/color"
 )
 
 type Deck struct {
+	sync.Mutex
 	cards []card.Card
 }
 
@@ -22,6 +24,8 @@ func (d *Deck) DrawOne() card.Card {
 }
 
 func (d *Deck) Draw(amount int) []card.Card {
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
 	if len(d.cards) < amount {
 		fillDeck(d)
 	}

@@ -40,17 +40,17 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 		state := <-game.States[player.ID]
 		switch state {
 		case stateFirstCard:
-			UnoGame.PlayFirstCard()
+			if msg := UnoGame.PlayFirstCard(); msg != "" {
+				database.Broadcast(room.ID, msg)
+			}
 			pc := UnoGame.Players().Next()
 			game.States[pc.ID()] <- statePlay
 		case statePlay:
-			err := handlePlayUno(player, game)
+			err := handlePlayUno(room, player, game)
 			if err != nil {
 				log.Error(err)
 				return 0, err
 			}
-			pc := UnoGame.Players().Next()
-			game.States[pc.ID()] <- statePlay
 		case stateWaiting:
 			return consts.StateWaiting, nil
 		default:
@@ -63,27 +63,43 @@ func (g *Uno) Exit(player *database.Player) consts.StateID {
 	return consts.StateUnoGame
 }
 
-func handlePlayUno(player *database.Player, game *database.UnoGame) error {
+func handlePlayUno(room *database.Room, player *database.Player, game *database.UnoGame) error {
 	p := UnoGame.Current()
+	if p.ID() != player.ID {
+		game.States[p.ID()] <- statePlay
+		return nil
+	}
 	gameState := UnoGame.ExtractState(p)
-	card := p.Play(gameState, UnoGame.Deck())
-	if card == nil {
+	car, _ := p.Play(gameState, UnoGame.Deck())
+	if car == nil {
 		event.PlayerPassed.Emit(event.PlayerPassedPayload{
 			PlayerName: p.Name(),
 		})
+		pc := UnoGame.Players().Next()
+		game.States[pc.ID()] <- statePlay
 		return nil
 	}
-	UnoGame.Pile().Add(card)
+	UnoGame.Pile().Add(car)
 	event.CardPlayed.Emit(event.CardPlayedPayload{
 		PlayerName: p.Name(),
-		Card:       card,
+		Card:       car,
 	})
-	UnoGame.PerformCardActions(card)
-	if p.NoCards() {
-		for _, id := range game.Players {
-			game.States[id] <- stateWaiting
-		}
+	if msg := UnoGame.PerformCardActions(car); msg != "" {
+		database.Broadcast(room.ID, msg)
 	}
+	if p.NoCards() {
+		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n", p.Name()))
+		room.Lock()
+		room.Game = nil
+		room.State = consts.RoomStateWaiting
+		room.Unlock()
+		for _, playerId := range game.Players {
+			game.States[playerId] <- stateWaiting
+		}
+		return nil
+	}
+	pc := UnoGame.Players().Next()
+	game.States[pc.ID()] <- statePlay
 	return nil
 }
 

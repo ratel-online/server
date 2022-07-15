@@ -43,20 +43,20 @@ func (g *Game) DealStartingCards() {
 	})
 }
 
-func (g *Game) PlayFirstCard() {
+func (g *Game) PlayFirstCard() string {
 	firstCard := g.deck.DrawOne()
 	g.pile.Add(firstCard)
 	event.FirstCardPlayed.Emit(event.FirstCardPlayedPayload{
 		Card: firstCard,
 	})
-	g.PerformCardActions(firstCard)
+	return g.PerformCardActions(firstCard)
 }
 
 func (g *Game) Current() *playerController {
 	return g.players.Current()
 }
 
-func (g *Game) PerformCardActions(playedCard card.Card) {
+func (g *Game) PerformCardActions(playedCard card.Card) (ret string) {
 	player := g.players.Current()
 	for _, cardAction := range playedCard.Actions() {
 		switch cardAction := cardAction.(type) {
@@ -64,9 +64,9 @@ func (g *Game) PerformCardActions(playedCard card.Card) {
 			cards := g.deck.Draw(cardAction.Amount())
 			g.players.Current().AddCards(cards)
 		case action.ReverseTurnsAction:
-			g.players.Reverse()
+			ret += g.players.Reverse()
 		case action.SkipTurnAction:
-			g.players.Skip()
+			ret += g.players.Skip()
 		case action.PickColorAction:
 			gameState := g.ExtractState(player)
 			color := player.PickColor(gameState)
@@ -78,6 +78,7 @@ func (g *Game) PerformCardActions(playedCard card.Card) {
 			})
 		}
 	}
+	return
 }
 
 func (g Game) ExtractState(player *playerController) State {

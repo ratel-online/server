@@ -66,22 +66,23 @@ func (p *Player) NickName() string {
 }
 
 func (p *Player) PickColor(gameState game.State) color.Color {
-	p.WriteString(fmt.Sprintf(
-		"Select a color: '%s', '%s', '%s' or '%s'?",
-		color.Red,
-		color.Yellow,
-		color.Green,
-		color.Blue,
-	))
 	for {
+		p = getPlayer(p.ID)
+		p.WriteString(fmt.Sprintf(
+			"Select a color: '%s', '%s', '%s' or '%s'? \n",
+			color.Red,
+			color.Yellow,
+			color.Green,
+			color.Blue,
+		))
 		colorName, err := p.AskForString(consts.PlayTimeout)
 		if err != nil {
-			p.WriteString(fmt.Sprintf("Unknown color '%s'", colorName))
+			p.WriteString(fmt.Sprintf("Unknown color '%s' \n", colorName))
 			continue
 		}
 		chosenColor, err := color.ByName(colorName)
 		if err != nil {
-			p.WriteString(fmt.Sprintf("Unknown color '%s'", colorName))
+			p.WriteString(fmt.Sprintf("Unknown color '%s' \n", colorName))
 			continue
 		}
 		return chosenColor
@@ -89,8 +90,9 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 }
 
 func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card {
+	p = getPlayer(p.ID)
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("It's your turn, %s!\n", p.Name))
+	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
 	buf.WriteString(gameState.String())
 	p.WriteString(buf.String())
 	runeSequence := runeSequence{}
@@ -103,7 +105,7 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 	for label, card := range cardOptions {
 		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s (enter %s)", card, label))
 	}
-	cardSelectionMessage := strings.Join(cardSelectionLines, "\n")
+	cardSelectionMessage := strings.Join(cardSelectionLines, " \n ") + " \n "
 	for {
 		p = getPlayer(p.ID)
 		p.WriteString(cardSelectionMessage)
@@ -114,11 +116,11 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 		}
 		selectedCard, found := cardOptions[selectedLabel]
 		if !found {
-			p.WriteString(fmt.Sprintf("No card assigned to '%s'", selectedLabel))
+			p.WriteString(fmt.Sprintf("No card assigned to '%s' \n", selectedLabel))
 			continue
 		}
 		if !contains(playableCards, selectedCard) {
-			p.WriteString(fmt.Sprintf("Cheat detected! Card %s is not in %s's hand!", selectedCard, p.NickName()))
+			p.WriteString(fmt.Sprintf("Cheat detected! Card %s is not in %s's hand! \n", selectedCard, p.NickName()))
 			continue
 		}
 		return selectedCard
@@ -135,29 +137,34 @@ func contains(cards []card.Card, searchedCard card.Card) bool {
 }
 
 func (p *Player) OnFirstCardPlayed(payload event.FirstCardPlayedPayload) {
-	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("First card is %s", payload.Card))
+	p = getPlayer(p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("First card is %s\n", payload.Card))
 }
 
 func (p *Player) OnCardPlayed(payload event.CardPlayedPayload) {
-	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("%s played %s!", payload.PlayerName, payload.Card))
+	p = getPlayer(p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("%s played %s!\n", payload.PlayerName, payload.Card))
 }
 
 func (p *Player) OnColorPicked(payload event.ColorPickedPayload) {
-	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("%s picked color %s!", payload.PlayerName, payload.Color))
+	p = getPlayer(p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("%s picked color %s!\n", payload.PlayerName, payload.Color))
 }
 
 func (p *Player) OnPlayerPassed(payload event.PlayerPassedPayload) {
-	broadcast(getRoom(getPlayer(p.ID).RoomID), fmt.Sprintf("%s passed!", payload.PlayerName))
+	p = getPlayer(p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("%s passed!\n", payload.PlayerName))
 }
 
 func (p *Player) NotifyCardsDrawn(cards []card.Card) {
-	getPlayer(p.ID).WriteString(fmt.Sprintf("You drew %s!", cards))
+	p = getPlayer(p.ID)
+	getPlayer(p.ID).WriteString(fmt.Sprintf("You drew %s!\n", cards))
 }
 
 func (p *Player) NotifyNoMatchingCardsInHand(lastPlayedCard card.Card, hand []card.Card) {
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("%s, none of your cards match %s!", p.Name, lastPlayedCard))
-	buf.WriteString(fmt.Sprintf("Your hand is %s", hand))
+	buf.WriteString(fmt.Sprintf("%s, none of your cards match %s! \n", p.Name, lastPlayedCard))
+	buf.WriteString(fmt.Sprintf("Your hand is %s \n", hand))
 	getPlayer(p.ID).WriteString(buf.String())
 }
 
@@ -175,7 +182,7 @@ func (p *Player) Offline() {
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
-		broadcast(room, fmt.Sprintf("%s lost connection!\n", p.Name))
+		broadcast(room, fmt.Sprintf("%s lost connection! \n", p.Name))
 		if room.State == consts.RoomStateWaiting {
 			leaveRoom(room, p)
 		}

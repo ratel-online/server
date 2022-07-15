@@ -41,18 +41,18 @@ func (c *playerController) PickColor(gameState State) color.Color {
 	return c.player.PickColor(gameState)
 }
 
-func (c *playerController) Play(gameState State, deck *Deck) card.Card {
+func (c *playerController) Play(gameState State, deck *Deck) (selectedCard card.Card, noMatch bool) {
 	playableCards := c.hand.PlayableCards(gameState.LastPlayedCard)
 	if len(playableCards) == 0 {
 		c.player.NotifyNoMatchingCardsInHand(gameState.LastPlayedCard, gameState.CurrentPlayerHand)
-		playableDrawnCard := c.tryTopDecking(gameState, deck)
-		return playableDrawnCard
+		selectedCard = c.tryTopDecking(gameState, deck)
+		return selectedCard, true
 	}
 
 	for {
-		selectedCard := c.player.Play(playableCards, gameState)
+		selectedCard = c.player.Play(playableCards, gameState)
 		c.hand.RemoveCard(selectedCard)
-		return selectedCard
+		return selectedCard, false
 	}
 }
 

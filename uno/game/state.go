@@ -25,8 +25,6 @@ func (s State) String() string {
 		playerStatuses = append(playerStatuses, playerStatus)
 	}
 	lines = append(lines, fmt.Sprintf("Turn order: %s", strings.Join(playerStatuses, ", ")))
-
-	lines = append(lines, fmt.Sprintf("Your hand: %s", s.CurrentPlayerHand))
-
+	lines = append(lines, fmt.Sprintf("Your hand: %s\n", s.CurrentPlayerHand))
 	return strings.Join(lines, "\n")
 }

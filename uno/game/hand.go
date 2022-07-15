@@ -1,10 +1,13 @@
 package game
 
 import (
+	"sync"
+
 	"github.com/ratel-online/server/uno/card"
 )
 
 type Hand struct {
+	sync.Mutex
 	cards []card.Card
 }
 
@@ -13,6 +16,8 @@ func NewHand() *Hand {
 }
 
 func (h *Hand) AddCards(cards []card.Card) {
+	h.Mutex.Lock()
+	defer h.Mutex.Unlock()
 	h.cards = append(h.cards, cards...)
 }
 

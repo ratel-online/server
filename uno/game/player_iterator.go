@@ -42,14 +42,12 @@ func (i *PlayerIterator) Next() *playerController {
 	return i.players[i.cycler.Next()]
 }
 
-func (i *PlayerIterator) Reverse() {
+func (i *PlayerIterator) Reverse() string {
 	i.cycler.Reverse()
-	//todo
-	fmt.Println("Turn order has been reversed!")
+	return "Turn order has been reversed! \n"
 }
 
-func (i *PlayerIterator) Skip() {
+func (i *PlayerIterator) Skip() string {
 	skippedPlayer := i.Next()
-	//todo
-	fmt.Printf("%s's turn skipped!", skippedPlayer.Name())
+	return fmt.Sprintf("%s's turn skipped! \n", skippedPlayer.Name())
 }
