@@ -55,6 +55,9 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			return consts.StateWaiting, access, err
 		}
 		if room.State == consts.RoomStateRunning {
+			if room.Type == 4 {
+				_type = consts.StateRunFastGame
+			}
 			access = true
 			break
 		}
