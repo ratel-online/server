@@ -16,6 +16,7 @@ import (
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
+	mjGame "github.com/ratel-online/server/mahjong/game"
 	"github.com/ratel-online/server/uno/card"
 	"github.com/ratel-online/server/uno/card/color"
 	"github.com/ratel-online/server/uno/event"
@@ -51,6 +52,18 @@ type Player struct {
 	read   bool
 	state  consts.StateID
 	online bool
+}
+
+func (p *Player) MahjongPlayer() mjGame.Player {
+	return p
+}
+
+func (p *Player) PlayMJ(mjGame.State) int {
+	return 0
+}
+
+func (p *Player) NotifyTilesDrawn(drawnTiles []int) {
+
 }
 
 func (p *Player) GamePlayer() game.Player {
@@ -334,6 +347,7 @@ type Room struct {
 	Type              int       `json:"type"`
 	Game              *Game     `json:"gameId"`
 	UnoGame           *UnoGame  `json:"unoGame"`
+	Mahjong           *Mahjong  `json:"mahjong"`
 	State             int       `json:"state"`
 	Players           int       `json:"players"`
 	Robots            int       `json:"robots"`
@@ -420,4 +434,11 @@ type UnoGame struct {
 	Players []int64            `json:"players"`
 	States  map[int64]chan int `json:"states"`
 	Game    *game.Game         `json:"game"`
+}
+
+type Mahjong struct {
+	Room    *Room              `json:"room"`
+	Players []int64            `json:"players"`
+	States  map[int64]chan int `json:"states"`
+	Game    *mjGame.Game       `json:"game"`
 }
