@@ -17,6 +17,7 @@ import (
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
 	mjGame "github.com/ratel-online/server/mahjong/game"
+	"github.com/ratel-online/server/mahjong/tile"
 	"github.com/ratel-online/server/uno/card"
 	"github.com/ratel-online/server/uno/card/color"
 	"github.com/ratel-online/server/uno/event"
@@ -58,8 +59,40 @@ func (p *Player) MahjongPlayer() mjGame.Player {
 	return p
 }
 
-func (p *Player) PlayMJ(mjGame.State) int {
-	return 0
+func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
+	p = getPlayer(p.ID)
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
+	buf.WriteString(gameState.String())
+	p.WriteString(buf.String())
+	askBuf := bytes.Buffer{}
+	askBuf.WriteString("Select a tile to play:\n")
+	runeSequence := runeSequence{}
+	tileOptions := make(map[string]int)
+	for _, i := range tiles {
+		label := string(runeSequence.next())
+		tileOptions[label] = i
+		askBuf.WriteString(fmt.Sprintf("%s %s \n", tile.Tile(i).String(), label))
+	}
+	for {
+		p = getPlayer(p.ID)
+		p.WriteString(askBuf.String())
+		selectedLabel, err := p.AskForString(consts.PlayTimeout)
+		if err != nil {
+			if err == consts.ErrorsTimeout {
+				selectedLabel = "A"
+			} else {
+				return 0, err
+			}
+		}
+		selectedCard, found := tileOptions[selectedLabel]
+		if !found {
+			p.WriteString(fmt.Sprintf("No tile assigned to '%s' \n", selectedLabel))
+			continue
+		}
+		return selectedCard, nil
+
+	}
 }
 
 func (p *Player) NotifyTilesDrawn(drawnTiles []int) {

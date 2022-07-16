@@ -1,6 +1,10 @@
 package game
 
-import "github.com/ratel-online/server/mahjong/tile"
+import (
+	"sort"
+
+	"github.com/ratel-online/server/mahjong/tile"
+)
 
 type Game struct {
 	players *PlayerIterator
@@ -52,10 +56,11 @@ func (g Game) ExtractState(player *playerController) State {
 		playerSequence = append(playerSequence, player.Name())
 		playerHandCounts[player.Name()] = len(player.Hand())
 	})
-
+	playedTiles := g.pile.Tiles()
+	sort.Ints(playedTiles)
 	return State{
 		LastPlayedTile:    g.pile.Top(),
-		PlayedTiles:       g.pile.Tiles(),
+		PlayedTiles:       playedTiles,
 		CurrentPlayerHand: player.Hand(),
 		PlayerSequence:    playerSequence,
 	}

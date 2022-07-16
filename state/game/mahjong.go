@@ -54,7 +54,10 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		return nil
 	}
 	gameState := game.Game.ExtractState(p)
-	tile, win := p.Play(gameState, game.Game.Deck())
+	tile, win, err := p.Play(gameState, game.Game.Deck())
+	if err != nil {
+		return err
+	}
 	if win {
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n", p.Name()))
 		room.Lock()

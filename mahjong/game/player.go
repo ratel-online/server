@@ -3,6 +3,6 @@ package game
 type Player interface {
 	PlayerID() int64
 	NickName() string
-	PlayMJ(gameState State) int
+	PlayMJ(tiles []int, gameState State) (int, error)
 	NotifyTilesDrawn(drawnTiles []int)
 }

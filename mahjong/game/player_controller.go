@@ -33,16 +33,19 @@ func (c *playerController) ID() int64 {
 	return c.player.PlayerID()
 }
 
-func (c *playerController) Play(gameState State, deck *Deck) (selectedTile int, win bool) {
+func (c *playerController) Play(gameState State, deck *Deck) (int, bool, error) {
 	tile := deck.DrawOne()
 	c.hand.AddTiles([]int{tile})
 	if cwin.CanWin(c.Hand(), []int{}) {
-		return 0, true
+		return 0, true, nil
 	}
 	for {
-		selectedTile = c.player.PlayMJ(gameState)
+		selectedTile, err := c.player.PlayMJ(c.Hand(), gameState)
+		if err != nil {
+			return 0, false, err
+		}
 		c.hand.RemoveTile(selectedTile)
-		return selectedTile, false
+		return selectedTile, false, nil
 	}
 }
 
