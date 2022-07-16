@@ -24,6 +24,7 @@ var (
 	stateReset     = 3
 	stateWaiting   = 4
 	stateFirstCard = 5
+	stateTakeCard  = 6
 )
 
 func (g *Game) Next(player *database.Player) (consts.StateID, error) {
@@ -31,7 +32,7 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	game := room.Game
+	game := room.Game.(*database.Game)
 	buf := bytes.Buffer{}
 	if game.Room.EnableLaiZi {
 		if game.Room.EnableSkill {
@@ -258,7 +259,7 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 		}
 		//聊天開啓才能說話
 		if invalid && game.Room.EnableChat {
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+			player.BroadcastChat(fmt.Sprintf("%s say: %s\n", player.Name, ans))
 			continue
 		}
 		lastFaces := game.LastFaces

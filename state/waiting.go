@@ -25,10 +25,14 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, err
 	}
 	if access {
-		if room.Type == consts.GameTypeUno {
+		switch room.Type {
+		case consts.GameTypeUno:
 			return consts.StateUnoGame, nil
+		case consts.GameTypeMahjong:
+			return consts.StateMahjong, nil
+		default:
+			return _type, nil
 		}
-		return _type, nil
 	}
 	return s.Exit(player), nil
 }
@@ -82,11 +86,11 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			switch room.Type {
 			default:
 				room.Game, err = initGame(room)
+			case consts.GameTypeMahjong:
+				room.Game, err = game.InitMahjongGame(room)
 			case consts.GameTypeUno:
-				room.UnoGame, err = game.InitUnoGame(room)
-			}
-			//修改对接类别为跑得快
-			if room.Type == 4 {
+				room.Game, err = game.InitUnoGame(room)
+			case consts.GameTypeRunFast:
 				_type = consts.StateRunFastGame
 			}
 			if err != nil {
@@ -96,6 +100,7 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			}
 			room.State = consts.RoomStateRunning
 			room.Unlock()
+
 			break
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
@@ -110,9 +115,9 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 				}
 				continue
 			}
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			player.BroadcastChat(fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		} else if len(signal) > 0 {
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			player.BroadcastChat(fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		}
 	}
 	return _type, access, nil
@@ -132,7 +137,9 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
 	buf.WriteString("\nSettings:\n")
-	if room.Type != consts.GameTypeUno {
+	switch room.Type {
+	case consts.GameTypeUno, consts.GameTypeMahjong:
+	default:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)))

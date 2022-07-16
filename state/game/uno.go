@@ -21,7 +21,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	game := room.UnoGame
+	game := room.Game.(*database.UnoGame)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf(
 		"WELCOME TO %s%s%s!!!\n",
@@ -29,7 +29,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 		color.Yellow.Paint("N"),
 		color.Blue.Paint("O"),
 	))
-	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", game.Game.GetPlayerCards(player.Name)))
+	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", game.Game.GetPlayerCards(player.ID)))
 	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {
@@ -58,7 +58,11 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 }
 
 func (g *Uno) Exit(player *database.Player) consts.StateID {
-	database.GetRoom(player.RoomID).UnoGame.PlayerNumber--
+	room := database.GetRoom(player.RoomID)
+	if room == nil {
+		return consts.StateUnoGame
+	}
+	database.LeaveRoom(room.ID, player.ID)
 	return consts.StateUnoGame
 }
 
@@ -114,7 +118,7 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 	for playerId := range roomPlayers {
 		p := *database.GetPlayer(playerId)
 		players = append(players, p.ID)
-		unoPlayers = append(unoPlayers, p.GamePlayer())
+		unoPlayers = append(unoPlayers, p.UnoPlayer())
 		states[playerId] = make(chan int, 1)
 	}
 	rand.Seed(time.Now().UnixNano())
@@ -122,10 +126,9 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 	unoGame.DealStartingCards()
 	states[unoGame.Current().ID()] <- stateFirstCard
 	return &database.UnoGame{
-		Room:         room,
-		Players:      players,
-		States:       states,
-		Game:         unoGame,
-		PlayerNumber: len(players),
+		Room:    room,
+		Players: players,
+		States:  states,
+		Game:    unoGame,
 	}, nil
 }

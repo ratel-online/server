@@ -32,8 +32,8 @@ func New(players []Player) *Game {
 	}
 }
 
-func (g *Game) GetPlayerCards(name string) []card.Card {
-	return g.players.GetPlayerController(name).Hand()
+func (g *Game) GetPlayerCards(id int64) []card.Card {
+	return g.players.GetPlayerController(id).Hand()
 }
 
 func (g *Game) DealStartingCards() {
@@ -65,6 +65,9 @@ func (g *Game) PerformCardActions(playedCard card.Card) (ret string) {
 			g.players.Current().AddCards(cards)
 		case action.ReverseTurnsAction:
 			ret += g.players.Reverse()
+			if len(g.players.players) == 2 {
+				ret += g.players.Skip()
+			}
 		case action.SkipTurnAction:
 			ret += g.players.Skip()
 		case action.PickColorAction:

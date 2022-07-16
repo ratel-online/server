@@ -1,10 +1,7 @@
 package game
 
-import "sync"
-
-const (
-	left  = -1
-	right = 1
+import (
+	"sync"
 )
 
 type Cycler struct {
@@ -18,7 +15,7 @@ func NewCycler(elements []int64) *Cycler {
 	return &Cycler{
 		elements:  elements,
 		current:   len(elements) - 1,
-		direction: right,
+		direction: 1,
 	}
 }
 
@@ -38,15 +35,4 @@ func (c *Cycler) Next() int64 {
 	elementCount := len(c.elements)
 	c.current = (c.current + c.direction + elementCount) % elementCount
 	return c.elements[c.current]
-}
-
-func (c *Cycler) Reverse() {
-	c.Mutex.Lock()
-	defer c.Mutex.Unlock()
-	switch c.direction {
-	case right:
-		c.direction = left
-	case left:
-		c.direction = right
-	}
 }

@@ -1,9 +1,5 @@
 package game
 
-import (
-	"fmt"
-)
-
 type PlayerIterator struct {
 	players map[int64]*playerController
 	cycler  *Cycler
@@ -17,9 +13,9 @@ func newPlayerIterator(players []Player) *PlayerIterator {
 	var playerIDs []int64
 	playerMap := make(map[int64]*playerController, len(players))
 	for _, player := range players {
-		PlayerID := player.PlayerID()
-		playerIDs = append(playerIDs, PlayerID)
-		playerMap[PlayerID] = newPlayerController(player)
+		playerID := player.PlayerID()
+		playerIDs = append(playerIDs, playerID)
+		playerMap[playerID] = newPlayerController(player)
 	}
 	return &PlayerIterator{
 		players: playerMap,
@@ -40,14 +36,4 @@ func (i *PlayerIterator) ForEach(function func(player *playerController)) {
 
 func (i *PlayerIterator) Next() *playerController {
 	return i.players[i.cycler.Next()]
-}
-
-func (i *PlayerIterator) Reverse() string {
-	i.cycler.Reverse()
-	return "Turn order has been reversed! \n"
-}
-
-func (i *PlayerIterator) Skip() string {
-	skippedPlayer := i.Next()
-	return fmt.Sprintf("%s's turn skipped! \n", skippedPlayer.Name())
 }
