@@ -25,10 +25,14 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, err
 	}
 	if access {
-		if room.Type == consts.GameTypeUno {
+		switch room.Type {
+		case consts.GameTypeUno:
 			return consts.StateUnoGame, nil
+		case consts.GameTypeMahjong:
+			return consts.StateMahjong, nil
+		default:
+			return _type, nil
 		}
-		return _type, nil
 	}
 	return s.Exit(player), nil
 }
@@ -82,6 +86,8 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			switch room.Type {
 			default:
 				room.Game, err = initGame(room)
+			case consts.GameTypeMahjong:
+				room.Mahjong, err = game.InitMahjongGame(room)
 			case consts.GameTypeUno:
 				room.UnoGame, err = game.InitUnoGame(room)
 			}

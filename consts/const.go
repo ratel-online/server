@@ -18,6 +18,7 @@ const (
 	StateGame
 	StateRunFastGame
 	StateUnoGame
+	StateMahjong
 )
 
 type SkillID int
@@ -52,6 +53,7 @@ const (
 	GameTypeSkill   = 3
 	GameTypeRunFast = 4
 	GameTypeUno     = 5
+	GameTypeMahjong = 6
 
 	RobTimeout  = 20 * time.Second
 	PlayTimeout = 40 * time.Second
@@ -109,8 +111,9 @@ var (
 		GameTypeSkill:   "Skill",
 		GameTypeRunFast: "RunFast",
 		GameTypeUno:     "Uno",
+		GameTypeMahjong: "Mahjong",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeUno} // GameTypeLaiZi, GameTypeRunFast
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeUno, GameTypeMahjong} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",
