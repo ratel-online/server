@@ -9,7 +9,7 @@ type Player interface {
 	PlayerID() int64
 	NickName() string
 	PickColor(gameState State) color.Color
-	Play(playableCards []card.Card, gameState State) card.Card
+	Play(playableCards []card.Card, gameState State) (card.Card, error)
 	NotifyCardsDrawn(drawnCards []card.Card)
 	NotifyNoMatchingCardsInHand(lastPlayedCard card.Card, hand []card.Card)
 }

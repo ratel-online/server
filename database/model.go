@@ -90,6 +90,9 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 		))
 		colorName, err := p.AskForString(consts.PlayTimeout)
 		if err != nil {
+			if err == consts.ErrorsTimeout {
+				return color.Red
+			}
 			p.WriteString(fmt.Sprintf("Unknown color '%s' \n", colorName))
 			continue
 		}
@@ -102,7 +105,7 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 	}
 }
 
-func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card {
+func (p *Player) Play(playableCards []card.Card, gameState game.State) (card.Card, error) {
 	p = getPlayer(p.ID)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
@@ -124,8 +127,11 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 		p.WriteString(cardSelectionMessage)
 		selectedLabel, err := p.AskForString(consts.PlayTimeout)
 		if err != nil {
-			p.WriteString(err.Error())
-			continue
+			if err == consts.ErrorsTimeout {
+				selectedLabel = "A"
+			} else {
+				return nil, err
+			}
 		}
 		selectedCard, found := cardOptions[selectedLabel]
 		if !found {
@@ -136,7 +142,7 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) card.Card
 			p.WriteString(fmt.Sprintf("Cheat detected! Card %s is not in %s's hand! \n", selectedCard, p.NickName()))
 			continue
 		}
-		return selectedCard
+		return selectedCard, nil
 	}
 }
 
@@ -430,10 +436,24 @@ func (g Game) Team(playerId int64) string {
 }
 
 type UnoGame struct {
-	Room    *Room              `json:"room"`
-	Players []int64            `json:"players"`
-	States  map[int64]chan int `json:"states"`
-	Game    *game.Game         `json:"game"`
+	Room         *Room              `json:"room"`
+	Players      []int64            `json:"players"`
+	States       map[int64]chan int `json:"states"`
+	Game         *game.Game         `json:"game"`
+	PlayerNumber int                `json:"playerNumber"`
+}
+
+func (ug *UnoGame) HavePlay(player *Player) bool {
+	for _, id := range ug.Players {
+		if id == player.ID && player.online {
+			return true
+		}
+	}
+	return false
+}
+
+func (un *UnoGame) NeedExit() bool {
+	return un.PlayerNumber <= 1
 }
 
 type Mahjong struct {

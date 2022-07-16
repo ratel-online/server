@@ -58,6 +58,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 }
 
 func (g *Uno) Exit(player *database.Player) consts.StateID {
+	database.GetRoom(player.RoomID).UnoGame.PlayerNumber--
 	return consts.StateUnoGame
 }
 
@@ -67,25 +68,29 @@ func handlePlayUno(room *database.Room, player *database.Player, game *database.
 		game.States[p.ID()] <- statePlay
 		return nil
 	}
+	if !game.HavePlay(player) {
+		pc := game.Game.Players().Next()
+		game.States[pc.ID()] <- statePlay
+	}
 	gameState := game.Game.ExtractState(p)
-	car, _ := p.Play(gameState, game.Game.Deck())
-	if car == nil {
+	card, err := p.Play(gameState, game.Game.Deck())
+	if err != nil || card == nil {
 		event.PlayerPassed.Emit(event.PlayerPassedPayload{
 			PlayerName: p.Name(),
 		})
 		pc := game.Game.Players().Next()
 		game.States[pc.ID()] <- statePlay
-		return nil
+		return err
 	}
-	game.Game.Pile().Add(car)
+	game.Game.Pile().Add(card)
 	event.CardPlayed.Emit(event.CardPlayedPayload{
 		PlayerName: p.Name(),
-		Card:       car,
+		Card:       card,
 	})
-	if msg := game.Game.PerformCardActions(car); msg != "" {
+	if msg := game.Game.PerformCardActions(card); msg != "" {
 		database.Broadcast(room.ID, msg)
 	}
-	if p.NoCards() {
+	if p.NoCards() || game.NeedExit() {
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n", p.Name()))
 		room.Lock()
 		room.Game = nil
@@ -117,9 +122,10 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 	unoGame.DealStartingCards()
 	states[unoGame.Current().ID()] <- stateFirstCard
 	return &database.UnoGame{
-		Room:    room,
-		Players: players,
-		States:  states,
-		Game:    unoGame,
+		Room:         room,
+		Players:      players,
+		States:       states,
+		Game:         unoGame,
+		PlayerNumber: len(players),
 	}, nil
 }

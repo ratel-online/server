@@ -42,6 +42,9 @@ func (h *Hand) PlayableCards(lastPlayedCard card.Card) []card.Card {
 }
 
 func (h *Hand) RemoveCard(card card.Card) {
+	if card == nil {
+		return
+	}
 	for index, cardInHand := range h.cards {
 		if cardInHand.Equal(card) {
 			h.cards[index] = h.cards[len(h.cards)-1]
