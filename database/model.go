@@ -72,8 +72,9 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 	for _, i := range tiles {
 		label := string(runeSequence.next())
 		tileOptions[label] = i
-		askBuf.WriteString(fmt.Sprintf("%s %s \n", tile.Tile(i).String(), label))
+		askBuf.WriteString(fmt.Sprintf("%s:%s ", label, tile.Tile(i).String()))
 	}
+	askBuf.WriteString("\n")
 	for {
 		p = getPlayer(p.ID)
 		p.WriteString(askBuf.String())
