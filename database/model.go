@@ -77,6 +77,9 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 		))
 		colorName, err := p.AskForString(consts.PlayTimeout)
 		if err != nil {
+			if err == consts.ErrorsTimeout {
+				return color.Red
+			}
 			p.WriteString(fmt.Sprintf("Unknown color '%s' \n", colorName))
 			continue
 		}
