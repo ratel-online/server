@@ -59,9 +59,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 
 func (g *Uno) Exit(player *database.Player) consts.StateID {
 	room := database.GetRoom(player.RoomID)
-	room.Lock()
 	room.UnoGame.PlayerNumber--
-	room.Unlock()
 	database.LeaveRoom(room.ID, player.ID)
 	return consts.StateUnoGame
 }

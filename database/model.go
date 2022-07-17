@@ -109,7 +109,7 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int
 		}
 		selectedCards, found := tileOptions[selectedLabel]
 		if !found {
-			p.WriteString(fmt.Sprintf("No tile assigned to '%s' \n", selectedLabel))
+			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
 			continue
 		}
 		return ret, selectedCards, nil
@@ -144,7 +144,7 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 		}
 		selectedCard, found := tileOptions[selectedLabel]
 		if !found {
-			p.WriteString(fmt.Sprintf("No tile assigned to '%s' \n", selectedLabel))
+			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
 			continue
 		}
 		p.OnPlayTile(mjEvent.PlayTilePayload{
@@ -229,7 +229,7 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) (card.Car
 		}
 		selectedCard, found := cardOptions[selectedLabel]
 		if !found {
-			p.WriteString(fmt.Sprintf("No card assigned to '%s' \n", selectedLabel))
+			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
 			continue
 		}
 		if !contains(playableCards, selectedCard) {
