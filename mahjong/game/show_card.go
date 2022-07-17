@@ -2,6 +2,9 @@ package game
 
 import (
 	"fmt"
+
+	"github.com/ratel-online/server/mahjong/consts"
+	"github.com/ratel-online/server/mahjong/tile"
 )
 
 // ShowCard 明牌
@@ -19,7 +22,7 @@ func NewShowCard(opCode, target int, tiles []int, free bool) *ShowCard {
 }
 
 func (s *ShowCard) String() string {
-	return fmt.Sprintf("[明牌]code:%v,target:%v,tiles:%v,free:%v", s.opCode, s.target, s.tiles, s.free)
+	return fmt.Sprintf("[%v]%v", consts.OpCodeData[s.opCode], tile.ToTileString(s.tiles))
 }
 
 // GetOpCode 获取明牌类型

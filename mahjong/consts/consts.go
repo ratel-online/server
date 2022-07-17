@@ -6,3 +6,9 @@ const (
 	PENG
 	GANG
 )
+
+var OpCodeData = map[int]string{
+	CHI:  "吃",
+	PENG: "碰",
+	GANG: "杠",
+}

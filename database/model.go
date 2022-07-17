@@ -61,7 +61,7 @@ func (p *Player) MahjongPlayer() mjGame.Player {
 	return p
 }
 
-func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) ([]int, error) {
+func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int, error) {
 	p = getPlayer(p.ID)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
@@ -70,19 +70,23 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) ([]int, err
 	askBuf := bytes.Buffer{}
 	tileOptions := make(map[string][]int)
 	runeSequence := runeSequence{}
+	ret := 0
 	if pv, ok := gameState.SpecialPrivileges[p.ID]; ok {
 		label := string(runeSequence.next())
 		if pv == mjConsts.GANG {
-			askBuf.WriteString("You can 杠!!!")
+			askBuf.WriteString("You can 杠!!!\n")
+			ret = mjConsts.GANG
 			tileOptions[label] = []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
 		}
 		if pv == mjConsts.PENG {
-			askBuf.WriteString("You can 碰!!!")
+			askBuf.WriteString("You can 碰!!!\n")
+			ret = mjConsts.PENG
 			tileOptions[label] = []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
 		}
 		askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "yes"))
 	} else {
 		askBuf.WriteString("You can 吃!!!\n")
+		ret = mjConsts.CHI
 		for _, ts := range mjCard.CanChiTiles(tiles, gameState.LastPlayedTile) {
 			label := string(runeSequence.next())
 			tileOptions[label] = append(ts, gameState.LastPlayedTile)
@@ -99,7 +103,7 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) ([]int, err
 			if err == consts.ErrorsTimeout {
 				selectedLabel = "A"
 			} else {
-				return nil, err
+				return ret, nil, err
 			}
 		}
 		selectedCards, found := tileOptions[selectedLabel]
@@ -107,7 +111,7 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) ([]int, err
 			p.WriteString(fmt.Sprintf("No tile assigned to '%s' \n", selectedLabel))
 			continue
 		}
-		return selectedCards, nil
+		return ret, selectedCards, nil
 	}
 }
 func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {

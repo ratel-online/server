@@ -1,7 +1,6 @@
 package game
 
 import (
-	mconsts "github.com/ratel-online/server/mahjong/consts"
 	"github.com/ratel-online/server/mahjong/util"
 )
 
@@ -19,16 +18,8 @@ func newPlayerController(player Player) *playerController {
 	}
 }
 
-func (c *playerController) Chi(target int, tiles []int) {
-	c.showCards = append(c.showCards, NewShowCard(mconsts.CHI, target, tiles, false))
-}
-
-func (c *playerController) Peng(target int, tiles []int) {
-	c.showCards = append(c.showCards, NewShowCard(mconsts.PENG, target, tiles, false))
-}
-
-func (c *playerController) Gang(target int, tiles []int) {
-	c.showCards = append(c.showCards, NewShowCard(mconsts.GANG, target, tiles, false))
+func (c *playerController) operation(op, target int, tiles []int) {
+	c.showCards = append(c.showCards, NewShowCard(op, target, tiles, false))
 }
 
 func (c *playerController) GetShowCard() []*ShowCard {
@@ -75,11 +66,11 @@ func (c *playerController) Player() *Player {
 
 func (c *playerController) PlayPrivileges(gameState State, pile *Pile) (int, error) {
 	c.AddTiles([]int{pile.DrawOne()})
-	tiles, err := c.player.PlayPrivileges(c.Hand(), gameState)
+	op, tiles, err := c.player.PlayPrivileges(c.Hand(), gameState)
 	if err != nil {
 		return 0, err
 	}
-	c.Chi(int(pile.LastPlayer().ID()), tiles)
+	c.operation(op, int(pile.LastPlayer().ID()), tiles)
 	return c.Play(gameState)
 }
 
