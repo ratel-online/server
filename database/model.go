@@ -95,6 +95,7 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int
 		}
 	}
 	label := string(runeSequence.next())
+	tileOptions[label] = []int{}
 	askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "no"))
 	for {
 		p = getPlayer(p.ID)
@@ -107,7 +108,7 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int
 				return ret, nil, err
 			}
 		}
-		selectedCards, found := tileOptions[selectedLabel]
+		selectedCards, found := tileOptions[strings.ToUpper(selectedLabel)]
 		if !found {
 			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
 			continue
@@ -142,7 +143,7 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 				return 0, err
 			}
 		}
-		selectedCard, found := tileOptions[selectedLabel]
+		selectedCard, found := tileOptions[strings.ToUpper(selectedLabel)]
 		if !found {
 			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
 			continue
@@ -227,7 +228,7 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) (card.Car
 				return nil, err
 			}
 		}
-		selectedCard, found := cardOptions[selectedLabel]
+		selectedCard, found := cardOptions[strings.ToUpper(selectedLabel)]
 		if !found {
 			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
 			continue

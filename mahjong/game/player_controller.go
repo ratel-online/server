@@ -75,11 +75,17 @@ func (c *playerController) Player() *Player {
 }
 
 func (c *playerController) PlayPrivileges(gameState State, pile *Pile) (int, error) {
-	c.AddTiles([]int{pile.DrawOneFromBehind()})
-	op, tiles, err := c.player.PlayPrivileges(c.Hand(), gameState)
+	tiles := make([]int, 0, len(c.Hand())+1)
+	tiles = append(tiles, pile.Top())
+	tiles = append(tiles, c.Hand()...)
+	op, tiles, err := c.player.PlayPrivileges(tiles, gameState)
 	if err != nil {
 		return 0, err
 	}
+	if len(tiles) == 0 {
+		return c.Play(gameState)
+	}
+	c.AddTiles([]int{pile.DrawOneFromBehind()})
 	c.operation(op, int(pile.LastPlayer().ID()), tiles)
 	return c.Play(gameState)
 }
