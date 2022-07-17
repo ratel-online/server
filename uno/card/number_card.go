@@ -1,6 +1,8 @@
 package card
 
 import (
+	"fmt"
+
 	"github.com/ratel-online/server/uno/card/action"
 	"github.com/ratel-online/server/uno/card/color"
 )
@@ -35,5 +37,5 @@ func (c NumberCard) Number() int {
 }
 
 func (c NumberCard) String() string {
-	return c.color.Paintf("[ %d ]", c.number)
+	return c.color.Paintf("[%d]", c.number) + fmt.Sprintf("(%s)", c.color.Name())
 }

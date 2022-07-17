@@ -1,6 +1,8 @@
 package card
 
 import (
+	"fmt"
+
 	"github.com/ratel-online/server/uno/card/action"
 	"github.com/ratel-online/server/uno/card/color"
 )
@@ -29,5 +31,5 @@ func (c ReverseCard) Equal(other Card) bool {
 }
 
 func (c ReverseCard) String() string {
-	return c.color.Paint("[<=>]")
+	return c.color.Paintf("[<=>]") + fmt.Sprintf("(%s)", c.color.Name())
 }

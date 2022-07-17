@@ -7,15 +7,27 @@ import (
 	"github.com/fatih/color"
 )
 
+var colorData = map[string]string{
+	"red":    "红",
+	"green":  "绿",
+	"blue":   "蓝",
+	"yellow": "黄",
+}
+
 type Color interface {
 	Paint(string) string
 	Paintf(string, ...interface{}) string
 	String() string
+	Name() string
 }
 
 type colorStruct struct {
 	name          string
 	colorFunction func(string, ...interface{}) string
+}
+
+func (c *colorStruct) Name() string {
+	return colorData[c.name]
 }
 
 func (c *colorStruct) Paint(text string) string {

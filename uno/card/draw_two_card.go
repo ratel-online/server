@@ -1,6 +1,8 @@
 package card
 
 import (
+	"fmt"
+
 	"github.com/ratel-online/server/uno/card/action"
 	"github.com/ratel-online/server/uno/card/color"
 )
@@ -30,5 +32,5 @@ func (c DrawTwoCard) Equal(other Card) bool {
 }
 
 func (c DrawTwoCard) String() string {
-	return c.color.Paint("[+2!]")
+	return c.color.Paintf("[+2!]") + fmt.Sprintf("(%s)", c.color.Name())
 }
