@@ -52,8 +52,9 @@ const (
 	GameTypeUno     = 4
 	GameTypeMahjong = 5
 
-	RobTimeout  = 20 * time.Second
-	PlayTimeout = 40 * time.Second
+	RobTimeout         = 20 * time.Second
+	PlayTimeout        = 40 * time.Second
+	PlayMahjongTimeout = 2 * time.Minute
 )
 
 // Room properties.

@@ -99,7 +99,7 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int
 	for {
 		p = getPlayer(p.ID)
 		p.WriteString(askBuf.String())
-		selectedLabel, err := p.AskForString(consts.PlayTimeout)
+		selectedLabel, err := p.AskForString(consts.PlayMahjongTimeout)
 		if err != nil {
 			if err == consts.ErrorsTimeout {
 				selectedLabel = "A"
@@ -134,7 +134,7 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 	for {
 		p = getPlayer(p.ID)
 		p.WriteString(askBuf.String())
-		selectedLabel, err := p.AskForString(consts.PlayTimeout)
+		selectedLabel, err := p.AskForString(consts.PlayMahjongTimeout)
 		if err != nil {
 			if err == consts.ErrorsTimeout {
 				selectedLabel = "A"
