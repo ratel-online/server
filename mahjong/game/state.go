@@ -32,7 +32,7 @@ func (s State) String() string {
 		}
 		playerStatuses = append(playerStatuses, playerStatus)
 	}
-	lines = append(lines, fmt.Sprintf("Turn order: %s\n", strings.Join(playerStatuses, "\n")))
-	lines = append(lines, fmt.Sprintf("Your hand: %s\n", tile.ToTileString(s.CurrentPlayerHand)))
+	lines = append(lines, fmt.Sprintf("Turn order:\n %s \n", strings.Join(playerStatuses, "\n")))
+	lines = append(lines, fmt.Sprintf("Your hand: %s \n", tile.ToTileString(s.CurrentPlayerHand)))
 	return strings.Join(lines, "\n")
 }

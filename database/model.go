@@ -82,10 +82,10 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) ([]int, err
 		}
 		askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "yes"))
 	} else {
-		askBuf.WriteString("You can choose!!!\n")
+		askBuf.WriteString("You can 吃!!!\n")
 		for _, ts := range mjCard.CanChiTiles(tiles, gameState.LastPlayedTile) {
 			label := string(runeSequence.next())
-			tileOptions[label] = ts
+			tileOptions[label] = append(ts, gameState.LastPlayedTile)
 			askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
 		}
 	}

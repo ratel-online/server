@@ -155,9 +155,8 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 		}
 		mahjong.Players().Next()
 	}
-	database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", mahjong.Current().Name()))
-	tile := mahjong.Deck().DrawOne()
-	mahjong.Current().AddTiles([]int{tile})
+	// database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", mahjong.Current().Name()))
+	mahjong.Current().TryTopDecking(mahjong.Deck())
 	states[mahjong.Current().ID()] <- statePlay
 	return &database.Mahjong{
 		Room:    room,

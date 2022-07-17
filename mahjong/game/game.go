@@ -57,11 +57,13 @@ func (g Game) ExtractState(player *playerController) State {
 	g.players.ForEach(func(player *playerController) {
 		playerSequence = append(playerSequence, player.Name())
 		playerShowCards[player.Name()] = player.GetShowCard()
-		if card.CanGang(player.Hand(), g.pile.Top()) {
-			specialPrivileges[player.ID()] = consts.GANG
-		}
-		if card.CanPeng(player.Hand(), g.pile.Top()) {
-			specialPrivileges[player.ID()] = consts.PENG
+		if len(g.pile.Tiles()) > 0 {
+			if card.CanGang(player.Hand(), g.pile.Top()) {
+				specialPrivileges[player.ID()] = consts.GANG
+			}
+			if card.CanPeng(player.Hand(), g.pile.Top()) {
+				specialPrivileges[player.ID()] = consts.PENG
+			}
 		}
 	})
 	playedTiles := g.pile.Tiles()
