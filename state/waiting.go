@@ -19,7 +19,8 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
-	access, err := waitingForStart(player, room)
+	//_type 对接类别
+	_type, access, err := waitingForStart(player, room)
 	if err != nil {
 		return 0, err
 	}
@@ -30,7 +31,7 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		case consts.GameTypeMahjong:
 			return consts.StateMahjong, nil
 		default:
-			return consts.StateGame, nil
+			return _type, nil
 		}
 	}
 	return s.Exit(player), nil
@@ -50,16 +51,21 @@ func (*waiting) Exit(player *database.Player) consts.StateID {
 	return consts.StateHome
 }
 
-func waitingForStart(player *database.Player, room *database.Room) (bool, error) {
+func waitingForStart(player *database.Player, room *database.Room) (consts.StateID, bool, error) {
 	access := false
+	//对局类别
+	_type := consts.StateGame
 	player.StartTransaction()
 	defer player.StopTransaction()
 	for {
 		signal, err := player.AskForStringWithoutTransaction(time.Second)
 		if err != nil && err != consts.ErrorsTimeout {
-			return access, err
+			return consts.StateWaiting, access, err
 		}
 		if room.State == consts.RoomStateRunning {
+			if room.Type == 4 {
+				_type = consts.StateRunFastGame
+			}
 			access = true
 			break
 		}
@@ -67,6 +73,14 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		if signal == "ls" || signal == "v" {
 			viewRoomPlayers(room, player)
 		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
+			//跑得快限制必须三人
+			if room.Type == 4 && room.Players != 3 {
+				err := player.WriteError(consts.ErrorsGamePlayersInvalid)
+				if err != nil {
+					return consts.StateWaiting, false, err
+				}
+				continue
+			}
 			access = true
 			room.Lock()
 			switch room.Type {
@@ -77,10 +91,14 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			case consts.GameTypeUno:
 				room.UnoGame, err = game.InitUnoGame(room)
 			}
+			//修改对接类别为跑得快
+			if room.Type == 4 {
+				_type = consts.StateRunFastGame
+			}
 			if err != nil {
 				room.Unlock()
 				_ = player.WriteError(err)
-				return access, err
+				return consts.StateWaiting, access, err
 			}
 			room.State = consts.RoomStateRunning
 			room.Unlock()
@@ -89,7 +107,14 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
-				database.SetRoomProps(room, tags[1], tags[2])
+				//跑得快只允许修改房间名和是否开启对局聊天
+				if room.Type == 4 {
+					if tags[1] == "pwd" || tags[1] == "ct" {
+						database.SetRoomProps(room, tags[1], tags[2])
+					}
+				} else {
+					database.SetRoomProps(room, tags[1], tags[2])
+				}
 				continue
 			}
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
@@ -97,7 +122,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		}
 	}
-	return access, nil
+	return _type, access, nil
 }
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
@@ -119,6 +144,7 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	default:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)))
 	}
 	pwd := room.Password
 	if pwd != "" {
@@ -137,6 +163,10 @@ func initGame(room *database.Room) (*database.Game, error) {
 	if !room.EnableLandlord {
 		rules = rule.TeamRules
 	}
+	if room.Type == 4 {
+		return game.InitRunFastGame(room, rule.RunFastRules)
+	}
+
 	return game.InitGame(room, rules)
 }
 

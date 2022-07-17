@@ -21,6 +21,7 @@ func init() {
 	register(consts.StateGame, &game.Game{})
 	register(consts.StateUnoGame, &game.Uno{})
 	register(consts.StateMahjong, &game.Mahjong{})
+	register(consts.StateRunFastGame, &game.RunFastGame{})
 }
 
 func register(id consts.StateID, state State) {

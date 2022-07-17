@@ -462,6 +462,7 @@ type Room struct {
 	ActiveTime        time.Time `json:"activeTime"`
 	MaxPlayers        int       `json:"maxPlayers"`
 	Password          string    `json:"password"`
+	EnableChat        bool      `json:"enableChat"`
 	EnableLaiZi       bool      `json:"enableLaiZi"`
 	EnableSkill       bool      `json:"enableSkill"`
 	EnableLandlord    bool      `json:"enableLandlord"`
