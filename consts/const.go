@@ -1,8 +1,9 @@
 package consts
 
 import (
-	"github.com/ratel-online/core/consts"
 	"time"
+
+	"github.com/ratel-online/core/consts"
 )
 
 type StateID int
@@ -16,6 +17,7 @@ const (
 	StateWaiting
 	StateGame
 	StateRunFastGame
+	StateUnoGame
 )
 
 type SkillID int
@@ -49,6 +51,7 @@ const (
 	GameTypeLaiZi   = 2
 	GameTypeSkill   = 3
 	GameTypeRunFast = 4
+	GameTypeUno     = 5
 
 	RobTimeout  = 20 * time.Second
 	PlayTimeout = 40 * time.Second
@@ -105,8 +108,9 @@ var (
 		GameTypeLaiZi:   "LaiZi",
 		GameTypeSkill:   "Skill",
 		GameTypeRunFast: "RunFast",
+		GameTypeUno:     "Uno",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast} // GameTypeLaiZi, GameTypeRunFast
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeUno} // GameTypeLaiZi, GameTypeRunFast
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",

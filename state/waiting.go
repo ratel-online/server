@@ -3,12 +3,13 @@ package state
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/rule"
 	"github.com/ratel-online/server/state/game"
-	"strings"
-	"time"
 )
 
 type waiting struct{}
@@ -24,6 +25,9 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, err
 	}
 	if access {
+		if room.Type == consts.GameTypeUno {
+			return consts.StateUnoGame, nil
+		}
 		return _type, nil
 	}
 	return s.Exit(player), nil
@@ -75,7 +79,12 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			}
 			access = true
 			room.Lock()
-			room.Game, err = initGame(room)
+			switch room.Type {
+			default:
+				room.Game, err = initGame(room)
+			case consts.GameTypeUno:
+				room.UnoGame, err = game.InitUnoGame(room)
+			}
 			//修改对接类别为跑得快
 			if room.Type == 4 {
 				_type = consts.StateRunFastGame
@@ -123,9 +132,11 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
 	buf.WriteString("\nSettings:\n")
-	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
-	buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
-	buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)))
+	if room.Type != consts.GameTypeUno {
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)))
+	}
 	pwd := room.Password
 	if pwd != "" {
 		if room.Creator != currPlayer.ID {

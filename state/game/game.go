@@ -3,25 +3,27 @@ package game
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/skill"
-	"math/rand"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type Game struct{}
 
 var (
-	stateRob     = 1
-	statePlay    = 2
-	stateReset   = 3
-	stateWaiting = 4
+	stateRob       = 1
+	statePlay      = 2
+	stateReset     = 3
+	stateWaiting   = 4
+	stateFirstCard = 5
 )
 
 func (g *Game) Next(player *database.Player) (consts.StateID, error) {

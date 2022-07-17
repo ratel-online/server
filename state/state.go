@@ -1,12 +1,13 @@
 package state
 
 import (
+	"strings"
+
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/util/async"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/state/game"
-	"strings"
 )
 
 var states = map[consts.StateID]State{}
@@ -18,6 +19,7 @@ func init() {
 	register(consts.StateCreate, &create{})
 	register(consts.StateWaiting, &waiting{})
 	register(consts.StateGame, &game.Game{})
+	register(consts.StateUnoGame, &game.Uno{})
 	register(consts.StateRunFastGame, &game.RunFastGame{})
 }
 
