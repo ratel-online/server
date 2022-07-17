@@ -135,6 +135,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		p.DarkGang([]int{t, t, t, t})
 		p.TryTopDecking(game.Game.Deck())
 	}
+	gameState = game.Game.ExtractState(p)
 	tile, err := p.Play(gameState)
 	if err != nil {
 		return err
