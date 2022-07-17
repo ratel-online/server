@@ -65,7 +65,7 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 		game.States[playerId] <- stateWaiting
 	}
 	database.LeaveRoom(room.ID, player.ID)
-	return consts.StateUnoGame
+	return consts.StateMahjong
 }
 
 func handlePrivileges(room *database.Room, player *database.Player, game *database.Mahjong) error {
