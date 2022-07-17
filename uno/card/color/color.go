@@ -19,11 +19,11 @@ type colorStruct struct {
 }
 
 func (c *colorStruct) Paint(text string) string {
-	return c.colorFunction(text)
+	return c.colorFunction(text) + fmt.Sprintf("(%s)", c.name)
 }
 
 func (c *colorStruct) Paintf(text string, args ...interface{}) string {
-	return c.colorFunction(text, args...)
+	return c.colorFunction(text, args...) + fmt.Sprintf("(%s)", c.name)
 }
 
 func (c *colorStruct) String() string {
@@ -31,22 +31,22 @@ func (c *colorStruct) String() string {
 }
 
 var Red = &colorStruct{
-	name:          "red",
+	name:          "红",
 	colorFunction: color.New(color.FgHiRed).SprintfFunc(),
 }
 
 var Yellow = &colorStruct{
-	name:          "yellow",
+	name:          "黄",
 	colorFunction: color.New(color.FgHiYellow).SprintfFunc(),
 }
 
 var Green = &colorStruct{
-	name:          "green",
+	name:          "绿",
 	colorFunction: color.New(color.FgHiGreen).SprintfFunc(),
 }
 
 var Blue = &colorStruct{
-	name:          "blue",
+	name:          "蓝",
 	colorFunction: color.New(color.FgHiCyan).SprintfFunc(),
 }
 

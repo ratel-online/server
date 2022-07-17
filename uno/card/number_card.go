@@ -35,5 +35,5 @@ func (c NumberCard) Number() int {
 }
 
 func (c NumberCard) String() string {
-	return c.color.Paintf("[ %d ]", c.number)
+	return c.color.Paintf("[%d]", c.number)
 }
