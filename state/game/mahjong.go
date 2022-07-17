@@ -120,6 +120,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		return nil
 	}
 	p.TryTopDecking(game.Game.Deck())
+	gameState = game.Game.ExtractState(p)
 	if cwin.CanWin(p.Hand(), p.GetShowCardTiles()) {
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(p.Tiles())))
 		room.Lock()
