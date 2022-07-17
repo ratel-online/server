@@ -40,6 +40,9 @@ var roomPropsSetter = map[string]func(r *Room, v string){
 			r.Password = v
 		}
 	},
+	consts.RoomPropsChat: func(r *Room, v string) {
+		r.EnableChat = v == "on"
+	},
 	consts.RoomPropsPlayerNum: func(r *Room, v string) {
 		n, _ := strconv.Atoi(v)
 		if n < 2 || n > 50 {
@@ -82,6 +85,8 @@ func CreateRoom(creator int64, t int) *Room {
 		ActiveTime:     time.Now(),
 		MaxPlayers:     consts.MaxPlayers,
 		EnableLandlord: true,
+		//默認開啓聊天
+		EnableChat: true,
 	}
 	if room.Type == consts.GameTypeLaiZi {
 		room.EnableLaiZi = true
@@ -90,6 +95,11 @@ func CreateRoom(creator int64, t int) *Room {
 		room.EnableDontShuffle = true
 		room.EnableSkill = true
 		room.EnableLandlord = false
+	} else if room.Type == consts.GameTypeRunFast {
+		room.MaxPlayers = 3
+		room.EnableLaiZi = false
+		room.EnableLandlord = false
+		room.EnableDontShuffle = true
 	}
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})

@@ -3,8 +3,12 @@ package rule
 var LandlordRules = _rules{reserved: true}
 var TeamRules = _rules{}
 
+// RunFastRules 跑得快規則
+var RunFastRules = _rules{reserved: true, isRunFast: true}
+
 type _rules struct {
-	reserved bool
+	reserved  bool
+	isRunFast bool
 }
 
 func (r _rules) Value(key int) int {
@@ -27,7 +31,9 @@ func (r _rules) IsStraight(faces []int, count int) bool {
 	}
 	if count == 1 {
 		return len(faces) >= 5
-	} else if count == 2 {
+	} else if count == 2 && r.isRunFast {
+		return len(faces) >= 2
+	} else if count == 2 && !r.isRunFast {
 		return len(faces) >= 3
 	} else if count > 2 {
 		return len(faces) >= 2
