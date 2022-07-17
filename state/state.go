@@ -18,6 +18,7 @@ func init() {
 	register(consts.StateCreate, &create{})
 	register(consts.StateWaiting, &waiting{})
 	register(consts.StateGame, &game.Game{})
+	register(consts.StateRunFastGame, &game.RunFastGame{})
 }
 
 func register(id consts.StateID, state State) {
