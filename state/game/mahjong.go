@@ -28,8 +28,8 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	buf.WriteString("WELCOME TO MAHJONG GAME!!! \n")
 	buf.WriteString(fmt.Sprintf("Your Tiles: %s\n", game.Game.GetPlayerTiles(player.ID)))
-	database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", database.GetPlayer(room.Banker).Name))
 	_ = player.WriteString(buf.String())
+	database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", database.GetPlayer(room.Banker).Name))
 	for {
 		if room.State == consts.RoomStateWaiting {
 			return consts.StateWaiting, nil
@@ -55,6 +55,16 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 }
 
 func (g *Mahjong) Exit(player *database.Player) consts.StateID {
+	room := database.GetRoom(player.RoomID)
+	room.Lock()
+	room.Game = nil
+	room.State = consts.RoomStateWaiting
+	room.Unlock()
+	game := room.Mahjong
+	for _, playerId := range game.Players {
+		game.States[playerId] <- stateWaiting
+	}
+	database.LeaveRoom(room.ID, player.ID)
 	return consts.StateUnoGame
 }
 
