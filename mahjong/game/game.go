@@ -58,7 +58,7 @@ func (g Game) ExtractState(player *playerController) State {
 	g.players.ForEach(func(player *playerController) {
 		playerSequence = append(playerSequence, player.Name())
 		playerShowCards[player.Name()] = player.GetShowCard()
-		if len(g.pile.Tiles()) > 0 {
+		if len(g.pile.Tiles()) > 0 && g.pile.lastPlayer.ID() != player.ID() {
 			if card.CanGang(player.Hand(), g.pile.Top()) {
 				specialPrivileges[player.ID()] = consts.GANG
 			}
@@ -75,6 +75,7 @@ func (g Game) ExtractState(player *playerController) State {
 	tiles := player.Tiles()
 	sort.Ints(tiles)
 	return State{
+		LastPlayer:        g.pile.lastPlayer,
 		LastPlayedTile:    g.pile.Top(),
 		PlayedTiles:       playedTiles,
 		CurrentPlayerHand: tiles,

@@ -8,6 +8,7 @@ import (
 )
 
 type State struct {
+	LastPlayer        *playerController
 	LastPlayedTile    int
 	PlayedTiles       []int
 	CurrentPlayerHand []int
