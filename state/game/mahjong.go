@@ -10,8 +10,10 @@ import (
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/mahjong/card"
+	mjConsts "github.com/ratel-online/server/mahjong/consts"
 	"github.com/ratel-online/server/mahjong/event"
 	"github.com/ratel-online/server/mahjong/game"
+	"github.com/ratel-online/server/mahjong/tile"
 	cwin "github.com/ratel-online/server/mahjong/win"
 )
 
@@ -59,6 +61,18 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 func handlePrivileges(room *database.Room, player *database.Player, game *database.Mahjong) error {
 	p := game.Game.Current()
 	gameState := game.Game.ExtractState(p)
+	if pv, ok := gameState.SpecialPrivileges[p.ID()]; ok && pv == mjConsts.WIN {
+		p.AddTiles([]int{game.Game.Pile().DrawOneFromBehind()})
+		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(p.Tiles())))
+		room.Lock()
+		room.Game = nil
+		room.State = consts.RoomStateWaiting
+		room.Unlock()
+		for _, playerId := range game.Players {
+			game.States[playerId] <- stateWaiting
+		}
+		return nil
+	}
 	tile, err := p.PlayPrivileges(gameState, game.Game.Pile())
 	if err != nil {
 		return err
@@ -97,7 +111,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 	}
 	p.TryTopDecking(game.Game.Deck())
 	if cwin.CanWin(p.Hand(), p.GetShowCardTiles()) {
-		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n", p.Name()))
+		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(p.Tiles())))
 		room.Lock()
 		room.Game = nil
 		room.State = consts.RoomStateWaiting
