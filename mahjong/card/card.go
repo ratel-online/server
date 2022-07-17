@@ -2,6 +2,43 @@ package card
 
 import "github.com/ratel-online/server/mahjong/util"
 
+// 判断是不是可以吃
+func CanChi(cards []int, card int) bool {
+	return len(CanChiTiles(cards, card)) > 0
+}
+
+// 可以吃的牌
+func CanChiTiles(cards []int, card int) [][]int {
+	if !IsSuit(card) {
+		return [][]int{}
+	}
+	ret := make([][]int, 0)
+	if util.IntInSlice(card+1, cards) && util.IntInSlice(card+2, cards) {
+		ret = append(ret, []int{card + 1, card + 2})
+	}
+	if util.IntInSlice(card-1, cards) && util.IntInSlice(card-2, cards) {
+		ret = append(ret, []int{card - 1, card - 2})
+	}
+	if util.IntInSlice(card-1, cards) && util.IntInSlice(card+1, cards) {
+		ret = append(ret, []int{card - 1, card + 1})
+	}
+	return ret
+}
+
+// 判断是不是可以碰
+func CanPeng(cards []int, card int) bool {
+	cmap := NewCMap()
+	cmap.SetTiles(cards)
+	return cmap.GetTileCnt(card) == 2
+}
+
+// 判断是不是可以杠
+func CanGang(cards []int, card int) bool {
+	cmap := NewCMap()
+	cmap.SetTiles(cards)
+	return cmap.GetTileCnt(card) == 4
+}
+
 // IsSuit 是否普通牌
 // 普通牌是指万、筒、条
 func IsSuit(card int) bool {

@@ -16,6 +16,8 @@ import (
 	"github.com/ratel-online/core/util/json"
 	"github.com/ratel-online/core/util/poker"
 	"github.com/ratel-online/server/consts"
+	mjCard "github.com/ratel-online/server/mahjong/card"
+	mjConsts "github.com/ratel-online/server/mahjong/consts"
 	mjGame "github.com/ratel-online/server/mahjong/game"
 	"github.com/ratel-online/server/mahjong/tile"
 	"github.com/ratel-online/server/uno/card"
@@ -59,6 +61,55 @@ func (p *Player) MahjongPlayer() mjGame.Player {
 	return p
 }
 
+func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) ([]int, error) {
+	p = getPlayer(p.ID)
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
+	buf.WriteString(gameState.String())
+	p.WriteString(buf.String())
+	askBuf := bytes.Buffer{}
+	tileOptions := make(map[string][]int)
+	runeSequence := runeSequence{}
+	if pv, ok := gameState.SpecialPrivileges[p.ID]; ok {
+		label := string(runeSequence.next())
+		if pv == mjConsts.GANG {
+			askBuf.WriteString("You can 杠!!!")
+			tileOptions[label] = []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
+		}
+		if pv == mjConsts.PENG {
+			askBuf.WriteString("You can 碰!!!")
+			tileOptions[label] = []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
+		}
+		askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "yes"))
+	} else {
+		askBuf.WriteString("You can choose!!!\n")
+		for _, ts := range mjCard.CanChiTiles(tiles, gameState.LastPlayedTile) {
+			label := string(runeSequence.next())
+			tileOptions[label] = ts
+			askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+		}
+	}
+	label := string(runeSequence.next())
+	askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "no"))
+	for {
+		p = getPlayer(p.ID)
+		p.WriteString(askBuf.String())
+		selectedLabel, err := p.AskForString(consts.PlayTimeout)
+		if err != nil {
+			if err == consts.ErrorsTimeout {
+				selectedLabel = "A"
+			} else {
+				return nil, err
+			}
+		}
+		selectedCards, found := tileOptions[selectedLabel]
+		if !found {
+			p.WriteString(fmt.Sprintf("No tile assigned to '%s' \n", selectedLabel))
+			continue
+		}
+		return selectedCards, nil
+	}
+}
 func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 	p = getPlayer(p.ID)
 	buf := bytes.Buffer{}
@@ -399,6 +450,7 @@ type Room struct {
 	EnableSkill       bool      `json:"enableSkill"`
 	EnableLandlord    bool      `json:"enableLandlord"`
 	EnableDontShuffle bool      `json:"enableDontShuffle"`
+	Banker            int64     `json:"banker"`
 }
 
 func (r *Room) Model() model.Room {

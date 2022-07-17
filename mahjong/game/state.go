@@ -12,6 +12,8 @@ type State struct {
 	PlayedTiles       []int
 	CurrentPlayerHand []int
 	PlayerSequence    []string
+	PlayerShowCards   map[string][]*ShowCard
+	SpecialPrivileges map[int64]int
 }
 
 func (s State) String() string {
@@ -22,9 +24,15 @@ func (s State) String() string {
 	var playerStatuses []string
 	for _, playerName := range s.PlayerSequence {
 		playerStatus := playerName
+		if showCards, ok := s.PlayerShowCards[playerName]; ok {
+			playerStatus += "showCards："
+			for _, showCard := range showCards {
+				playerStatus += fmt.Sprintf("%s ", tile.ToTileString(showCard.tiles))
+			}
+		}
 		playerStatuses = append(playerStatuses, playerStatus)
 	}
-	lines = append(lines, fmt.Sprintf("Turn order: %s", strings.Join(playerStatuses, ", ")))
+	lines = append(lines, fmt.Sprintf("Turn order: %s\n", strings.Join(playerStatuses, "\n")))
 	lines = append(lines, fmt.Sprintf("Your hand: %s\n", tile.ToTileString(s.CurrentPlayerHand)))
 	return strings.Join(lines, "\n")
 }

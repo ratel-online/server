@@ -7,7 +7,7 @@ type Hand struct {
 }
 
 func NewHand() *Hand {
-	return &Hand{tiles: make([]int, 0, 14)}
+	return &Hand{tiles: make([]int, 0, 17)}
 }
 
 func (h *Hand) AddTiles(tiles []int) {
@@ -23,14 +23,6 @@ func (h *Hand) Tiles() []int {
 
 func (h *Hand) Empty() bool {
 	return len(h.tiles) == 0
-}
-
-func (h *Hand) PlayableTiles(lastPlayedTile int) []int {
-	var playableTiles []int
-	for _, candidateTile := range h.tiles {
-		playableTiles = append(playableTiles, candidateTile)
-	}
-	return playableTiles
 }
 
 func (h *Hand) RemoveTile(tile int) {

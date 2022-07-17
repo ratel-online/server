@@ -42,8 +42,8 @@ func fillDeck(deck *Deck) {
 	tiles = append(tiles, generate(tile.BING, 9, 4)...)
 	tiles = append(tiles, generate(tile.FENG, 4, 4)...)
 	tiles = append(tiles, generate(tile.DRAGON, 3, 4)...)
-	tiles = append(tiles, generate(tile.SEASON, 4, 1)...)
-	tiles = append(tiles, generate(tile.HUA, 4, 1)...)
+	// tiles = append(tiles, generate(tile.SEASON, 4, 1)...)
+	// tiles = append(tiles, generate(tile.HUA, 4, 1)...)
 	shuffleCards(tiles)
 	deck.tiles = append(deck.tiles, tiles...)
 }

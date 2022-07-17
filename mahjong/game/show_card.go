@@ -1,4 +1,4 @@
-package card
+package game
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ func NewShowCard(opCode, target int, tiles []int, free bool) *ShowCard {
 	return showCard
 }
 
-func (s *ShowCard) string() string {
+func (s *ShowCard) String() string {
 	return fmt.Sprintf("[明牌]code:%v,target:%v,tiles:%v,free:%v", s.opCode, s.target, s.tiles, s.free)
 }
 

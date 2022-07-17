@@ -3,6 +3,8 @@ package game
 import (
 	"sort"
 
+	"github.com/ratel-online/server/mahjong/card"
+	"github.com/ratel-online/server/mahjong/consts"
 	"github.com/ratel-online/server/mahjong/tile"
 )
 
@@ -32,8 +34,8 @@ func New(players []Player) *Game {
 	}
 }
 
-func (g *Game) GetPlayerTiles(name string) string {
-	tiles := g.players.GetPlayerController(name).Hand()
+func (g *Game) GetPlayerTiles(id int64) string {
+	tiles := g.players.GetPlayerController(id).Hand()
 	return tile.ToTileString(tiles)
 }
 
@@ -50,11 +52,17 @@ func (g *Game) Current() *playerController {
 
 func (g Game) ExtractState(player *playerController) State {
 	playerSequence := make([]string, 0)
-	playerHandCounts := make(map[string]int)
-
+	playerShowCards := make(map[string][]*ShowCard)
+	specialPrivileges := make(map[int64]int)
 	g.players.ForEach(func(player *playerController) {
 		playerSequence = append(playerSequence, player.Name())
-		playerHandCounts[player.Name()] = len(player.Hand())
+		playerShowCards[player.Name()] = player.GetShowCard()
+		if card.CanGang(player.Hand(), g.pile.Top()) {
+			specialPrivileges[player.ID()] = consts.GANG
+		}
+		if card.CanPeng(player.Hand(), g.pile.Top()) {
+			specialPrivileges[player.ID()] = consts.PENG
+		}
 	})
 	playedTiles := g.pile.Tiles()
 	sort.Ints(playedTiles)
@@ -63,5 +71,7 @@ func (g Game) ExtractState(player *playerController) State {
 		PlayedTiles:       playedTiles,
 		CurrentPlayerHand: player.Hand(),
 		PlayerSequence:    playerSequence,
+		PlayerShowCards:   playerShowCards,
+		SpecialPrivileges: specialPrivileges,
 	}
 }

@@ -9,8 +9,10 @@ import (
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
+	"github.com/ratel-online/server/mahjong/card"
 	"github.com/ratel-online/server/mahjong/event"
 	"github.com/ratel-online/server/mahjong/game"
+	cwin "github.com/ratel-online/server/mahjong/win"
 )
 
 type Mahjong struct{}
@@ -22,8 +24,8 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 	}
 	game := room.Mahjong
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprint("WELCOME TO MAHJONG GAME!!!\n"))
-	buf.WriteString(fmt.Sprintf("Your Tiles: %s\n", game.Game.GetPlayerTiles(player.Name)))
+	buf.WriteString("WELCOME TO MAHJONG GAME!!! \n")
+	buf.WriteString(fmt.Sprintf("Your Tiles: %s\n", game.Game.GetPlayerTiles(player.ID)))
 	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {
@@ -33,6 +35,12 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 		switch state {
 		case statePlay:
 			err := handlePlayMahjong(room, player, game)
+			if err != nil {
+				log.Error(err)
+				return 0, err
+			}
+		case statePrivileges:
+			err := handlePrivileges(room, player, game)
 			if err != nil {
 				log.Error(err)
 				return 0, err
@@ -47,6 +55,34 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 	return consts.StateUnoGame
 }
 
+func handlePrivileges(room *database.Room, player *database.Player, game *database.Mahjong) error {
+	p := game.Game.Current()
+	gameState := game.Game.ExtractState(p)
+	tile, err := p.PlayPrivileges(gameState, game.Game.Pile())
+	if err != nil {
+		return err
+	}
+	game.Game.Pile().Add(tile)
+	game.Game.Pile().SetLastPlayer(p)
+	event.TilePlayed.Emit(event.TilePlayedPayload{
+		PlayerName: p.Name(),
+		Tile:       tile,
+	})
+	gameState = game.Game.ExtractState(p)
+	if len(gameState.SpecialPrivileges) > 0 {
+		for {
+			pc := game.Game.Players().Next()
+			if _, ok := gameState.SpecialPrivileges[pc.ID()]; ok {
+				game.States[pc.ID()] <- statePrivileges
+				return nil
+			}
+		}
+	}
+	pc := game.Game.Players().Next()
+	game.States[pc.ID()] <- statePlay
+	return nil
+}
+
 func handlePlayMahjong(room *database.Room, player *database.Player, game *database.Mahjong) error {
 	p := game.Game.Current()
 	if p.ID() != player.ID {
@@ -54,11 +90,12 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		return nil
 	}
 	gameState := game.Game.ExtractState(p)
-	tile, win, err := p.Play(gameState, game.Game.Deck())
-	if err != nil {
-		return err
+	if card.CanChi(p.Hand(), gameState.LastPlayedTile) {
+		game.States[p.ID()] <- statePrivileges
+		return nil
 	}
-	if win {
+	p.TryTopDecking(game.Game.Deck())
+	if cwin.CanWin(p.Hand(), p.GetShowCardTiles()) {
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n", p.Name()))
 		room.Lock()
 		room.Game = nil
@@ -69,20 +106,35 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		}
 		return nil
 	}
+	tile, err := p.Play(gameState)
+	if err != nil {
+		return err
+	}
 	game.Game.Pile().Add(tile)
+	game.Game.Pile().SetLastPlayer(p)
 	event.TilePlayed.Emit(event.TilePlayedPayload{
 		PlayerName: p.Name(),
 		Tile:       tile,
 	})
+	gameState = game.Game.ExtractState(p)
+	if len(gameState.SpecialPrivileges) > 0 {
+		for {
+			pc := game.Game.Players().Next()
+			if _, ok := gameState.SpecialPrivileges[pc.ID()]; ok {
+				game.States[pc.ID()] <- statePrivileges
+				return nil
+			}
+		}
+	}
 	pc := game.Game.Players().Next()
 	game.States[pc.ID()] <- statePlay
 	return nil
 }
 
 func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
-	players := make([]int64, 0)
 	roomPlayers := database.RoomPlayers(room.ID)
-	mjPlayers := make([]game.Player, 0)
+	players := make([]int64, 0, len(roomPlayers))
+	mjPlayers := make([]game.Player, 0, len(roomPlayers))
 	states := map[int64]chan int{}
 	for playerId := range roomPlayers {
 		p := *database.GetPlayer(playerId)
@@ -93,6 +145,17 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 	rand.Seed(time.Now().UnixNano())
 	mahjong := game.New(mjPlayers)
 	mahjong.DealStartingTiles()
+
+	if room.Banker == 0 {
+		room.Banker = players[rand.Intn(len(players))]
+	}
+	for {
+		if mahjong.Current().ID() == room.Banker {
+			break
+		}
+		mahjong.Players().Next()
+	}
+	database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", mahjong.Current().Name()))
 	tile := mahjong.Deck().DrawOne()
 	mahjong.Current().AddTiles([]int{tile})
 	states[mahjong.Current().ID()] <- statePlay
