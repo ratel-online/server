@@ -15,3 +15,7 @@ func (l *DummyListener) ReceivedPayloads() []interface{} {
 func (l *DummyListener) OnTilePlayed(payload TilePlayedPayload) {
 	l.receivedPayloads = append(l.receivedPayloads, payload)
 }
+
+func (l *DummyListener) OnPlayTile(payload PlayTilePayload) {
+	l.receivedPayloads = append(l.receivedPayloads, payload)
+}

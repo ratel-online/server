@@ -1,6 +1,8 @@
 package game
 
 import (
+	"github.com/ratel-online/server/mahjong/consts"
+	"github.com/ratel-online/server/mahjong/event"
 	"github.com/ratel-online/server/mahjong/util"
 )
 
@@ -18,8 +20,12 @@ func newPlayerController(player Player) *playerController {
 	}
 }
 
+func (c *playerController) DarkGang(tiles []int) {
+	c.showCards = append(c.showCards, NewShowCard(consts.GANG, 0, tiles, false, false))
+}
+
 func (c *playerController) operation(op, target int, tiles []int) {
-	c.showCards = append(c.showCards, NewShowCard(op, target, tiles, false))
+	c.showCards = append(c.showCards, NewShowCard(op, target, tiles, true, false))
 }
 
 func (c *playerController) GetShowCard() []*ShowCard {
@@ -42,6 +48,10 @@ func (c *playerController) AddTiles(tiles []int) {
 func (c *playerController) TryTopDecking(deck *Deck) {
 	extraCard := deck.DrawOne()
 	c.AddTiles([]int{extraCard})
+	event.PlayTile.Emit(event.PlayTilePayload{
+		PlayerName: c.player.NickName(),
+		Tile:       extraCard,
+	})
 }
 
 func (c *playerController) Hand() []int {
@@ -65,7 +75,7 @@ func (c *playerController) Player() *Player {
 }
 
 func (c *playerController) PlayPrivileges(gameState State, pile *Pile) (int, error) {
-	c.AddTiles([]int{pile.DrawOne()})
+	c.AddTiles([]int{pile.DrawOneFromBehind()})
 	op, tiles, err := c.player.PlayPrivileges(c.Hand(), gameState)
 	if err != nil {
 		return 0, err

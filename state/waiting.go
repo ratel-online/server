@@ -84,6 +84,7 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			}
 			room.State = consts.RoomStateRunning
 			room.Unlock()
+
 			break
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")

@@ -39,8 +39,8 @@ func (p *Pile) Top() int {
 	return p.tiles[pileSize-1]
 }
 
-func (d *Pile) DrawOne() int {
-	tiles := d.tiles[0:1]
-	d.tiles = d.tiles[1:]
+func (d *Pile) DrawOneFromBehind() int {
+	tiles := d.tiles[len(d.tiles)-1:]
+	d.tiles = d.tiles[0 : len(d.tiles)-1]
 	return tiles[0]
 }

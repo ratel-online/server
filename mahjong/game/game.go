@@ -6,6 +6,7 @@ import (
 	"github.com/ratel-online/server/mahjong/card"
 	"github.com/ratel-online/server/mahjong/consts"
 	"github.com/ratel-online/server/mahjong/tile"
+	"github.com/ratel-online/server/mahjong/win"
 )
 
 type Game struct {
@@ -64,14 +65,19 @@ func (g Game) ExtractState(player *playerController) State {
 			if card.CanPeng(player.Hand(), g.pile.Top()) {
 				specialPrivileges[player.ID()] = consts.PENG
 			}
+			if win.CanWin(append(player.Hand(), g.pile.Top()), player.GetShowCardTiles()) {
+				specialPrivileges[player.ID()] = consts.WIN
+			}
 		}
 	})
 	playedTiles := g.pile.Tiles()
 	sort.Ints(playedTiles)
+	tiles := player.Tiles()
+	sort.Ints(tiles)
 	return State{
 		LastPlayedTile:    g.pile.Top(),
 		PlayedTiles:       playedTiles,
-		CurrentPlayerHand: player.Hand(),
+		CurrentPlayerHand: tiles,
 		PlayerSequence:    playerSequence,
 		PlayerShowCards:   playerShowCards,
 		SpecialPrivileges: specialPrivileges,

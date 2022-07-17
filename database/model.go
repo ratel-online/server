@@ -18,6 +18,7 @@ import (
 	"github.com/ratel-online/server/consts"
 	mjCard "github.com/ratel-online/server/mahjong/card"
 	mjConsts "github.com/ratel-online/server/mahjong/consts"
+	mjEvent "github.com/ratel-online/server/mahjong/event"
 	mjGame "github.com/ratel-online/server/mahjong/game"
 	"github.com/ratel-online/server/mahjong/tile"
 	"github.com/ratel-online/server/uno/card"
@@ -146,13 +147,17 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 			p.WriteString(fmt.Sprintf("No tile assigned to '%s' \n", selectedLabel))
 			continue
 		}
+		p.OnPlayTile(mjEvent.PlayTilePayload{
+			PlayerName: p.Name,
+			Tile:       selectedCard,
+		})
 		return selectedCard, nil
-
 	}
 }
 
 func (p *Player) NotifyTilesDrawn(drawnTiles []int) {
-
+	p = getPlayer(p.ID)
+	getPlayer(p.ID).WriteString(fmt.Sprintf("You drew %s!\n", tile.ToTileString(drawnTiles)))
 }
 
 func (p *Player) GamePlayer() game.Player {
@@ -242,6 +247,12 @@ func contains(cards []card.Card, searchedCard card.Card) bool {
 		}
 	}
 	return false
+}
+
+func (p *Player) OnPlayTile(payload mjEvent.PlayTilePayload) {
+	p = getPlayer(p.ID)
+	p.WriteString(fmt.Sprintf("You play %s ! \n", tile.Tile(payload.Tile)))
+	Broadcast(p.RoomID, fmt.Sprintf("%s PlayTile %s !\n", payload.PlayerName, tile.Tile(payload.Tile)), p.ID)
 }
 
 func (p *Player) OnFirstCardPlayed(payload event.FirstCardPlayedPayload) {

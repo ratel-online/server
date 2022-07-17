@@ -26,6 +26,7 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 	buf := bytes.Buffer{}
 	buf.WriteString("WELCOME TO MAHJONG GAME!!! \n")
 	buf.WriteString(fmt.Sprintf("Your Tiles: %s\n", game.Game.GetPlayerTiles(player.ID)))
+	database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", database.GetPlayer(room.Banker).Name))
 	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {
@@ -90,7 +91,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		return nil
 	}
 	gameState := game.Game.ExtractState(p)
-	if card.CanChi(p.Hand(), gameState.LastPlayedTile) {
+	if gameState.LastPlayedTile > 0 && card.CanChi(p.Hand(), gameState.LastPlayedTile) {
 		game.States[p.ID()] <- statePrivileges
 		return nil
 	}
@@ -105,6 +106,10 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 			game.States[playerId] <- stateWaiting
 		}
 		return nil
+	}
+	if t, ok := card.HaveGang(p.Hand()); ok {
+		p.DarkGang([]int{t, t, t, t})
+		p.TryTopDecking(game.Game.Deck())
 	}
 	tile, err := p.Play(gameState)
 	if err != nil {
@@ -145,7 +150,6 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 	rand.Seed(time.Now().UnixNano())
 	mahjong := game.New(mjPlayers)
 	mahjong.DealStartingTiles()
-
 	if room.Banker == 0 {
 		room.Banker = players[rand.Intn(len(players))]
 	}
@@ -155,8 +159,6 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 		}
 		mahjong.Players().Next()
 	}
-	// database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", mahjong.Current().Name()))
-	mahjong.Current().TryTopDecking(mahjong.Deck())
 	states[mahjong.Current().ID()] <- statePlay
 	return &database.Mahjong{
 		Room:    room,

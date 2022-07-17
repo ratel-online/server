@@ -13,16 +13,21 @@ type ShowCard struct {
 	target int   // 明牌对象，吃、碰、杠的牌是谁打出来的
 	tiles  []int // 关联的牌
 	free   bool  // 是否付费，用于转弯杠，暂时用不上了
+	show   bool
 }
 
 // NewShowCard 生成一个明牌
-func NewShowCard(opCode, target int, tiles []int, free bool) *ShowCard {
-	showCard := &ShowCard{opCode: opCode, target: target, tiles: tiles, free: free}
+func NewShowCard(opCode, target int, tiles []int, show bool, free bool) *ShowCard {
+	showCard := &ShowCard{opCode: opCode, target: target, tiles: tiles, show: show, free: free}
 	return showCard
 }
 
 func (s *ShowCard) String() string {
-	return fmt.Sprintf("[%v]%v", consts.OpCodeData[s.opCode], tile.ToTileString(s.tiles))
+	tileString := tile.ToTileString(s.tiles)
+	if !s.show {
+		tileString = "暗杠"
+	}
+	return fmt.Sprintf("[%v]%v", consts.OpCodeData[s.opCode], tileString)
 }
 
 // GetOpCode 获取明牌类型
@@ -68,12 +73,12 @@ func (s *ShowCard) ModifyQiangKong() {
 	s.tiles = append([]int{}, s.tiles[0:s.GetTilesLen()-1]...)
 }
 
-// IsPong 明牌是否是pong
-func (s *ShowCard) IsPong() bool {
-	return s.opCode == 9
+// IsPong 明牌是否是peng
+func (s *ShowCard) IsPeng() bool {
+	return s.opCode == consts.PENG
 }
 
-// IsPongTile 明牌是否是pong了这个牌
-func (s *ShowCard) IsPongTile(tile int) bool {
-	return s.opCode == 9 && s.tiles[0] == tile
+// IsPongTile 明牌是否是peng了这个牌
+func (s *ShowCard) IsPengTile(tile int) bool {
+	return s.opCode == consts.PENG && s.tiles[0] == tile
 }

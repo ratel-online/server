@@ -2,6 +2,17 @@ package card
 
 import "github.com/ratel-online/server/mahjong/util"
 
+func HaveGang(tiles []int) (int, bool) {
+	cmap := NewCMap()
+	cmap.SetTiles(tiles)
+	for t, i := range cmap.GetTileMap() {
+		if i == 4 {
+			return t, true
+		}
+	}
+	return 0, false
+}
+
 // 判断是不是可以吃
 func CanChi(cards []int, card int) bool {
 	return len(CanChiTiles(cards, card)) > 0
