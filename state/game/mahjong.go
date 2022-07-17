@@ -56,7 +56,6 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 
 func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 	room := database.GetRoom(player.RoomID)
-	room.Game = nil
 	room.State = consts.RoomStateWaiting
 	game := room.Mahjong
 	for _, playerId := range game.Players {
