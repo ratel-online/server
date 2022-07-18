@@ -30,5 +30,5 @@ func (c DrawTwoCard) Equal(other Card) bool {
 }
 
 func (c DrawTwoCard) String() string {
-	return c.color.Paint("[+2!]")
+	return c.color.Paint("+2!")
 }

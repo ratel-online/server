@@ -27,5 +27,5 @@ func (c WildCard) Equal(other Card) bool {
 }
 
 func (c WildCard) String() string {
-	return "[(*)]"
+	return "(*)"
 }
