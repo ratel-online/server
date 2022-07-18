@@ -75,6 +75,16 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 		_ = player.WriteString(buf.String())
 		before := time.Now().Unix()
 		pokers := game.Pokers[player.ID]
+		//auto pass
+		if !master {
+			list := poker.RunFastComparativeFaces(*game.LastFaces, game.Pokers[player.ID], rule.RunFastRules)
+			if len(list) == 0 {
+				nextPlayer := database.GetPlayer(game.NextPlayer(player.ID))
+				database.Broadcast(player.RoomID, fmt.Sprintf("%s auto passed, next %s\n", player.Name, nextPlayer.Name))
+				game.States[nextPlayer.ID] <- statePlay
+				return nil
+			}
+		}
 		ans, err := player.AskForString(timeout)
 		if err != nil {
 			if master {
@@ -96,6 +106,7 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 		} else {
 			timeout -= time.Second * time.Duration(time.Now().Unix()-before)
 		}
+
 		ans = strings.ToLower(ans)
 		if ans == "" {
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
@@ -156,12 +167,14 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 			invalid = true
 		}
 		//聊天開啓才能說話
-		if invalid && game.Room.EnableChat {
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
-			continue
-		} else if invalid && !game.Room.EnableChat {
-			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
-			continue
+		if invalid {
+			if game.Room.EnableChat {
+				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+				continue
+			} else {
+				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
+				continue
+			}
 		}
 		lastFaces := game.LastFaces
 		if !master && lastFaces != nil {
@@ -171,7 +184,7 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 			}
 			access := false
 			for _, faces := range facesArr {
-				//跑得快規則	非標準牌只能最後出
+				//非標準牌只能最後出
 				if (faces.Type == 10 || faces.Type == 12 || faces.Type == 14 || faces.Type == 16) && len(faces.Values) != len(pokers) {
 					_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsEndToPlay.Error()))
 					continue
@@ -187,7 +200,7 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 				continue
 			}
 		} else {
-			//跑得快規則	非標準牌只能最後出
+			//非標準牌只能最後出
 			if (facesArr[0].Type == 10 || facesArr[0].Type == 12 || facesArr[0].Type == 14 || facesArr[0].Type == 16) && len(facesArr[0].Values) != len(pokers) {
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsEndToPlay.Error()))
 				continue

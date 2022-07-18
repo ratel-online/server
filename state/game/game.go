@@ -257,9 +257,14 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 			invalid = true
 		}
 		//聊天開啓才能說話
-		if invalid && game.Room.EnableChat {
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
-			continue
+		if invalid {
+			if game.Room.EnableChat {
+				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+				continue
+			} else {
+				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
+				continue
+			}
 		}
 		lastFaces := game.LastFaces
 		if !master && lastFaces != nil {
