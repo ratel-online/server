@@ -39,13 +39,19 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 		case statePlay:
 			err := handlePlayMahjong(room, player, game)
 			if err != nil {
-				log.Error(err)
+				if _, ok := err.(consts.Error); ok {
+					game.States[player.ID] <- statePlay
+					log.Error(err)
+				}
 				return 0, err
 			}
 		case statePrivileges:
 			err := handlePrivileges(room, player, game)
 			if err != nil {
-				log.Error(err)
+				if _, ok := err.(consts.Error); ok {
+					game.States[player.ID] <- statePrivileges
+					log.Error(err)
+				}
 				return 0, err
 			}
 		case stateWaiting:
