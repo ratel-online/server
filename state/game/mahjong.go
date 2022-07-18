@@ -28,9 +28,9 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 	game := room.Mahjong
 	buf := bytes.Buffer{}
 	buf.WriteString("WELCOME TO MAHJONG GAME!!! \n")
+	buf.WriteString(fmt.Sprintf("%s is Banker! \n", database.GetPlayer(room.Banker).Name))
 	buf.WriteString(fmt.Sprintf("Your Tiles: %s\n", game.Game.GetPlayerTiles(player.ID)))
 	_ = player.WriteString(buf.String())
-	database.Broadcast(room.ID, fmt.Sprintf("%s is Banker! \n", database.GetPlayer(room.Banker).Name))
 	for {
 		if room.State == consts.RoomStateWaiting {
 			return consts.StateWaiting, nil
@@ -48,7 +48,7 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 				return 0, err
 			}
 		case stateTakeCard:
-			err := handleTakeMahjong(player, game)
+			err := handleTakeMahjong(room, player, game)
 			if err != nil {
 				if _, ok := err.(consts.Error); ok {
 					game.States[player.ID] <- stateTakeCard
@@ -67,10 +67,21 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 	return consts.StateMahjong
 }
 
-func handleTakeMahjong(player *database.Player, game *database.Mahjong) error {
+func handleTakeMahjong(room *database.Room, player *database.Player, game *database.Mahjong) error {
 	p := game.Game.Current()
 	if p.ID() != player.ID {
 		game.States[p.ID()] <- stateTakeCard
+		return nil
+	}
+	if game.Game.Deck().NoTiles() {
+		database.Broadcast(room.ID, "Game over but no winners!!! \n")
+		room.Lock()
+		room.Game = nil
+		room.State = consts.RoomStateWaiting
+		room.Unlock()
+		for _, playerId := range game.Players {
+			game.States[playerId] <- stateWaiting
+		}
 		return nil
 	}
 	if t, ok := card.HaveGang(p.Hand()); ok {

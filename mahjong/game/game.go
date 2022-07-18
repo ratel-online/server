@@ -50,14 +50,14 @@ func (g *Game) Current() *playerController {
 }
 
 func (g Game) ExtractState(player *playerController) State {
-	playerSequence := make([]string, 0)
+	playerSequence := make([]*playerController, 0)
 	playerShowCards := make(map[string][]*ShowCard)
 	specialPrivileges := make(map[int64][]int)
 	canWin := make([]*playerController, 0)
 	originallyPlayer := g.pile.originallyPlayer
 	topTile := g.pile.Top()
 	g.players.ForEach(func(player *playerController) {
-		playerSequence = append(playerSequence, player.Name())
+		playerSequence = append(playerSequence, player)
 		playerShowCards[player.Name()] = player.GetShowCard()
 		if _, ok := g.pile.SayNoPlayer()[player.ID()]; !ok &&
 			topTile > 0 && g.pile.lastPlayer.ID() != player.ID() {
@@ -82,6 +82,7 @@ func (g Game) ExtractState(player *playerController) State {
 		LastPlayedTile:    g.pile.Top(),
 		PlayedTiles:       g.pile.Tiles(),
 		CurrentPlayerHand: player.Tiles(),
+		CurrentPlayer:     player,
 		PlayerSequence:    playerSequence,
 		PlayerShowCards:   playerShowCards,
 		SpecialPrivileges: specialPrivileges,

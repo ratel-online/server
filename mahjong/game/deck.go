@@ -16,6 +16,10 @@ func NewDeck() *Deck {
 	return deck
 }
 
+func (d *Deck) NoTiles() bool {
+	return len(d.tiles) == 0
+}
+
 func (d *Deck) DrawOne() int {
 	return d.Draw(1)[0]
 }
