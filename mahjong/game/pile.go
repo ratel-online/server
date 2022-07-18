@@ -4,7 +4,16 @@ type Pile struct {
 	tiles            []int
 	lastPlayer       *playerController
 	originallyPlayer *playerController
+	currentPlayer    *playerController
 	sayNoPlayer      map[int64]*playerController
+}
+
+func (p *Pile) SetCurrentPlayer(player *playerController) {
+	p.currentPlayer = player
+}
+
+func (p *Pile) CurrentPlayer() *playerController {
+	return p.currentPlayer
 }
 
 func (p *Pile) AddSayNoPlayer(player *playerController) {

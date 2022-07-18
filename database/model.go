@@ -180,11 +180,6 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 	}
 }
 
-func (p *Player) NotifyTilesDrawn(drawnTiles []int) {
-	p = getPlayer(p.ID)
-	getPlayer(p.ID).WriteString(fmt.Sprintf("You drew %s!\n", tile.ToTileString(drawnTiles)))
-}
-
 func (p *Player) GamePlayer() game.Player {
 	return p
 }
@@ -392,7 +387,7 @@ func (p *Player) askForPacket(timeout ...time.Duration) (*protocol.Packet, error
 		return nil, consts.ErrorsChanClosed
 	}
 	single := strings.ToLower(packet.String())
-	if single == "exit" || single == "e" {
+	if single == "exit" {
 		return nil, consts.ErrorsExist
 	}
 	return packet, nil

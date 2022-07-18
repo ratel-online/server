@@ -113,7 +113,7 @@ func handleTakeMahjong(room *database.Room, player *database.Player, game *datab
 				game.States[p.ID()] <- statePlay
 				return nil
 			}
-			p = game.Game.Players().Next()
+			p = game.Game.Next()
 		}
 	}
 	p.TryTopDecking(game.Game.Deck())
@@ -159,7 +159,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		PlayerName: p.Name(),
 		Tile:       til,
 	})
-	pc := game.Game.Players().Next()
+	pc := game.Game.Next()
 	game.Game.Pile().SetOriginallyPlayer(pc)
 	gameState = game.Game.ExtractState(p)
 	if len(gameState.CanWin) > 0 {
@@ -183,7 +183,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 				game.States[pc.ID()] <- stateTakeCard
 				return nil
 			}
-			pc = game.Game.Players().Next()
+			pc = game.Game.Next()
 		}
 	}
 	game.States[pc.ID()] <- stateTakeCard
@@ -211,7 +211,7 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 		if mahjong.Current().ID() == room.Banker {
 			break
 		}
-		mahjong.Players().Next()
+		mahjong.Next()
 	}
 	states[mahjong.Current().ID()] <- stateTakeCard
 	return &database.Mahjong{

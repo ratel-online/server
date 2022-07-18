@@ -25,6 +25,12 @@ func (g *Game) Pile() *Pile {
 	return g.pile
 }
 
+func (g *Game) Next() *playerController {
+	player := g.Players().Next()
+	g.pile.SetCurrentPlayer(player)
+	return player
+}
+
 func New(players []Player) *Game {
 	return &Game{
 		players: newPlayerIterator(players),

@@ -1,9 +1,5 @@
 package game
 
-import (
-	"fmt"
-)
-
 type PlayerIterator struct {
 	players map[int64]*playerController
 	cycler  *Cycler
@@ -40,9 +36,4 @@ func (i *PlayerIterator) ForEach(function func(player *playerController)) {
 
 func (i *PlayerIterator) Next() *playerController {
 	return i.players[i.cycler.Next()]
-}
-
-func (i *PlayerIterator) Skip() string {
-	skippedPlayer := i.Next()
-	return fmt.Sprintf("%s's turn skipped! \n", skippedPlayer.Name())
 }

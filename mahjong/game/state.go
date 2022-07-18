@@ -28,9 +28,6 @@ func (s State) String() string {
 	var playerStatuses []string
 
 	for _, player := range s.PlayerSequence {
-		if player.ID() == s.LastPlayer.ID() {
-			continue
-		}
 		playerStatus := player.Name()
 		canTing, _ := ting.CanTing(player.Hand(), player.GetShowCardTiles())
 		if canTing {
@@ -46,8 +43,10 @@ func (s State) String() string {
 	}
 	drew := s.CurrentPlayerHand[len(s.CurrentPlayerHand)-1]
 	sort.Ints(s.CurrentPlayerHand)
-	lines = append(lines, fmt.Sprintf("Turn order:\n %s ", strings.Join(playerStatuses, "\n")))
-	lines = append(lines, fmt.Sprintf("%s Last played tile: %s", s.LastPlayer.Name(), tile.Tile(s.LastPlayedTile).String()))
+	if s.LastPlayer != nil {
+		lines = append(lines, fmt.Sprintf("Turn order:\n%s ", strings.Join(playerStatuses, "\n")))
+		lines = append(lines, fmt.Sprintf("%s Last played tile: %s", s.LastPlayer.Name(), tile.Tile(s.LastPlayedTile).String()))
+	}
 	lines = append(lines, fmt.Sprintf("Your drew: %s ", tile.Tile(drew)))
 	if canTing, tingCards := ting.CanTing(s.CurrentPlayer.Hand(), s.CurrentPlayer.GetShowCardTiles()); canTing {
 		lines = append(lines, fmt.Sprintf("Your ting: %s ", tile.ToTileString(tingCards)))

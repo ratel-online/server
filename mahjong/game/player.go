@@ -5,5 +5,4 @@ type Player interface {
 	NickName() string
 	PlayMJ(tiles []int, gameState State) (int, error)
 	TakeMahjong(tiles []int, gameState State) (int, []int, error)
-	NotifyTilesDrawn(drawnTiles []int)
 }

@@ -51,7 +51,6 @@ func (c *playerController) GetShowCardTiles() []int {
 
 func (c *playerController) AddTiles(tiles []int) {
 	c.hand.AddTiles(tiles)
-	c.player.NotifyTilesDrawn(tiles)
 }
 
 func (c *playerController) TryTopDecking(deck *Deck) {
