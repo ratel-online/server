@@ -1,7 +1,5 @@
 package game
 
-import "sort"
-
 type Hand struct {
 	tiles []int
 }
@@ -12,7 +10,6 @@ func NewHand() *Hand {
 
 func (h *Hand) AddTiles(tiles []int) {
 	h.tiles = append(h.tiles, tiles...)
-	sort.Ints(h.tiles)
 }
 
 func (h *Hand) Tiles() []int {
