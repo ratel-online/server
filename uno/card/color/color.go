@@ -20,11 +20,11 @@ type colorStruct struct {
 }
 
 func (c *colorStruct) Paint(text string) string {
-	return fmt.Sprintf("[%s", c.title) + c.colorFunction(text) + "]"
+	return fmt.Sprintf("%s", c.title) + c.colorFunction(text)
 }
 
 func (c *colorStruct) Paintf(text string, args ...interface{}) string {
-	return fmt.Sprintf("[%s", c.title) + c.colorFunction(text, args...) + "]"
+	return fmt.Sprintf("%s", c.title) + c.colorFunction(text, args...)
 }
 
 func (c *colorStruct) String() string {
