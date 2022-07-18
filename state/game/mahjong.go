@@ -105,6 +105,7 @@ func handleTakeMahjong(player *database.Player, game *database.Mahjong) error {
 		}
 	}
 	p.TryTopDecking(game.Game.Deck())
+	game.States[p.ID()] <- statePlay
 	return nil
 }
 
