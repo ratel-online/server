@@ -1,7 +1,7 @@
 # Ratel-Online
 [![Go Reference](https://pkg.go.dev/badge/github.com/ratel-online/server.svg)](https://pkg.go.dev/github.com/ratel-online/server)
 
-命令行在线多人斗地主！支持癞子，大招，不洗牌等模式！
+命令行在线多人棋牌游戏！支持斗地主，跑得快,UNO,麻将等模式！
 ## 客户端
 - 浏览器在线：[http://rtol.isnico.com/](http://rtol.isnico.com/)
 - 客户端下载：[https://github.com/ratel-online/client/releases](https://github.com/ratel-online/client/releases)
@@ -15,6 +15,7 @@
 - **Skill**: 癞子版技能大招模式
 - **RunFast**: 跑得快模式
 - **Uno**: Uno模式
+- **Mahjong**: 麻将模式
 
 ### 斗地主类规则
 游戏人数2~6人不等，超过3人2副牌，超过5人3副牌，规则参考欢乐斗地主。
@@ -37,7 +38,7 @@
 
 `三带二`,`四带三`,`二连对`,这些是与斗地主不同之处
 
-非标准牌只能在最后出,比如 `3334`(三带一) 只能只剩下这四张牌的时候出
+非标准牌只能在最后出,比如 `3334`(三带一) 只能只剩下这四张牌的时候出(四带二也同理)
 
 更多例子:
 - 3带2：`000j8`
@@ -49,6 +50,9 @@
 
 ### Uno规则
 具体参考: [https://zh.m.wikipedia.org/zh-tw/UNO](https://zh.m.wikipedia.org/zh-tw/UNO)
+
+### 麻将规则
+具体规则有待补充
 
 ### 演示
 视频教程：[https://www.bilibili.com/video/BV16Y411b7BD](https://www.bilibili.com/video/BV16Y411b7BD)
@@ -70,7 +74,7 @@
 - `set lz off`： 关闭癞子模式
 - `set pwd xxxx`：设置密码，例如密码为"xxxx"
 - `set pwd off`：取消密码
-- `set pn 6`: 设置房间人数上限，例如最大6个人
+- `set pn 6`: 设置房间人数上限，例如最大6个人(默认为3人)
 - 其余的会转为聊天内容
 
 游戏指令：
