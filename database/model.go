@@ -64,6 +64,7 @@ func (p *Player) MahjongPlayer() mjGame.Player {
 
 func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int, error) {
 	p = getPlayer(p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
 	buf.WriteString(gameState.String())
@@ -118,6 +119,7 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int
 }
 func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 	p = getPlayer(p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
 	buf.WriteString(gameState.String())
@@ -202,6 +204,7 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 
 func (p *Player) Play(playableCards []card.Card, gameState game.State) (card.Card, error) {
 	p = getPlayer(p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
 	buf.WriteString(gameState.String())
