@@ -193,7 +193,7 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 			p.WriteString(fmt.Sprintf("Unknown color '%s' \n", colorName))
 			continue
 		}
-		chosenColor, err := color.ByName(colorName)
+		chosenColor, err := color.ByName(strings.ToLower(colorName))
 		if err != nil {
 			p.WriteString(fmt.Sprintf("Unknown color '%s' \n", colorName))
 			continue
@@ -217,7 +217,7 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) (card.Car
 	}
 	cardSelectionLines := []string{"Select a card to play:"}
 	for label, card := range cardOptions {
-		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s (enter %s)", card, label))
+		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s %s", card, label))
 	}
 	cardSelectionMessage := strings.Join(cardSelectionLines, " \n ") + " \n "
 	for {

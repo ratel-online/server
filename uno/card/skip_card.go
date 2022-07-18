@@ -29,5 +29,5 @@ func (c SkipCard) Equal(other Card) bool {
 }
 
 func (c SkipCard) String() string {
-	return c.color.Paint("[(/)]")
+	return c.color.Paint("(/)")
 }

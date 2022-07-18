@@ -29,5 +29,5 @@ func (c WildDrawFourCard) Equal(other Card) bool {
 }
 
 func (c WildDrawFourCard) String() string {
-	return "[+4!]"
+	return "+4!"
 }

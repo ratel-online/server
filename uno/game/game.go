@@ -65,6 +65,9 @@ func (g *Game) PerformCardActions(playedCard card.Card) (ret string) {
 			g.players.Current().AddCards(cards)
 		case action.ReverseTurnsAction:
 			ret += g.players.Reverse()
+			if len(g.players.players) == 2 {
+				ret += g.players.Skip()
+			}
 		case action.SkipTurnAction:
 			ret += g.players.Skip()
 		case action.PickColorAction:

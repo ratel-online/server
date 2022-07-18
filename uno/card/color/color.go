@@ -15,15 +15,16 @@ type Color interface {
 
 type colorStruct struct {
 	name          string
+	title         string
 	colorFunction func(string, ...interface{}) string
 }
 
 func (c *colorStruct) Paint(text string) string {
-	return c.colorFunction(text)
+	return fmt.Sprintf("%s", c.title) + c.colorFunction(text)
 }
 
 func (c *colorStruct) Paintf(text string, args ...interface{}) string {
-	return c.colorFunction(text, args...)
+	return fmt.Sprintf("%s", c.title) + c.colorFunction(text, args...)
 }
 
 func (c *colorStruct) String() string {
@@ -31,22 +32,26 @@ func (c *colorStruct) String() string {
 }
 
 var Red = &colorStruct{
-	name:          "red",
+	name:          "r",
+	title:         "红",
 	colorFunction: color.New(color.FgHiRed).SprintfFunc(),
 }
 
 var Yellow = &colorStruct{
-	name:          "yellow",
+	name:          "y",
+	title:         "黄",
 	colorFunction: color.New(color.FgHiYellow).SprintfFunc(),
 }
 
 var Green = &colorStruct{
-	name:          "green",
+	name:          "g",
+	title:         "绿",
 	colorFunction: color.New(color.FgHiGreen).SprintfFunc(),
 }
 
 var Blue = &colorStruct{
-	name:          "blue",
+	name:          "b",
+	title:         "蓝",
 	colorFunction: color.New(color.FgHiCyan).SprintfFunc(),
 }
 
