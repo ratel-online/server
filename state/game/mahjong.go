@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/ratel-online/core/log"
@@ -117,7 +118,9 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 	}
 	gameState := game.Game.ExtractState(p)
 	if cwin.CanWin(p.Hand(), p.GetShowCardTiles()) {
-		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(p.Tiles())))
+		tiles := p.Tiles()
+		sort.Ints(tiles)
+		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
 		room.Lock()
 		room.Game = nil
 		room.State = consts.RoomStateWaiting
@@ -150,7 +153,9 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 	gameState = game.Game.ExtractState(p)
 	if len(gameState.CanWin) > 0 {
 		for _, p := range gameState.CanWin {
-			database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(append(p.Tiles(), gameState.LastPlayedTile))))
+			tiles := append(p.Tiles(), gameState.LastPlayedTile)
+			sort.Ints(tiles)
+			database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
 		}
 		room.Lock()
 		room.Game = nil

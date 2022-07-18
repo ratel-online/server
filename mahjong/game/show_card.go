@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/ratel-online/server/mahjong/consts"
 	"github.com/ratel-online/server/mahjong/tile"
@@ -18,8 +19,8 @@ type ShowCard struct {
 
 // NewShowCard 生成一个明牌
 func NewShowCard(opCode, target int, tiles []int, show bool, free bool) *ShowCard {
-	showCard := &ShowCard{opCode: opCode, target: target, tiles: tiles, show: show, free: free}
-	return showCard
+	sort.Ints(tiles)
+	return &ShowCard{opCode: opCode, target: target, tiles: tiles, show: show, free: free}
 }
 
 func (s *ShowCard) String() string {
@@ -66,6 +67,7 @@ func (s *ShowCard) ModifyPongToKong(kongCode int, free bool) {
 	s.opCode = kongCode
 	s.free = free
 	s.tiles = append(s.tiles, s.tiles[0])
+	sort.Ints(s.tiles)
 }
 
 // ModifyQiangKong 将kong设置为被抢的状态
