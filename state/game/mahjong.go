@@ -40,7 +40,10 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 		case statePlay:
 			err := handlePlayMahjong(room, player, game)
 			if err != nil {
-				if _, ok := err.(consts.Error); ok {
+				if err, ok := err.(consts.Error); ok {
+					if err == consts.ErrorsExist {
+						player.WriteString("Don't quit a good game！\n")
+					}
 					game.States[player.ID] <- statePlay
 					log.Error(err)
 					continue
@@ -51,6 +54,9 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 			err := handleTakeMahjong(room, player, game)
 			if err != nil {
 				if _, ok := err.(consts.Error); ok {
+					if err == consts.ErrorsExist {
+						player.WriteString("Don't quit a good game！\n")
+					}
 					game.States[player.ID] <- stateTakeCard
 					log.Error(err)
 					continue
@@ -64,6 +70,23 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 }
 
 func (g *Mahjong) Exit(player *database.Player) consts.StateID {
+	room := database.GetRoom(player.RoomID)
+	if room == nil {
+		return consts.StateMahjong
+	}
+	game := room.Mahjong
+	if game == nil {
+		return consts.StateMahjong
+	}
+	for _, playerId := range game.Players {
+		game.States[playerId] <- stateWaiting
+	}
+	database.Broadcast(player.RoomID, fmt.Sprintf("player %s exit, game over! \n", player.Name))
+	database.LeaveRoom(player.RoomID, player.ID)
+	room.Lock()
+	room.Game = nil
+	room.State = consts.RoomStateWaiting
+	room.Unlock()
 	return consts.StateMahjong
 }
 
