@@ -43,10 +43,10 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 				if err, ok := err.(consts.Error); ok {
 					if err == consts.ErrorsExist {
 						player.WriteString("Don't quit a good game！\n")
+						game.States[player.ID] <- statePlay
+						log.Error(err)
+						continue
 					}
-					game.States[player.ID] <- statePlay
-					log.Error(err)
-					continue
 				}
 				return 0, err
 			}
@@ -56,10 +56,10 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 				if _, ok := err.(consts.Error); ok {
 					if err == consts.ErrorsExist {
 						player.WriteString("Don't quit a good game！\n")
+						game.States[player.ID] <- stateTakeCard
+						log.Error(err)
+						continue
 					}
-					game.States[player.ID] <- stateTakeCard
-					log.Error(err)
-					continue
 				}
 				return 0, err
 			}
