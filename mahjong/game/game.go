@@ -71,7 +71,6 @@ func (g Game) ExtractState(player *playerController) State {
 		}
 	})
 	playedTiles := g.pile.Tiles()
-	sort.Ints(playedTiles)
 	tiles := player.Tiles()
 	sort.Ints(tiles)
 	return State{
