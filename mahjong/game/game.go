@@ -59,7 +59,8 @@ func (g Game) ExtractState(player *playerController) State {
 	g.players.ForEach(func(player *playerController) {
 		playerSequence = append(playerSequence, player.Name())
 		playerShowCards[player.Name()] = player.GetShowCard()
-		if topTile > 0 && g.pile.lastPlayer.ID() != player.ID() {
+		if _, ok := g.pile.SayNoPlayer()[player.ID()]; !ok &&
+			topTile > 0 && g.pile.lastPlayer.ID() != player.ID() {
 			if win.CanWin(append(player.Hand(), g.pile.Top()), player.GetShowCardTiles()) {
 				canWin = append(canWin, player)
 			}

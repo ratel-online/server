@@ -116,6 +116,7 @@ func (c *playerController) TakeMahjong(gameState State, deck *Deck, pile *Pile) 
 				c.TryTopDecking(deck)
 			}
 		}
+		pile.AddSayNoPlayer(c)
 		return op, false, nil
 	}
 	c.AddTiles([]int{pile.BottomDrawOne()})

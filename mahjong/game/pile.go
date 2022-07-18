@@ -4,6 +4,18 @@ type Pile struct {
 	tiles            []int
 	lastPlayer       *playerController
 	originallyPlayer *playerController
+	sayNoPlayer      map[int64]*playerController
+}
+
+func (p *Pile) AddSayNoPlayer(player *playerController) {
+	if p.sayNoPlayer == nil {
+		p.sayNoPlayer = make(map[int64]*playerController)
+	}
+	p.sayNoPlayer[player.ID()] = player
+}
+
+func (p *Pile) SayNoPlayer() map[int64]*playerController {
+	return p.sayNoPlayer
 }
 
 func NewPile() *Pile {
@@ -12,6 +24,7 @@ func NewPile() *Pile {
 
 func (p *Pile) SetOriginallyPlayer(player *playerController) {
 	p.originallyPlayer = player
+	p.sayNoPlayer = make(map[int64]*playerController)
 }
 
 func (p *Pile) OriginallyPlayer() *playerController {
