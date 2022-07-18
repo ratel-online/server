@@ -19,12 +19,12 @@ import (
 type Game struct{}
 
 var (
-	stateRob        = 1
-	statePlay       = 2
-	stateReset      = 3
-	stateWaiting    = 4
-	stateFirstCard  = 5
-	statePrivileges = 6
+	stateRob       = 1
+	statePlay      = 2
+	stateReset     = 3
+	stateWaiting   = 4
+	stateFirstCard = 5
+	stateTakeCard  = 6
 )
 
 func (g *Game) Next(player *database.Player) (consts.StateID, error) {

@@ -15,6 +15,9 @@ func HaveGang(tiles []int) (int, bool) {
 
 // 判断是不是可以吃
 func CanChi(cards []int, card int) bool {
+	if card == 0 {
+		return false
+	}
 	return len(CanChiTiles(cards, card)) > 0
 }
 

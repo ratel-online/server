@@ -26,6 +26,12 @@ func (d *Deck) Draw(amount int) []int {
 	return tiles
 }
 
+func (d *Deck) BottomDrawOne() int {
+	tile := d.tiles[len(d.tiles)-1]
+	d.tiles = d.tiles[:len(d.tiles)-1]
+	return tile
+}
+
 func fillDeck(deck *Deck) {
 	tiles := make([]int, 0, 144)
 	generate := func(tile, num, count int) []int {

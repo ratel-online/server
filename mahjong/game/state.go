@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/ratel-online/server/mahjong/tile"
@@ -9,18 +10,19 @@ import (
 
 type State struct {
 	LastPlayer        *playerController
+	OriginallyPlayer  *playerController
 	LastPlayedTile    int
 	PlayedTiles       []int
 	CurrentPlayerHand []int
 	PlayerSequence    []string
 	PlayerShowCards   map[string][]*ShowCard
-	SpecialPrivileges map[int64]int
+	SpecialPrivileges map[int64][]int
+	CanWin            []*playerController
 }
 
 func (s State) String() string {
 	var lines []string
 	lines = append(lines, fmt.Sprintf("playedTiles:%s", tile.ToTileString(s.PlayedTiles)))
-	lines = append(lines, fmt.Sprintf("Last played tile: %s", tile.Tile(s.LastPlayedTile).String()))
 	var playerStatuses []string
 	for _, playerName := range s.PlayerSequence {
 		playerStatus := playerName
@@ -32,7 +34,11 @@ func (s State) String() string {
 		}
 		playerStatuses = append(playerStatuses, playerStatus)
 	}
-	lines = append(lines, fmt.Sprintf("Turn order:\n%s \n", strings.Join(playerStatuses, "\n")))
+	drew := s.CurrentPlayerHand[len(s.CurrentPlayerHand)-1]
+	sort.Ints(s.CurrentPlayerHand)
+	lines = append(lines, fmt.Sprintf("Turn order:\n%s ", strings.Join(playerStatuses, "\n")))
+	lines = append(lines, fmt.Sprintf("Last played tile: %s", tile.Tile(s.LastPlayedTile).String()))
+	lines = append(lines, fmt.Sprintf("Your drew: %s ", tile.Tile(drew)))
 	lines = append(lines, fmt.Sprintf("Your hand: %s \n", tile.ToTileString(s.CurrentPlayerHand)))
 	return strings.Join(lines, "\n")
 }

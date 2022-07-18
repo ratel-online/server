@@ -52,31 +52,38 @@ func (g *Game) Current() *playerController {
 func (g Game) ExtractState(player *playerController) State {
 	playerSequence := make([]string, 0)
 	playerShowCards := make(map[string][]*ShowCard)
-	specialPrivileges := make(map[int64]int)
+	specialPrivileges := make(map[int64][]int)
+	canWin := make([]*playerController, 0)
+	originallyPlayer := g.pile.originallyPlayer
+	topTile := g.pile.Top()
 	g.players.ForEach(func(player *playerController) {
 		playerSequence = append(playerSequence, player.Name())
 		playerShowCards[player.Name()] = player.GetShowCard()
-		if len(g.pile.Tiles()) > 0 && g.pile.lastPlayer.ID() != player.ID() {
-			if card.CanGang(player.Hand(), g.pile.Top()) {
-				specialPrivileges[player.ID()] = consts.GANG
-			}
-			if card.CanPeng(player.Hand(), g.pile.Top()) {
-				specialPrivileges[player.ID()] = consts.PENG
-			}
+		if topTile > 0 && g.pile.lastPlayer.ID() != player.ID() {
 			if win.CanWin(append(player.Hand(), g.pile.Top()), player.GetShowCardTiles()) {
-				specialPrivileges[player.ID()] = consts.WIN
+				canWin = append(canWin, player)
+			}
+			if card.CanGang(player.Hand(), topTile) {
+				specialPrivileges[player.ID()] = append(specialPrivileges[player.ID()], consts.GANG)
+			}
+			if card.CanPeng(player.Hand(), topTile) {
+				specialPrivileges[player.ID()] = append(specialPrivileges[player.ID()], consts.PENG)
+			}
+			if originallyPlayer.ID() == player.ID() &&
+				card.CanChi(player.Hand(), topTile) {
+				specialPrivileges[player.ID()] = append(specialPrivileges[player.ID()], consts.CHI)
 			}
 		}
 	})
-	playedTiles := g.pile.Tiles()
-	tiles := player.Tiles()
 	return State{
 		LastPlayer:        g.pile.lastPlayer,
+		OriginallyPlayer:  originallyPlayer,
 		LastPlayedTile:    g.pile.Top(),
-		PlayedTiles:       playedTiles,
-		CurrentPlayerHand: tiles,
+		PlayedTiles:       g.pile.Tiles(),
+		CurrentPlayerHand: player.Tiles(),
 		PlayerSequence:    playerSequence,
 		PlayerShowCards:   playerShowCards,
 		SpecialPrivileges: specialPrivileges,
+		CanWin:            canWin,
 	}
 }

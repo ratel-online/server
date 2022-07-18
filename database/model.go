@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -62,42 +63,61 @@ func (p *Player) MahjongPlayer() mjGame.Player {
 	return p
 }
 
-func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int, error) {
+type OP struct {
+	operation int
+	tiles     []int
+}
+
+func (p *Player) TakeMahjong(tiles []int, gameState mjGame.State) (int, []int, error) {
 	p = getPlayer(p.ID)
-	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
+	Broadcast(p.RoomID, fmt.Sprintf("It's %s take mahjong! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
+	buf.WriteString(fmt.Sprintf("It's your take mahjong, %s! \n", p.Name))
 	buf.WriteString(gameState.String())
 	p.WriteString(buf.String())
 	askBuf := bytes.Buffer{}
-	tileOptions := make(map[string][]int)
+	tileOptions := make(map[string]*OP)
 	runeSequence := runeSequence{}
-	ret := 0
-	if pv, ok := gameState.SpecialPrivileges[p.ID]; ok {
-		label := string(runeSequence.next())
-		if pv == mjConsts.GANG {
-			askBuf.WriteString("You can 杠!!!\n")
-			ret = mjConsts.GANG
-			tileOptions[label] = []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
-		}
-		if pv == mjConsts.PENG {
-			askBuf.WriteString("You can 碰!!!\n")
-			ret = mjConsts.PENG
-			tileOptions[label] = []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
-		}
-		askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "yes"))
-	} else {
-		askBuf.WriteString("You can 吃!!!\n")
-		ret = mjConsts.CHI
-		for _, ts := range mjCard.CanChiTiles(tiles, gameState.LastPlayedTile) {
-			label := string(runeSequence.next())
-			tileOptions[label] = append(ts, gameState.LastPlayedTile)
-			askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+	if pvs, ok := gameState.SpecialPrivileges[p.ID]; ok {
+		for _, pv := range pvs {
+			switch pv {
+			case mjConsts.GANG:
+				askBuf.WriteString("You can 杠!!!\n")
+				label := string(runeSequence.next())
+				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
+				tileOptions[label] = &OP{
+					operation: mjConsts.GANG,
+					tiles:     append(ts, gameState.LastPlayedTile),
+				}
+				askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+			case mjConsts.PENG:
+				askBuf.WriteString("You can 碰!!!\n")
+				label := string(runeSequence.next())
+				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile}
+				tileOptions[label] = &OP{
+					operation: mjConsts.GANG,
+					tiles:     append(ts, gameState.LastPlayedTile),
+				}
+				askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+			case mjConsts.CHI:
+				askBuf.WriteString("You can 吃!!!\n")
+				for _, ts := range mjCard.CanChiTiles(tiles, gameState.LastPlayedTile) {
+					label := string(runeSequence.next())
+					tileOptions[label] = &OP{
+						operation: mjConsts.CHI,
+						tiles:     append(ts, gameState.LastPlayedTile),
+					}
+					askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+				}
+			}
 		}
 	}
 	label := string(runeSequence.next())
-	tileOptions[label] = []int{}
 	askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "no"))
+	tileOptions[label] = &OP{
+		operation: 0,
+		tiles:     []int{},
+	}
 	for {
 		p = getPlayer(p.ID)
 		p.WriteString(askBuf.String())
@@ -106,17 +126,18 @@ func (p *Player) PlayPrivileges(tiles []int, gameState mjGame.State) (int, []int
 			if err == consts.ErrorsTimeout {
 				selectedLabel = "A"
 			} else {
-				return ret, nil, err
+				return 0, nil, err
 			}
 		}
-		selectedCards, found := tileOptions[strings.ToUpper(selectedLabel)]
+		selected, found := tileOptions[strings.ToUpper(selectedLabel)]
 		if !found {
 			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
 			continue
 		}
-		return ret, selectedCards, nil
+		return selected.operation, selected.tiles, nil
 	}
 }
+
 func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 	p = getPlayer(p.ID)
 	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
@@ -128,6 +149,7 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 	askBuf.WriteString("Select a tile to play:\n")
 	runeSequence := runeSequence{}
 	tileOptions := make(map[string]int)
+	sort.Ints(tiles)
 	for _, i := range tiles {
 		label := string(runeSequence.next())
 		tileOptions[label] = i
