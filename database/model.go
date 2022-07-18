@@ -95,7 +95,7 @@ func (p *Player) TakeMahjong(tiles []int, gameState mjGame.State) (int, []int, e
 				label := string(runeSequence.next())
 				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile}
 				tileOptions[label] = &OP{
-					operation: mjConsts.GANG,
+					operation: mjConsts.PENG,
 					tiles:     append(ts, gameState.LastPlayedTile),
 				}
 				askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
