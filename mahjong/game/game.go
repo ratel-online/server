@@ -1,6 +1,8 @@
 package game
 
 import (
+	"sort"
+
 	"github.com/ratel-online/server/mahjong/card"
 	"github.com/ratel-online/server/mahjong/consts"
 	"github.com/ratel-online/server/mahjong/tile"
@@ -70,6 +72,7 @@ func (g Game) ExtractState(player *playerController) State {
 	})
 	playedTiles := g.pile.Tiles()
 	tiles := player.Tiles()
+	sort.Ints(tiles)
 	return State{
 		LastPlayer:        g.pile.lastPlayer,
 		LastPlayedTile:    g.pile.Top(),

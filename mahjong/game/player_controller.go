@@ -1,8 +1,6 @@
 package game
 
 import (
-	"sort"
-
 	"github.com/ratel-online/server/mahjong/consts"
 	"github.com/ratel-online/server/mahjong/event"
 	"github.com/ratel-online/server/mahjong/util"
@@ -94,7 +92,6 @@ func (c *playerController) PlayPrivileges(gameState State, pile *Pile) (int, err
 
 func (c *playerController) Play(gameState State) (int, error) {
 	tiles := c.Hand()
-	sort.Ints(tiles)
 	selectedTile, err := c.player.PlayMJ(tiles, gameState)
 	if err != nil {
 		return 0, err
