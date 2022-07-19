@@ -88,18 +88,23 @@ func CreateRoom(creator int64, t int) *Room {
 		//默認開啓聊天
 		EnableChat: true,
 	}
-	if room.Type == consts.GameTypeLaiZi {
+	switch room.Type {
+	case consts.GameTypeLaiZi:
 		room.EnableLaiZi = true
-	} else if room.Type == consts.GameTypeSkill {
+	case consts.GameTypeSkill:
 		room.EnableLaiZi = true
 		room.EnableDontShuffle = true
 		room.EnableSkill = true
 		room.EnableLandlord = false
-	} else if room.Type == consts.GameTypeRunFast {
+	case consts.GameTypeRunFast:
 		room.MaxPlayers = 3
 		room.EnableLaiZi = false
 		room.EnableLandlord = false
 		room.EnableDontShuffle = true
+	case consts.GameTypeUno:
+		room.MaxPlayers = 10
+	case consts.GameTypeMahjong:
+		room.MaxPlayers = 4
 	}
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
