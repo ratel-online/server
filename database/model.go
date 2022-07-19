@@ -123,6 +123,10 @@ func (p *Player) TakeMahjong(tiles []int, gameState mjGame.State) (int, []int, e
 		p.WriteString(askBuf.String())
 		selectedLabel, err := p.AskForString(consts.PlayMahjongTimeout)
 		if err != nil {
+			if err == consts.ErrorsExist {
+				p.WriteString("Don't quit a good game！\n")
+				continue
+			}
 			if err == consts.ErrorsTimeout {
 				selectedLabel = "A"
 			} else {
@@ -161,6 +165,10 @@ func (p *Player) PlayMJ(tiles []int, gameState mjGame.State) (int, error) {
 		p.WriteString(askBuf.String())
 		selectedLabel, err := p.AskForString(consts.PlayMahjongTimeout)
 		if err != nil {
+			if err == consts.ErrorsExist {
+				p.WriteString("Don't quit a good game！\n")
+				continue
+			}
 			if err == consts.ErrorsTimeout {
 				selectedLabel = "A"
 			} else {

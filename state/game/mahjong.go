@@ -7,7 +7,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/mahjong/card"
@@ -40,27 +39,11 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 		case statePlay:
 			err := handlePlayMahjong(room, player, game)
 			if err != nil {
-				if err, ok := err.(consts.Error); ok {
-					if err == consts.ErrorsExist {
-						player.WriteString("Don't quit a good game！\n")
-						game.States[player.ID] <- statePlay
-						log.Error(err)
-						continue
-					}
-				}
 				return 0, err
 			}
 		case stateTakeCard:
 			err := handleTakeMahjong(room, player, game)
 			if err != nil {
-				if _, ok := err.(consts.Error); ok {
-					if err == consts.ErrorsExist {
-						player.WriteString("Don't quit a good game！\n")
-						game.States[player.ID] <- stateTakeCard
-						log.Error(err)
-						continue
-					}
-				}
 				return 0, err
 			}
 		case stateWaiting:
