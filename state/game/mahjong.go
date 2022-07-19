@@ -187,28 +187,27 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		return nil
 	}
 	if len(gameState.SpecialPrivileges) > 0 {
-		pvid := pc.ID()
+		pvID := pc.ID()
 		flag := false
 		for _, i := range []int{mjconsts.GANG, mjconsts.PENG, mjconsts.CHI} {
 			for id, pvs := range gameState.SpecialPrivileges {
 				if util.IntInSlice(i, pvs) {
-					pvid = id
+					pvID = id
 					flag = true
 					break
 				}
-				if flag {
-					break
-				}
+			}
+			if flag {
+				break
 			}
 		}
 		for {
-			if pc.ID() == pvid {
+			if pc.ID() == pvID {
 				game.States[pc.ID()] <- stateTakeCard
 				return nil
 			}
 			pc = game.Game.Next()
 		}
-
 	}
 	game.States[pc.ID()] <- stateTakeCard
 	return nil
