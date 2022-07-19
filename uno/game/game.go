@@ -32,8 +32,8 @@ func New(players []Player) *Game {
 	}
 }
 
-func (g *Game) GetPlayerCards(name string) []card.Card {
-	return g.players.GetPlayerController(name).Hand()
+func (g *Game) GetPlayerCards(id int64) []card.Card {
+	return g.players.GetPlayerController(id).Hand()
 }
 
 func (g *Game) DealStartingCards() {

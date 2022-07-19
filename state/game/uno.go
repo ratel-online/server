@@ -29,7 +29,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 		color.Yellow.Paint("N"),
 		color.Blue.Paint("O"),
 	))
-	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", game.Game.GetPlayerCards(player.Name)))
+	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", game.Game.GetPlayerCards(player.ID)))
 	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {

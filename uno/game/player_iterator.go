@@ -5,25 +5,25 @@ import (
 )
 
 type PlayerIterator struct {
-	players map[string]*playerController
+	players map[int64]*playerController
 	cycler  *Cycler
 }
 
-func (i *PlayerIterator) GetPlayerController(name string) *playerController {
-	return i.players[name]
+func (i *PlayerIterator) GetPlayerController(id int64) *playerController {
+	return i.players[id]
 }
 
 func newPlayerIterator(players []Player) *PlayerIterator {
-	var playerNames []string
-	playerMap := make(map[string]*playerController, len(players))
+	var playerIDs []int64
+	playerMap := make(map[int64]*playerController, len(players))
 	for _, player := range players {
-		playerName := player.NickName()
-		playerNames = append(playerNames, playerName)
-		playerMap[playerName] = newPlayerController(player)
+		PlayerID := player.PlayerID()
+		playerIDs = append(playerIDs, PlayerID)
+		playerMap[PlayerID] = newPlayerController(player)
 	}
 	return &PlayerIterator{
 		players: playerMap,
-		cycler:  NewCycler(playerNames),
+		cycler:  NewCycler(playerIDs),
 	}
 }
 

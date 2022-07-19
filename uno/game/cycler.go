@@ -9,12 +9,12 @@ const (
 
 type Cycler struct {
 	sync.Mutex
-	elements  []string
+	elements  []int64
 	current   int
 	direction int
 }
 
-func NewCycler(elements []string) *Cycler {
+func NewCycler(elements []int64) *Cycler {
 	return &Cycler{
 		elements:  elements,
 		current:   len(elements) - 1,
@@ -22,17 +22,17 @@ func NewCycler(elements []string) *Cycler {
 	}
 }
 
-func (c *Cycler) Current() string {
+func (c *Cycler) Current() int64 {
 	return c.elements[c.current]
 }
 
-func (c *Cycler) ForEach(function func(string)) {
+func (c *Cycler) ForEach(function func(int64)) {
 	for _, element := range c.elements {
 		function(element)
 	}
 }
 
-func (c *Cycler) Next() string {
+func (c *Cycler) Next() int64 {
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
 	elementCount := len(c.elements)
