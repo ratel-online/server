@@ -14,6 +14,7 @@ import (
 	"github.com/ratel-online/server/mahjong/event"
 	"github.com/ratel-online/server/mahjong/game"
 	"github.com/ratel-online/server/mahjong/tile"
+	"github.com/ratel-online/server/mahjong/util"
 	cwin "github.com/ratel-online/server/mahjong/win"
 )
 
@@ -186,13 +187,28 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		return nil
 	}
 	if len(gameState.SpecialPrivileges) > 0 {
+		pvid := pc.ID()
+		flag := false
+		for _, i := range []int{mjconsts.GANG, mjconsts.PENG, mjconsts.CHI} {
+			for id, pvs := range gameState.SpecialPrivileges {
+				if util.IntInSlice(i, pvs) {
+					pvid = id
+					flag = true
+					break
+				}
+				if flag {
+					break
+				}
+			}
+		}
 		for {
-			if _, ok := gameState.SpecialPrivileges[pc.ID()]; ok {
+			if pc.ID() == pvid {
 				game.States[pc.ID()] <- stateTakeCard
 				return nil
 			}
 			pc = game.Game.Next()
 		}
+
 	}
 	game.States[pc.ID()] <- stateTakeCard
 	return nil
