@@ -227,7 +227,7 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 	rand.Seed(time.Now().UnixNano())
 	mahjong := game.New(mjPlayers)
 	mahjong.DealStartingTiles()
-	if room.Banker == 0 {
+	if room.Banker == 0 || !util.Int64InSlice(room.Banker, players) {
 		room.Banker = players[rand.Intn(len(players))]
 	}
 	for {

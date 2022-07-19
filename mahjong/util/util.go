@@ -17,6 +17,18 @@ func GenRangeInt(length int, from int) []int {
 }
 
 // IntInSlice 判断某个int值是否在切片中
+func Int64InSlice(finder int64, slice []int64) bool {
+	exists := false
+	for _, v := range slice {
+		if v == finder {
+			exists = true
+			break
+		}
+	}
+	return exists
+}
+
+// IntInSlice 判断某个int值是否在切片中
 func IntInSlice(finder int, slice []int) bool {
 	exists := false
 	for _, v := range slice {
