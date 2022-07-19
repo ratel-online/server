@@ -204,7 +204,7 @@ func (p *Player) PickColor(gameState game.State) color.Color {
 	for {
 		p = getPlayer(p.ID)
 		p.WriteString(fmt.Sprintf(
-			"Select a color: '%s', '%s', '%s' or '%s'? \n",
+			"Select a color: %s, %s, %s or %s ? \n",
 			color.Red,
 			color.Yellow,
 			color.Green,
@@ -242,7 +242,7 @@ func (p *Player) Play(playableCards []card.Card, gameState game.State) (card.Car
 	}
 	cardSelectionLines := []string{"Select a card to play:"}
 	for label, card := range cardOptions {
-		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s %s", card, label))
+		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s %s", label, card))
 	}
 	cardSelectionMessage := strings.Join(cardSelectionLines, " \n ") + " \n "
 	for {
