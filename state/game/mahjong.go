@@ -157,6 +157,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
 		room.Lock()
 		room.Game = nil
+		room.Banker = p.ID()
 		room.State = consts.RoomStateWaiting
 		room.Unlock()
 		for _, playerId := range game.Players {
@@ -193,6 +194,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		}
 		room.Lock()
 		room.Game = nil
+		room.Banker = gameState.CanWin[rand.Intn(len(gameState.CanWin))].ID()
 		room.State = consts.RoomStateWaiting
 		room.Unlock()
 		for _, playerId := range game.Players {
