@@ -88,7 +88,7 @@ func (g Game) ExtractState(player *playerController) State {
 		LastPlayedTile:    g.pile.Top(),
 		PlayedTiles:       g.pile.Tiles(),
 		CurrentPlayerHand: player.Tiles(),
-		CurrentPlayer:     player,
+		CurrentPlayer:     g.Current(),
 		PlayerSequence:    playerSequence,
 		PlayerShowCards:   playerShowCards,
 		SpecialPrivileges: specialPrivileges,
