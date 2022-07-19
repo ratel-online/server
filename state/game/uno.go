@@ -62,7 +62,6 @@ func (g *Uno) Exit(player *database.Player) consts.StateID {
 	if room == nil {
 		return consts.StateUnoGame
 	}
-	room.UnoGame.PlayerNumber--
 	database.LeaveRoom(room.ID, player.ID)
 	return consts.StateUnoGame
 }
@@ -127,10 +126,9 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 	unoGame.DealStartingCards()
 	states[unoGame.Current().ID()] <- stateFirstCard
 	return &database.UnoGame{
-		Room:         room,
-		Players:      players,
-		States:       states,
-		Game:         unoGame,
-		PlayerNumber: len(players),
+		Room:    room,
+		Players: players,
+		States:  states,
+		Game:    unoGame,
 	}, nil
 }

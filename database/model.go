@@ -567,11 +567,10 @@ func (g Game) Team(playerId int64) string {
 }
 
 type UnoGame struct {
-	Room         *Room              `json:"room"`
-	Players      []int64            `json:"players"`
-	States       map[int64]chan int `json:"states"`
-	Game         *game.Game         `json:"game"`
-	PlayerNumber int                `json:"playerNumber"`
+	Room    *Room              `json:"room"`
+	Players []int64            `json:"players"`
+	States  map[int64]chan int `json:"states"`
+	Game    *game.Game         `json:"game"`
 }
 
 func (ug *UnoGame) HavePlay(player *Player) bool {
@@ -584,7 +583,7 @@ func (ug *UnoGame) HavePlay(player *Player) bool {
 }
 
 func (un *UnoGame) NeedExit() bool {
-	return un.PlayerNumber <= 1
+	return un.Room.Players <= 1
 }
 
 type Mahjong struct {
