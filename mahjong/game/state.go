@@ -27,12 +27,14 @@ func (s State) String() string {
 	lines = append(lines, fmt.Sprintf("playedTiles:%s", tile.ToTileString(s.PlayedTiles)))
 	var playerStatuses []string
 	playTings := []int{}
+	flag := true
 	for _, player := range s.PlayerSequence {
 		playerStatus := fmt.Sprintf("%s:", player.Name())
 		if canTing, tingCards := ting.CanTing(player.Hand(), player.GetShowCardTiles()); canTing {
 			playerStatus += "(听)"
-			if player.ID() == s.CurrentPlayer.ID() {
+			if flag {
 				playTings = tingCards
+				flag = false
 			}
 		}
 		if showCards, ok := s.PlayerShowCards[player.Name()]; ok && len(showCards) > 0 {
