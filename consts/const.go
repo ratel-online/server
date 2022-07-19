@@ -57,7 +57,7 @@ const (
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
-	PlayMahjongTimeout = 2 * time.Minute
+	PlayMahjongTimeout = 30 * time.Second
 )
 
 // Room properties.
