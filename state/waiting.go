@@ -115,9 +115,9 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 				}
 				continue
 			}
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			player.BroadcastChat(fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		} else if len(signal) > 0 {
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			player.BroadcastChat(fmt.Sprintf("%s say: %s\n", player.Name, signal))
 		}
 	}
 	return _type, access, nil

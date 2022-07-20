@@ -118,7 +118,7 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 	for playerId := range roomPlayers {
 		p := *database.GetPlayer(playerId)
 		players = append(players, p.ID)
-		unoPlayers = append(unoPlayers, p.GamePlayer())
+		unoPlayers = append(unoPlayers, p.UnoPlayer())
 		states[playerId] = make(chan int, 1)
 	}
 	rand.Seed(time.Now().UnixNano())

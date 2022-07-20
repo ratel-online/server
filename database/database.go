@@ -3,12 +3,10 @@ package database
 import (
 	"sort"
 	"strconv"
-	stringx "strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/awesome-cap/hashmap"
-	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/util/async"
@@ -57,7 +55,7 @@ func init() {
 		for {
 			time.Sleep(1 * time.Minute)
 			rooms.Foreach(func(e *hashmap.Entry) {
-				roomCancel(e.Value().(*Room))
+				e.Value().(*Room).Cancel()
 			})
 		}
 	})
@@ -109,22 +107,6 @@ func CreateRoom(creator int64, t int) *Room {
 	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
 	return room
-}
-
-func deleteRoom(room *Room) {
-	if room != nil {
-		rooms.Del(room.ID)
-		roomPlayers.Del(room.ID)
-		deleteGame(room.Game)
-	}
-}
-
-func deleteGame(game *Game) {
-	if game != nil {
-		for _, state := range game.States {
-			close(state)
-		}
-	}
 }
 
 func GetRooms() []*Room {
@@ -203,7 +185,7 @@ func JoinRoom(roomId, playerId int64) error {
 		room.Players++
 		player.RoomID = roomId
 	} else {
-		deleteRoom(room)
+		room.delete()
 		return consts.ErrorsRoomInvalid
 	}
 	return nil
@@ -214,80 +196,12 @@ func LeaveRoom(roomId, playerId int64) {
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
-		leaveRoom(room, getPlayer(playerId))
-	}
-}
-
-func leaveRoom(room *Room, player *Player) {
-	if room == nil || player == nil {
-		return
-	}
-	room.ActiveTime = time.Now()
-	playersIds := getRoomPlayers(room.ID)
-	if _, ok := playersIds[player.ID]; ok {
-		room.Players--
-		player.RoomID = 0
-		delete(playersIds, player.ID)
-		if len(playersIds) > 0 && room.Creator == player.ID {
-			for k := range playersIds {
-				room.Creator = k
-				break
-			}
-		}
-	}
-	if len(playersIds) == 0 {
-		deleteRoom(room)
-	}
-}
-
-func offline(roomId, playerId int64) {
-	room := getRoom(roomId)
-	if room != nil {
-		room.Lock()
-		defer room.Unlock()
-		if room.State == consts.RoomStateWaiting {
-			leaveRoom(room, getPlayer(playerId))
-		}
-		roomCancel(room)
-	}
-}
-
-func roomCancel(room *Room) {
-	if room.ActiveTime.Add(24 * time.Hour).Before(time.Now()) {
-		log.Infof("room %d is timeout 24 hours, removed.\n", room.ID)
-		deleteRoom(room)
-		return
-	}
-	living := false
-	playerIds := getRoomPlayers(room.ID)
-	for id := range playerIds {
-		if getPlayer(id).online {
-			living = true
-			break
-		}
-	}
-	if !living {
-		log.Infof("room %d is not living, removed.\n", room.ID)
-		deleteRoom(room)
+		room.removePlayer(getPlayer(playerId))
 	}
 }
 
 func RoomPlayers(roomId int64) map[int64]bool {
 	return getRoomPlayers(roomId)
-}
-
-func broadcast(room *Room, msg string, exclude ...int64) {
-	room.ActiveTime = time.Now()
-	excludeSet := map[int64]bool{}
-	for _, exc := range exclude {
-		excludeSet[exc] = true
-	}
-	roomPlayers := getRoomPlayers(room.ID)
-	for playerId := range roomPlayers {
-		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
-			_ = player.WriteString(">> " + msg)
-		}
-	}
 }
 
 func Broadcast(roomId int64, msg string, exclude ...int64) {
@@ -297,12 +211,7 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	}
 	room.Lock()
 	defer room.Unlock()
-	broadcast(room, msg, exclude...)
-}
-
-func BroadcastChat(player *Player, msg string, exclude ...int64) {
-	log.Infof("chat msg, player %s[%d] %s say: %s\n", player.Name, player.ID, player.IP, stringx.TrimSpace(msg))
-	Broadcast(player.RoomID, strings.Desensitize(msg), exclude...)
+	room.broadcast(msg, exclude...)
 }
 
 func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {

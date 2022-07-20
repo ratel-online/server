@@ -3,6 +3,11 @@ package game
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/util/poker"
@@ -10,10 +15,6 @@ import (
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/rule"
 	"github.com/ratel-online/server/skill"
-	"math/rand"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type RunFastGame struct{}
@@ -157,7 +158,7 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 		}
 		//聊天開啓才能說話
 		if invalid && game.Room.EnableChat {
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+			player.BroadcastChat(fmt.Sprintf("%s say: %s\n", player.Name, ans))
 			continue
 		} else if invalid && !game.Room.EnableChat {
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
