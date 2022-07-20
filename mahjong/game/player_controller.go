@@ -94,11 +94,11 @@ func (c *playerController) Player() *Player {
 	return &c.player
 }
 
-func (c *playerController) TakeMahjong(gameState State, deck *Deck, pile *Pile) (int, bool, error) {
+func (c *playerController) Take(gameState State, deck *Deck, pile *Pile) (int, bool, error) {
 	tiles := make([]int, 0, len(c.Hand())+1)
 	tiles = append(tiles, c.Hand()...)
 	tiles = append(tiles, pile.Top())
-	op, tiles, err := c.player.TakeMahjong(tiles, gameState)
+	op, tiles, err := c.player.Take(tiles, gameState)
 	if err != nil {
 		return op, false, err
 	}
@@ -124,7 +124,7 @@ func (c *playerController) TakeMahjong(gameState State, deck *Deck, pile *Pile) 
 }
 
 func (c *playerController) Play(gameState State) (int, error) {
-	selectedTile, err := c.player.PlayMJ(c.Hand(), gameState)
+	selectedTile, err := c.player.Play(c.Hand(), gameState)
 	if err != nil {
 		return 0, err
 	}

@@ -53,7 +53,7 @@ func (mp *MahjongPlayer) OnPlayTile(payload event.PlayTilePayload) {
 	Broadcast(p.RoomID, fmt.Sprintf("%s PlayTile %s !\n", payload.PlayerName, tile.Tile(payload.Tile)), p.ID)
 }
 
-func (mp *MahjongPlayer) TakeMahjong(tiles []int, gameState game.State) (int, []int, error) {
+func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, error) {
 	p := getPlayer(mp.ID)
 	Broadcast(p.RoomID, fmt.Sprintf("It's %s take mahjong! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}
@@ -127,7 +127,7 @@ func (mp *MahjongPlayer) TakeMahjong(tiles []int, gameState game.State) (int, []
 	}
 }
 
-func (mp *MahjongPlayer) PlayMJ(tiles []int, gameState game.State) (int, error) {
+func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 	p := getPlayer(mp.ID)
 	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}

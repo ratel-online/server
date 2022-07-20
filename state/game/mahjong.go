@@ -43,7 +43,7 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 				return 0, err
 			}
 		case stateTakeCard:
-			err := handleTakeMahjong(room, player, game)
+			err := handleTake(room, player, game)
 			if err != nil {
 				return 0, err
 			}
@@ -74,7 +74,7 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 	return consts.StateMahjong
 }
 
-func handleTakeMahjong(room *database.Room, player *database.Player, game *database.Mahjong) error {
+func handleTake(room *database.Room, player *database.Player, game *database.Mahjong) error {
 	p := game.Game.Current()
 	if p.ID() != player.ID {
 		game.States[p.ID()] <- stateTakeCard
@@ -106,7 +106,7 @@ func handleTakeMahjong(room *database.Room, player *database.Player, game *datab
 	}
 	gameState := game.Game.ExtractState(p)
 	if len(gameState.SpecialPrivileges) > 0 {
-		_, ok, err := p.TakeMahjong(gameState, game.Game.Deck(), game.Game.Pile())
+		_, ok, err := p.Take(gameState, game.Game.Deck(), game.Game.Pile())
 		if err != nil {
 			return err
 		}
