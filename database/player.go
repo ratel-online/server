@@ -195,8 +195,8 @@ func (p Player) Model() model.Player {
 	}
 	room := getRoom(p.RoomID)
 	if room != nil && room.Game != nil {
-		modelPlayer.Pokers = len(room.Game.Pokers[p.ID])
-		modelPlayer.Group = room.Game.Groups[p.ID]
+		modelPlayer.Pokers = len(room.Game.(*Game).Pokers[p.ID])
+		modelPlayer.Group = room.Game.(*Game).Groups[p.ID]
 	}
 	return modelPlayer
 }

@@ -14,3 +14,7 @@ func (s *runeSequence) next() rune {
 	s.currentRune++
 	return currentRune
 }
+
+type RoomGame interface {
+	delete()
+}

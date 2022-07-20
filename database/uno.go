@@ -32,6 +32,14 @@ func (un *UnoGame) NeedExit() bool {
 	return un.Room.Players <= 1
 }
 
+func (un *UnoGame) delete() {
+	if un != nil {
+		for _, state := range un.States {
+			close(state)
+		}
+	}
+}
+
 type UnoPlayer struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`

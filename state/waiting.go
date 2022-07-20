@@ -87,9 +87,9 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			default:
 				room.Game, err = initGame(room)
 			case consts.GameTypeMahjong:
-				room.Mahjong, err = game.InitMahjongGame(room)
+				room.Game, err = game.InitMahjongGame(room)
 			case consts.GameTypeUno:
-				room.UnoGame, err = game.InitUnoGame(room)
+				room.Game, err = game.InitUnoGame(room)
 			case consts.GameTypeRunFast:
 				_type = consts.StateRunFastGame
 			}

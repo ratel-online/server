@@ -14,9 +14,7 @@ type Room struct {
 
 	ID                int64     `json:"id"`
 	Type              int       `json:"type"`
-	Game              *Game     `json:"gameId"`
-	UnoGame           *UnoGame  `json:"unoGame"`
-	Mahjong           *Mahjong  `json:"mahjong"`
+	Game              RoomGame  `json:"roomGame"`
 	State             int       `json:"state"`
 	Players           int       `json:"players"`
 	Robots            int       `json:"robots"`

@@ -24,7 +24,7 @@ func (g *RunFastGame) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	game := room.Game
+	game := room.Game.(*database.Game)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("Game starting!\n"))
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))

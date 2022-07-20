@@ -25,7 +25,7 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	game := room.Mahjong
+	game := room.Game.(*database.Mahjong)
 	buf := bytes.Buffer{}
 	buf.WriteString("WELCOME TO MAHJONG GAME!!! \n")
 	buf.WriteString(fmt.Sprintf("%s is Banker! \n", database.GetPlayer(room.Banker).Name))
@@ -58,7 +58,7 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 	if room == nil {
 		return consts.StateMahjong
 	}
-	game := room.Mahjong
+	game := room.Game.(*database.Mahjong)
 	if game == nil {
 		return consts.StateMahjong
 	}
@@ -68,7 +68,7 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 	database.Broadcast(player.RoomID, fmt.Sprintf("player %s exit, game over! \n", player.Name))
 	database.LeaveRoom(player.RoomID, player.ID)
 	room.Lock()
-	room.Mahjong = nil
+	room.Game = nil
 	room.State = consts.RoomStateWaiting
 	room.Unlock()
 	return consts.StateMahjong
@@ -83,7 +83,7 @@ func handleTakeMahjong(room *database.Room, player *database.Player, game *datab
 	if game.Game.Deck().NoTiles() {
 		database.Broadcast(room.ID, "Game over but no winners!!! \n")
 		room.Lock()
-		room.Mahjong = nil
+		room.Game = nil
 		room.State = consts.RoomStateWaiting
 		room.Unlock()
 		for _, playerId := range game.Players {
@@ -140,7 +140,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		sort.Ints(tiles)
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
 		room.Lock()
-		room.Mahjong = nil
+		room.Game = nil
 		room.Banker = p.ID()
 		room.State = consts.RoomStateWaiting
 		room.Unlock()
@@ -177,7 +177,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 			database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
 		}
 		room.Lock()
-		room.Mahjong = nil
+		room.Game = nil
 		room.Banker = gameState.CanWin[rand.Intn(len(gameState.CanWin))].ID()
 		room.State = consts.RoomStateWaiting
 		room.Unlock()

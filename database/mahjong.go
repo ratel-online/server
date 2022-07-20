@@ -39,6 +39,14 @@ func (p *MahjongPlayer) NickName() string {
 	return p.Name
 }
 
+func (game *Mahjong) delete() {
+	if game != nil {
+		for _, state := range game.States {
+			close(state)
+		}
+	}
+}
+
 func (mp *MahjongPlayer) OnPlayTile(payload event.PlayTilePayload) {
 	p := getPlayer(mp.ID)
 	p.WriteString(fmt.Sprintf("You play %s ! \n", tile.Tile(payload.Tile)))
