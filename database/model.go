@@ -334,7 +334,9 @@ func (p Player) String() string {
 	return fmt.Sprintf("%s[%d]", p.Name, p.ID)
 }
 
-type RoomGame interface{}
+type RoomGame interface {
+	delete()
+}
 
 type Room struct {
 	sync.Mutex
@@ -394,6 +396,14 @@ type Game struct {
 	PlayTimeOut map[int64]time.Duration `json:"playTimeOut"`
 	Rules       poker.Rules             `json:"rules"`
 	Discards    model.Pokers            `json:"discards"`
+}
+
+func (game *Game) delete() {
+	if game != nil {
+		for _, state := range game.States {
+			close(state)
+		}
+	}
 }
 
 func (g Game) NextPlayer(curr int64) int64 {
