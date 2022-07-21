@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/awesome-cap/hashmap v0.0.0-20211211100532-e3300ac4ae14
 	github.com/fatih/color v1.8.0
+	github.com/feel-easy/mahjong v0.0.0-20220721030133-7a0f4032c008
 	github.com/gorilla/websocket v1.4.2
 	github.com/ratel-online/core v0.0.0-20220717092113-9fdec75dd055
 	github.com/stretchr/testify v1.6.1

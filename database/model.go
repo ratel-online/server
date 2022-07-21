@@ -323,8 +323,9 @@ func (p Player) Model() model.Player {
 	}
 	room := getRoom(p.RoomID)
 	if room != nil && room.Game != nil {
-		modelPlayer.Pokers = len(room.Game.Pokers[p.ID])
-		modelPlayer.Group = room.Game.Groups[p.ID]
+		game := room.Game.(*Game)
+		modelPlayer.Pokers = len(game.Pokers[p.ID])
+		modelPlayer.Group = game.Groups[p.ID]
 	}
 	return modelPlayer
 }
@@ -333,15 +334,18 @@ func (p Player) String() string {
 	return fmt.Sprintf("%s[%d]", p.Name, p.ID)
 }
 
+type RoomGame interface{}
+
 type Room struct {
 	sync.Mutex
 
 	ID                int64     `json:"id"`
 	Type              int       `json:"type"`
-	Game              *Game     `json:"gameId"`
+	Game              RoomGame  `json:"gameId"`
 	UnoGame           *UnoGame  `json:"unoGame"`
 	State             int       `json:"state"`
 	Players           int       `json:"players"`
+	Banker            int       `json:"banker"`
 	Robots            int       `json:"robots"`
 	Creator           int64     `json:"creator"`
 	ActiveTime        time.Time `json:"activeTime"`
