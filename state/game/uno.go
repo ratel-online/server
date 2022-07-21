@@ -21,7 +21,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	game := room.UnoGame
+	game := room.Game.(*database.UnoGame)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf(
 		"WELCOME TO %s%s%s!!!\n",

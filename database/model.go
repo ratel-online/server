@@ -218,7 +218,6 @@ type Room struct {
 	ID                int64     `json:"id"`
 	Type              int       `json:"type"`
 	Game              RoomGame  `json:"gameId"`
-	UnoGame           *UnoGame  `json:"unoGame"`
 	State             int       `json:"state"`
 	Players           int       `json:"players"`
 	Banker            int       `json:"banker"`

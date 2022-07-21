@@ -86,7 +86,7 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			default:
 				room.Game, err = initGame(room)
 			case consts.GameTypeUno:
-				room.UnoGame, err = game.InitUnoGame(room)
+				room.Game, err = game.InitUnoGame(room)
 			case consts.GameTypeMahjong:
 				room.Game, err = game.InitMahjongGame(room)
 			//修改对接类别为跑得快

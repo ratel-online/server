@@ -114,13 +114,13 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 		p.WriteString(askBuf.String())
 		selectedLabel, err := p.AskForString(consts.PlayMahjongTimeout)
 		if err != nil {
-			if err == rconsts.ErrorsExist {
+			switch err {
+			case rconsts.ErrorsExist:
 				p.WriteString("Don't quit a good game！\n")
-				continue
-			}
-			if err == rconsts.ErrorsTimeout {
+				selectedLabel = "E"
+			case rconsts.ErrorsTimeout:
 				selectedLabel = "A"
-			} else {
+			default:
 				return 0, nil, err
 			}
 		}
@@ -156,13 +156,13 @@ func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 		p.WriteString(askBuf.String())
 		selectedLabel, err := p.AskForString(rconsts.PlayMahjongTimeout)
 		if err != nil {
-			if err == rconsts.ErrorsExist {
+			switch err {
+			case rconsts.ErrorsExist:
 				p.WriteString("Don't quit a good game！\n")
-				continue
-			}
-			if err == rconsts.ErrorsTimeout {
+				selectedLabel = "E"
+			case rconsts.ErrorsTimeout:
 				selectedLabel = "A"
-			} else {
+			default:
 				return 0, err
 			}
 		}
