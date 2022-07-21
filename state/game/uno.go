@@ -58,7 +58,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 }
 
 func (g *Uno) Exit(player *database.Player) consts.StateID {
-	return consts.StateUnoGame
+	return consts.StateHome
 }
 
 func handlePlayUno(room *database.Room, player *database.Player, game *database.UnoGame) error {
