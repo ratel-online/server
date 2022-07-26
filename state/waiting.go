@@ -19,7 +19,6 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
-	//_type 对接类别
 	access, err := waitingForStart(player, room)
 	if err != nil {
 		return 0, err

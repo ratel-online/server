@@ -48,7 +48,8 @@ func askForGameType(player *database.Player) (gameType int, err error) {
 	}
 	// 游戏类型输入非法
 	if _, ok := consts.GameTypes[gameType]; !ok {
-		return 0, player.WriteError(consts.ErrorsGameTypeInvalid)
+		_ = player.WriteError(consts.ErrorsGameTypeInvalid)
+		return 0, consts.ErrorsGameTypeInvalid
 	}
 	return
 }
