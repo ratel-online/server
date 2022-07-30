@@ -91,6 +91,7 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 				room.Game, err = game.InitMahjongGame(room)
 			//修改对接类别为跑得快
 			case consts.GameTypeRunFast:
+				room.Game, err = initGame(room)
 				_type = consts.StateRunFastGame
 			}
 			if err != nil {
