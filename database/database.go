@@ -114,12 +114,6 @@ func deleteRoom(room *Room) {
 	}
 }
 
-func deleteGame(game *Game) {
-	if game != nil {
-		game.delete()
-	}
-}
-
 func GetRooms() []*Room {
 	list := make([]*Room, 0)
 	rooms.Foreach(func(e *hashmap.Entry) {
