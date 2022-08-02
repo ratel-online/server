@@ -19,19 +19,21 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
-	//_type 对接类别
-	_type, access, err := waitingForStart(player, room)
+	access, err := waitingForStart(player, room)
 	if err != nil {
 		return 0, err
 	}
 	if access {
 		switch room.Type {
+		default:
+			return consts.StateGame, nil
+		case consts.GameTypeRunFast:
+			return consts.StateRunFastGame, nil
 		case consts.GameTypeUno:
 			return consts.StateUnoGame, nil
 		case consts.GameTypeMahjong:
 			return consts.StateMahjong, nil
 		}
-		return _type, nil
 	}
 	return s.Exit(player), nil
 }
@@ -50,21 +52,17 @@ func (*waiting) Exit(player *database.Player) consts.StateID {
 	return consts.StateHome
 }
 
-func waitingForStart(player *database.Player, room *database.Room) (consts.StateID, bool, error) {
+func waitingForStart(player *database.Player, room *database.Room) (bool, error) {
 	access := false
 	//对局类别
-	_type := consts.StateGame
 	player.StartTransaction()
 	defer player.StopTransaction()
 	for {
 		signal, err := player.AskForStringWithoutTransaction(time.Second)
 		if err != nil && err != consts.ErrorsTimeout {
-			return consts.StateWaiting, access, err
+			return access, err
 		}
 		if room.State == consts.RoomStateRunning {
-			if room.Type == 4 {
-				_type = consts.StateRunFastGame
-			}
 			access = true
 			break
 		}
@@ -73,10 +71,10 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 			viewRoomPlayers(room, player)
 		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
 			//跑得快限制必须三人
-			if room.Type == 4 && room.Players != 3 {
+			if room.Type == consts.GameTypeRunFast && room.Players != 3 {
 				err := player.WriteError(consts.ErrorsGamePlayersInvalid)
 				if err != nil {
-					return consts.StateWaiting, false, err
+					return false, err
 				}
 				continue
 			}
@@ -89,15 +87,11 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 				room.Game, err = game.InitUnoGame(room)
 			case consts.GameTypeMahjong:
 				room.Game, err = game.InitMahjongGame(room)
-			//修改对接类别为跑得快
-			case consts.GameTypeRunFast:
-				room.Game, err = initGame(room)
-				_type = consts.StateRunFastGame
 			}
 			if err != nil {
 				room.Unlock()
 				_ = player.WriteError(err)
-				return consts.StateWaiting, access, err
+				return access, err
 			}
 			room.State = consts.RoomStateRunning
 			room.Unlock()
@@ -105,8 +99,8 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
 			if len(tags) == 3 {
-				//跑得快只允许修改房间名和是否开启对局聊天
-				if room.Type == 4 {
+				//跑得快只允许修改房间名和是否开启聊天
+				if room.Type == consts.GameTypeRunFast {
 					if tags[1] == "pwd" || tags[1] == "ct" {
 						database.SetRoomProps(room, tags[1], tags[2])
 					}
@@ -115,17 +109,24 @@ func waitingForStart(player *database.Player, room *database.Room) (consts.State
 				}
 				continue
 			}
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			if room.EnableChat {
+				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			} else {
+				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
+			}
 		} else if len(signal) > 0 {
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			if room.EnableChat {
+				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+			} else {
+				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
+			}
 		}
 	}
-	return _type, access, nil
+	return access, nil
 }
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
-
 	buf.WriteString(fmt.Sprintf("Room ID: %d\n", room.ID))
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
 	for playerId := range database.RoomPlayers(room.ID) {
@@ -161,10 +162,6 @@ func initGame(room *database.Room) (*database.Game, error) {
 	if !room.EnableLandlord {
 		rules = rule.TeamRules
 	}
-	if room.Type == 4 {
-		return game.InitRunFastGame(room, rule.RunFastRules)
-	}
-
 	return game.InitGame(room, rules)
 }
 
