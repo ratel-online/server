@@ -110,7 +110,9 @@ func deleteRoom(room *Room) {
 	if room != nil {
 		rooms.Del(room.ID)
 		roomPlayers.Del(room.ID)
-		room.Game.delete()
+		if room.Game != nil {
+			room.Game.delete()
+		}
 	}
 }
 
