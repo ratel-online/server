@@ -6,12 +6,12 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/feel-easy/uno/card/color"
+	"github.com/feel-easy/uno/event"
+	"github.com/feel-easy/uno/game"
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
-	"github.com/ratel-online/server/uno/card/color"
-	"github.com/ratel-online/server/uno/event"
-	"github.com/ratel-online/server/uno/game"
 )
 
 type Uno struct{}
@@ -21,7 +21,7 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, player.WriteError(consts.ErrorsExist)
 	}
-	game := room.UnoGame
+	game := room.Game.(*database.UnoGame)
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf(
 		"WELCOME TO %s%s%s!!!\n",
@@ -29,13 +29,13 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 		color.Yellow.Paint("N"),
 		color.Blue.Paint("O"),
 	))
-	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", game.Game.GetPlayerCards(player.Name)))
+	buf.WriteString(fmt.Sprintf("Your Cards: %s\n", game.Game.GetPlayerCards(int(player.ID))))
 	_ = player.WriteString(buf.String())
 	for {
 		if room.State == consts.RoomStateWaiting {
 			return consts.StateWaiting, nil
 		}
-		state := <-game.States[player.ID]
+		state := <-game.States[int(player.ID)]
 		switch state {
 		case stateFirstCard:
 			if msg := game.Game.PlayFirstCard(); msg != "" {
@@ -58,13 +58,12 @@ func (g *Uno) Next(player *database.Player) (consts.StateID, error) {
 }
 
 func (g *Uno) Exit(player *database.Player) consts.StateID {
-	database.GetRoom(player.RoomID).UnoGame.PlayerNumber--
-	return consts.StateUnoGame
+	return consts.StateHome
 }
 
 func handlePlayUno(room *database.Room, player *database.Player, game *database.UnoGame) error {
 	p := game.Game.Current()
-	if p.ID() != player.ID {
+	if p.ID() != int(player.ID) {
 		game.States[p.ID()] <- statePlay
 		return nil
 	}
@@ -107,25 +106,24 @@ func handlePlayUno(room *database.Room, player *database.Player, game *database.
 }
 
 func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
-	players := make([]int64, 0)
+	players := make([]int, 0)
 	roomPlayers := database.RoomPlayers(room.ID)
 	unoPlayers := make([]game.Player, 0)
-	states := map[int64]chan int{}
+	states := map[int]chan int{}
 	for playerId := range roomPlayers {
-		p := *database.GetPlayer(playerId)
-		players = append(players, p.ID)
-		unoPlayers = append(unoPlayers, p.GamePlayer())
-		states[playerId] = make(chan int, 1)
+		p := database.GetPlayer(playerId)
+		players = append(players, int(p.ID))
+		unoPlayers = append(unoPlayers, database.NewUnoPlayer(p))
+		states[int(playerId)] = make(chan int, 1)
 	}
 	rand.Seed(time.Now().UnixNano())
 	unoGame := game.New(unoPlayers)
 	unoGame.DealStartingCards()
 	states[unoGame.Current().ID()] <- stateFirstCard
 	return &database.UnoGame{
-		Room:         room,
-		Players:      players,
-		States:       states,
-		Game:         unoGame,
-		PlayerNumber: len(players),
+		Room:    room,
+		Players: players,
+		States:  states,
+		Game:    unoGame,
 	}, nil
 }

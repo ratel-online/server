@@ -31,6 +31,8 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 			return consts.StateRunFastGame, nil
 		case consts.GameTypeUno:
 			return consts.StateUnoGame, nil
+		case consts.GameTypeMahjong:
+			return consts.StateMahjong, nil
 		}
 	}
 	return s.Exit(player), nil
@@ -82,9 +84,11 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			default:
 				room.Game, err = initGame(room)
 			case consts.GameTypeUno:
-				room.UnoGame, err = game.InitUnoGame(room)
+				room.Game, err = game.InitUnoGame(room)
 			case consts.GameTypeRunFast:
 				room.Game, err = game.InitRunFastGame(room, rule.RunFastRules)
+			case consts.GameTypeMahjong:
+				room.Game, err = game.InitMahjongGame(room)
 			}
 			if err != nil {
 				room.Unlock()
@@ -136,7 +140,9 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
 	}
 	buf.WriteString("\nSettings:\n")
-	if room.Type != consts.GameTypeUno {
+	switch room.Type {
+	case consts.GameTypeUno, consts.GameTypeMahjong:
+	default:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)))
