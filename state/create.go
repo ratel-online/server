@@ -27,7 +27,7 @@ func (*create) Next(player *database.Player) (consts.StateID, error) {
 	return consts.StateWaiting, nil
 }
 
-func (*create) Exit(player *database.Player) consts.StateID {
+func (*create) Exit(_ *database.Player) consts.StateID {
 	return consts.StateHome
 }
 
@@ -44,7 +44,8 @@ func askForGameType(player *database.Player) (gameType int, err error) {
 	}
 	gameType, err = player.AskForInt()
 	if err != nil {
-		return 0, player.WriteError(err)
+		_ = player.WriteError(consts.ErrorsGameTypeInvalid)
+		return 0, consts.ErrorsGameTypeInvalid
 	}
 	// 游戏类型输入非法
 	if _, ok := consts.GameTypes[gameType]; !ok {
