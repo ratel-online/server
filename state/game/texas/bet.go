@@ -12,14 +12,15 @@ import (
 
 func bet(player *database.Player, game *database.Texas) error {
 	texasPlayer := game.Player(player.ID)
-	if texasPlayer.Folded {
+	if texasPlayer.Folded || texasPlayer.AllIn {
 		return nextPlayer(player, game, stateBet)
 	}
 	if game.MaxBetPlayer != nil && game.MaxBetPlayer.ID == player.ID {
 		return nextRound(game)
 	}
 
-	database.Broadcast(player.RoomID, fmt.Sprintf("Current player: %s\n", player.Name), player.ID)
+	database.Broadcast(player.RoomID, fmt.Sprintf("Next it's %s's turn to bet\n", player.Name), player.ID)
+
 	timeout := consts.BetTimeout
 	for {
 		before := time.Now().Unix()
@@ -27,7 +28,7 @@ func bet(player *database.Player, game *database.Texas) error {
 		buf := bytes.Buffer{}
 		buf.WriteString(fmt.Sprintf("Your hand: %s\n", texasPlayer.Hand.TexasString()))
 		for _, p := range game.Players {
-			status := "active"
+			status := "betting"
 			if p.Folded {
 				status = "folded"
 			}
@@ -38,7 +39,7 @@ func bet(player *database.Player, game *database.Texas) error {
 			if p.ID == player.ID {
 				name = "* You"
 			}
-			buf.WriteString(fmt.Sprintf("%s amount %d, bets %d, status: %s\n", name, p.Amount, p.Bets, status))
+			buf.WriteString(fmt.Sprintf("%s amount %d, total bets %d, status: %s\n", name, p.Amount, p.Bets, status))
 		}
 		buf.WriteString("What do you want to do? (call/raise/fold/check/allin)\n")
 		_ = player.WriteString(buf.String())
