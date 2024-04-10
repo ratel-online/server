@@ -16,6 +16,7 @@ type Texas struct {
 	MaxBetPlayer *TexasPlayer   `json:"maxBetPlayer"`
 	Round        string         `json:"round"`
 	Folded       int            `json:"folded"`
+	AllIn        int            `json:"allIn"`
 }
 
 func (g *Texas) delete() {

@@ -12,11 +12,12 @@ import (
 
 func bet(player *database.Player, game *database.Texas) error {
 	texasPlayer := game.Player(player.ID)
+	if game.AllIn == len(game.Players) ||
+		(game.MaxBetPlayer != nil && game.MaxBetPlayer.ID == player.ID) {
+		return nextRound(game)
+	}
 	if texasPlayer.Folded || texasPlayer.AllIn {
 		return nextPlayer(player, game, stateBet)
-	}
-	if game.MaxBetPlayer != nil && game.MaxBetPlayer.ID == player.ID {
-		return nextRound(game)
 	}
 
 	database.Broadcast(player.RoomID, fmt.Sprintf("Next it's %s's turn to bet\n", player.Name), player.ID)
@@ -114,6 +115,7 @@ func bet(player *database.Player, game *database.Texas) error {
 			texasPlayer.Amount = 0
 			texasPlayer.Bets += betAmount
 			game.Pot += betAmount
+			game.AllIn++
 			if game.MaxBetPlayer == nil {
 				game.MaxBetPlayer = texasPlayer
 			}
@@ -124,6 +126,7 @@ func bet(player *database.Player, game *database.Texas) error {
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s all in, bet %d\n", player.Name, betAmount))
 		default:
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+			continue
 		}
 		break
 	}
