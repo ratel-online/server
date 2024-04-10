@@ -20,7 +20,7 @@ func bet(player *database.Player, game *database.Texas) error {
 		return nextPlayer(player, game, stateBet)
 	}
 
-	database.Broadcast(player.RoomID, fmt.Sprintf("Next it's %s's turn to bet\n", player.Name), player.ID)
+	database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn to bet\n", player.Name), player.ID)
 
 	timeout := consts.BetTimeout
 	for {
