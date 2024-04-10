@@ -1,10 +1,15 @@
 package rule
 
-var LandlordRules = _rules{reserved: true}
-var TeamRules = _rules{}
-
-// RunFastRules 跑得快規則
-var RunFastRules = _rules{reserved: true, isRunFast: true}
+var (
+	// LandlordRules 斗地主规则
+	LandlordRules = _rules{reserved: true}
+	// TeamRules 团队规则
+	TeamRules = _rules{}
+	// RunFastRules 跑得快規則
+	RunFastRules = _rules{reserved: true, isRunFast: true}
+	// TexasRules 德州扑克规则
+	TexasRules = _texasRule{}
+)
 
 type _rules struct {
 	reserved  bool

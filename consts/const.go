@@ -18,7 +18,8 @@ const (
 	StateGame
 	StateRunFastGame
 	StateUnoGame
-	StateMahjong
+	StateMahjongGame
+	StateTexasGame
 )
 
 type SkillID int
@@ -54,10 +55,12 @@ const (
 	GameTypeRunFast = 4
 	GameTypeUno     = 5
 	GameTypeMahjong = 6
+	GameTypeTexas   = 7
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
 	PlayMahjongTimeout = 30 * time.Second
+	BetTimeout         = 60 * time.Second
 )
 
 // Room properties.
@@ -105,6 +108,7 @@ var (
 	ErrorsHaveToPlay             = NewErr(1, false, "Have to play. ")
 	ErrorsMustHaveToPlay         = NewErr(1, false, "There is a hand that can be played and must be played. ")
 	ErrorsEndToPlay              = NewErr(1, false, "Can only come out at the end. ")
+	ErrorsUnknownTexasRound      = NewErr(1, false, "Unknown texas round. ")
 
 	GameTypes = map[int]string{
 		GameTypeClassic: "Classic",
@@ -113,8 +117,9 @@ var (
 		GameTypeRunFast: "RunFast",
 		GameTypeUno:     "Uno",
 		GameTypeMahjong: "Mahjong",
+		GameTypeTexas:   "Texas",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeUno, GameTypeMahjong} // GameTypeLaiZi, GameTypeRunFast
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeUno, GameTypeMahjong, GameTypeTexas}
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",

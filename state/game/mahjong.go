@@ -3,10 +3,6 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
-	"sort"
-	"time"
-
 	"github.com/feel-easy/mahjong/card"
 	mjconsts "github.com/feel-easy/mahjong/consts"
 	"github.com/feel-easy/mahjong/event"
@@ -14,8 +10,10 @@ import (
 	"github.com/feel-easy/mahjong/tile"
 	"github.com/feel-easy/mahjong/util"
 	"github.com/feel-easy/mahjong/win"
+	"github.com/ratel-online/core/util/rand"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
+	"sort"
 )
 
 type Mahjong struct{}
@@ -224,7 +222,6 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 		playerIDs = append(playerIDs, int(player.ID))
 		states[int(playerId)] = make(chan int, 1)
 	}
-	rand.Seed(time.Now().UnixNano())
 	mahjong := game.New(mjPlayers)
 	mahjong.DealStartingTiles()
 	if room.Banker == 0 || !util.IntInSlice(room.Banker, playerIDs) {

@@ -3,9 +3,6 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
-	"time"
-
 	"github.com/feel-easy/uno/card/color"
 	"github.com/feel-easy/uno/event"
 	"github.com/feel-easy/uno/game"
@@ -116,7 +113,6 @@ func InitUnoGame(room *database.Room) (*database.UnoGame, error) {
 		unoPlayers = append(unoPlayers, database.NewUnoPlayer(p))
 		states[int(playerId)] = make(chan int, 1)
 	}
-	rand.Seed(time.Now().UnixNano())
 	unoGame := game.New(unoPlayers)
 	unoGame.DealStartingCards()
 	states[unoGame.Current().ID()] <- stateFirstCard
