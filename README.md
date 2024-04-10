@@ -3,7 +3,7 @@
 
 命令行在线多人棋牌游戏！支持斗地主，跑得快,UNO,麻将等模式！
 ## 客户端
-- 浏览器在线：[http://rtol.isnico.com/](http://rtol.isnico.com/)
+- 浏览器在线：[http://ratel.lde.ng/](http://ratel.lde.ng/)
 - 客户端下载：[https://github.com/ratel-online/client/releases](https://github.com/ratel-online/client/releases)
 
 ## 社区
