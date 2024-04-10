@@ -3,7 +3,7 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
+	"github.com/ratel-online/core/util/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +42,6 @@ func (g *RunFastGame) Next(player *database.Player) (consts.StateID, error) {
 			game.States[player.ID] <- statePlay
 		case stateReset:
 			if player.ID == room.Creator {
-				rand.Seed(time.Now().UnixNano())
 				game.States[game.Players[rand.Intn(len(game.States))]] <- stateRob
 			}
 			return 0, nil
@@ -280,7 +279,6 @@ func InitRunFastGame(room *database.Room, rules poker.Rules) (*database.Game, er
 			mnemonic[i] = 4
 		}
 	}
-	rand.Seed(time.Now().UnixNano())
 	for i := range players {
 		states[players[i]] = make(chan int, 1)
 		groups[players[i]] = 0
@@ -304,7 +302,6 @@ func InitRunFastGame(room *database.Room, rules poker.Rules) (*database.Game, er
 	} else {
 		FirstPlayerId = FirstPlayerIds[rand.Intn(len(FirstPlayerIds)-1)]
 	}
-	rand.Seed(time.Now().UnixNano())
 	states[players[rand.Intn(len(states))]] <- stateRob
 	return &database.Game{
 		FirstPlayer: FirstPlayerId,

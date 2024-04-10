@@ -3,7 +3,8 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
+	"github.com/ratel-online/core/util/rand"
+	"github.com/ratel-online/server/rule"
 	"strconv"
 	"strings"
 	"time"
@@ -77,7 +78,6 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 			}
 		case stateReset:
 			if player.ID == room.Creator {
-				rand.Seed(time.Now().UnixNano())
 				game.States[game.Players[rand.Intn(len(game.States))]] <- stateRob
 			}
 			return 0, nil
@@ -341,7 +341,12 @@ func handlePlay(player *database.Player, game *database.Game) error {
 	return playing(player, game, master, game.PlayTimes[player.ID])
 }
 
-func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
+func InitGame(room *database.Room) (*database.Game, error) {
+	rules := rule.LandlordRules
+	if !room.EnableLandlord {
+		rules = rule.TeamRules
+	}
+
 	distributes, decks := poker.Distribute(room.Players, room.EnableDontShuffle, rules)
 	players := make([]int64, 0)
 	roomPlayers := database.RoomPlayers(room.ID)
@@ -363,7 +368,6 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 	for i := 1; i <= 13; i++ {
 		mnemonic[i] = 4 * decks
 	}
-	rand.Seed(time.Now().UnixNano())
 	for i := range players {
 		states[players[i]] = make(chan int, 1)
 		groups[players[i]] = 0
@@ -372,7 +376,6 @@ func InitGame(room *database.Room, rules poker.Rules) (*database.Game, error) {
 		playTimes[players[i]] = 1
 		playTimeout[players[i]] = consts.PlayTimeout
 	}
-	rand.Seed(time.Now().UnixNano())
 	states[players[rand.Intn(len(states))]] <- stateRob
 	return &database.Game{
 		Room:        room,
@@ -404,7 +407,6 @@ func resetGame(game *database.Game) error {
 	playTimeout := map[int64]time.Duration{}
 	firstOaa := poker.Random(14, 15)
 	lastOaa := poker.Random(14, 15, firstOaa)
-	rand.Seed(time.Now().UnixNano())
 	for i := range players {
 		game.Pokers[players[i]] = distributes[i]
 		skills[players[i]] = rand.Intn(len(skill.Skills))

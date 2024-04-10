@@ -54,6 +54,10 @@ func (p *Player) Write(bytes []byte) error {
 	})
 }
 
+func (p *Player) IsOnline() bool {
+	return p.online
+}
+
 func (p *Player) Offline() {
 	p.online = false
 	_ = p.conn.Close()

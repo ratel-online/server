@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"fmt"
+	"github.com/ratel-online/server/state/game/texas"
 	"strings"
 	"time"
 
@@ -32,7 +33,9 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		case consts.GameTypeUno:
 			return consts.StateUnoGame, nil
 		case consts.GameTypeMahjong:
-			return consts.StateMahjong, nil
+			return consts.StateMahjongGame, nil
+		case consts.GameTypeTexas:
+			return consts.StateTexasGame, nil
 		}
 	}
 	return s.Exit(player), nil
@@ -82,13 +85,15 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 			room.Lock()
 			switch room.Type {
 			default:
-				room.Game, err = initGame(room)
+				room.Game, err = game.InitGame(room)
 			case consts.GameTypeUno:
 				room.Game, err = game.InitUnoGame(room)
 			case consts.GameTypeRunFast:
 				room.Game, err = game.InitRunFastGame(room, rule.RunFastRules)
 			case consts.GameTypeMahjong:
 				room.Game, err = game.InitMahjongGame(room)
+			case consts.GameTypeTexas:
+				room.Game, err = texas.Init(room)
 			}
 			if err != nil {
 				room.Unlock()
@@ -157,14 +162,6 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	}
 	buf.WriteString(fmt.Sprintf("%-5s%-20v\n", "pwd", pwd))
 	_ = currPlayer.WriteString(buf.String())
-}
-
-func initGame(room *database.Room) (*database.Game, error) {
-	rules := rule.LandlordRules
-	if !room.EnableLandlord {
-		rules = rule.TeamRules
-	}
-	return game.InitGame(room, rules)
 }
 
 func sprintPropsState(on bool) string {
