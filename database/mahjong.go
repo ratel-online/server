@@ -21,7 +21,7 @@ type Mahjong struct {
 	Game      *game.Game       `json:"game"`
 }
 
-func (game *Mahjong) delete() {
+func (game *Mahjong) Clean() {
 	if game != nil {
 		for _, state := range game.States {
 			close(state)

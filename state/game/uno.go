@@ -88,10 +88,8 @@ func handlePlayUno(room *database.Room, player *database.Player, game *database.
 	}
 	if p.NoCards() || game.NeedExit() {
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n", p.Name()))
-		room.Lock()
 		room.Game = nil
 		room.State = consts.RoomStateWaiting
-		room.Unlock()
 		for _, playerId := range game.Players {
 			game.States[playerId] <- stateWaiting
 		}

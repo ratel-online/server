@@ -53,9 +53,9 @@ const (
 	GameTypeLaiZi   = 2
 	GameTypeSkill   = 3
 	GameTypeRunFast = 4
-	GameTypeUno     = 5
-	GameTypeMahjong = 6
-	GameTypeTexas   = 7
+	GameTypeTexas   = 5
+	GameTypeUno     = 6
+	GameTypeMahjong = 7
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
@@ -111,15 +111,15 @@ var (
 	ErrorsUnknownTexasRound      = NewErr(1, false, "Unknown texas round. ")
 
 	GameTypes = map[int]string{
-		GameTypeClassic: "Classic",
-		GameTypeLaiZi:   "LaiZi",
-		GameTypeSkill:   "Skill",
-		GameTypeRunFast: "RunFast",
-		GameTypeUno:     "Uno",
-		GameTypeMahjong: "Mahjong",
-		GameTypeTexas:   "Texas",
+		GameTypeClassic: "斗地主",
+		GameTypeLaiZi:   "斗地主-癞子版",
+		GameTypeSkill:   "斗地主-大招版",
+		GameTypeRunFast: "跑得快",
+		//GameTypeUno:     "Uno",
+		//GameTypeMahjong: "Mahjong",
+		GameTypeTexas: "德州扑克",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeUno, GameTypeMahjong, GameTypeTexas}
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeTexas}
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",

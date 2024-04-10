@@ -70,14 +70,14 @@ func RoomList(player *database.Player) error {
 
 func RoomInfo(player *database.Player, room *database.Room) error {
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
+	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Amount", "Title"))
 	for playerId := range database.RoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"
 		}
 		info := database.GetPlayer(playerId)
-		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", info.Name, info.Score, title))
+		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", info.Name, info.Amount, title))
 	}
 	return player.WriteString(buf.String())
 }

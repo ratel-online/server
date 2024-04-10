@@ -36,9 +36,9 @@ type Player struct {
 	ID     int64  `json:"id"`
 	IP     string `json:"ip"`
 	Name   string `json:"name"`
-	Score  int64  `json:"score"`
 	Mode   int    `json:"mode"`
 	Type   int    `json:"type"`
+	Amount uint   `json:"amount"`
 	RoomID int64  `json:"roomId"`
 
 	conn   *network.Conn
@@ -195,9 +195,8 @@ func (p *Player) Conn(conn *network.Conn) {
 
 func (p Player) Model() model.Player {
 	modelPlayer := model.Player{
-		ID:    p.ID,
-		Name:  p.Name,
-		Score: p.Score,
+		ID:   p.ID,
+		Name: p.Name,
 	}
 	room := getRoom(p.RoomID)
 	if room != nil && room.Game != nil {
@@ -213,7 +212,7 @@ func (p Player) String() string {
 }
 
 type RoomGame interface {
-	delete()
+	Clean()
 }
 
 type Room struct {
@@ -275,12 +274,16 @@ type Game struct {
 	Discards    model.Pokers            `json:"discards"`
 }
 
-func (game *Game) delete() {
+func (game *Game) Clean() {
 	if game != nil {
 		for _, state := range game.States {
 			close(state)
 		}
 	}
+}
+
+func (game *Game) Start() {
+
 }
 
 func (g Game) NextPlayer(curr int64) int64 {

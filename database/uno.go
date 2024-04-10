@@ -32,7 +32,7 @@ func (un *UnoGame) NeedExit() bool {
 	return un.Room.Players <= 1
 }
 
-func (un *UnoGame) delete() {
+func (un *UnoGame) Clean() {
 	if un != nil {
 		for _, state := range un.States {
 			close(state)

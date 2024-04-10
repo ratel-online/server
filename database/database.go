@@ -65,10 +65,10 @@ func init() {
 
 func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	player := &Player{
-		ID:    info.ID,
-		IP:    conn.IP(),
-		Name:  strings.Desensitize(info.Name),
-		Score: info.Score,
+		ID:     info.ID,
+		IP:     conn.IP(),
+		Name:   strings.Desensitize(info.Name),
+		Amount: 10000,
 	}
 	player.Conn(conn)                  // 初始化play对象
 	players.Set(info.ID, player)       // 写入用户池
@@ -113,7 +113,7 @@ func deleteRoom(room *Room) {
 		rooms.Del(room.ID)
 		roomPlayers.Del(room.ID)
 		if room.Game != nil {
-			room.Game.delete()
+			room.Game.Clean()
 		}
 	}
 }

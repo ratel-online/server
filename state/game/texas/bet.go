@@ -40,7 +40,7 @@ func bet(player *database.Player, game *database.Texas) error {
 			if p.ID == player.ID {
 				name = "* You"
 			}
-			buf.WriteString(fmt.Sprintf("%s amount %d, total bets %d, status: %s\n", name, p.Amount, p.Bets, status))
+			buf.WriteString(fmt.Sprintf("%s amount %d, total bets %d, status: %s\n", name, p.Amount(), p.Bets, status))
 		}
 		buf.WriteString("What do you want to do? (call/raise/fold/check/allin)\n")
 		_ = player.WriteString(buf.String())
@@ -58,16 +58,11 @@ func bet(player *database.Player, game *database.Texas) error {
 				_ = player.WriteString("You don't need to call, wound you like to check?\n")
 				continue
 			}
-			if texasPlayer.Amount < minCall {
+			if texasPlayer.Amount() < minCall {
 				_ = player.WriteString("You don't have enough money to call\n")
 				continue
 			}
-			texasPlayer.Amount -= minCall
-			texasPlayer.Bets += minCall
-			game.Pot += minCall
-			if game.MaxBetPlayer == nil {
-				game.MaxBetPlayer = texasPlayer
-			}
+			game.Bet(texasPlayer, minCall)
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s call, bet %d\n", player.Name, minCall))
 		case "raise":
 			if len(instructions) <= 1 || instructions[1] == "" {
@@ -83,15 +78,11 @@ func bet(player *database.Player, game *database.Texas) error {
 				_ = player.WriteString(fmt.Sprintf("The amount you want to raise is less than the minimum call amount %d\n", minCall))
 				continue
 			}
-			if texasPlayer.Amount < betAmount {
+			if texasPlayer.Amount() < betAmount {
 				_ = player.WriteString("You don't have enough money to raise\n")
 				continue
 			}
-			texasPlayer.Amount -= betAmount
-			texasPlayer.Bets += betAmount
-			game.Pot += betAmount
-			game.MaxBetAmount = texasPlayer.Bets
-			game.MaxBetPlayer = texasPlayer
+			game.Bet(texasPlayer, betAmount)
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s raise, bet %d\n", player.Name, betAmount))
 		case "fold":
 			texasPlayer.Folded = true
@@ -105,24 +96,11 @@ func bet(player *database.Player, game *database.Texas) error {
 				_ = player.WriteString("You can't check, because someone else bet higher than you\n")
 				continue
 			}
-			if game.MaxBetPlayer == nil {
-				game.MaxBetPlayer = texasPlayer
-			}
+			game.Bet(texasPlayer, 0)
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s check\n", player.Name))
 		case "allin":
-			betAmount := texasPlayer.Amount
-			texasPlayer.AllIn = true
-			texasPlayer.Amount = 0
-			texasPlayer.Bets += betAmount
-			game.Pot += betAmount
-			game.AllIn++
-			if game.MaxBetPlayer == nil {
-				game.MaxBetPlayer = texasPlayer
-			}
-			if texasPlayer.Bets > game.MaxBetAmount {
-				game.MaxBetAmount = texasPlayer.Bets
-				game.MaxBetPlayer = texasPlayer
-			}
+			betAmount := texasPlayer.Amount()
+			game.Bet(texasPlayer, betAmount)
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s all in, bet %d\n", player.Name, betAmount))
 		default:
 			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))

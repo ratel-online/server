@@ -28,11 +28,17 @@ func nextRound(game *database.Texas) error {
 
 func preFlopRound(game *database.Texas) error {
 	game.Round = "per-flop"
-	game.MaxBetPlayer = nil
-	game.BBPlayer().Amount -= 20
-	game.BBPlayer().Bets = 20
-	game.SBPlayer().Amount -= 10
-	game.SBPlayer().Bets = 10
+	for id := range database.RoomPlayers(game.Room.ID) {
+		player := database.GetPlayer(id)
+		if player.Amount < 100 {
+			player.Amount += 10000
+			database.Broadcast(game.Room.ID, fmt.Sprintf("%s is too poor, system give him 10000\n", player.Name))
+		}
+	}
+
+	game.Pot += 30
+	game.BBPlayer().Bet(20)
+	game.SBPlayer().Bet(10)
 
 	for id := range database.RoomPlayers(game.Room.ID) {
 		player := database.GetPlayer(id)
@@ -104,7 +110,7 @@ func settlementRound(game *database.Texas) error {
 			}
 		}
 		if winner != nil {
-			winner.Amount += game.Pot
+			winner.Add(game.Pot)
 			buf.WriteString(fmt.Sprintf("Winner: %s, got all pot: %d\n", winner.Name, game.Pot))
 		} else {
 			buf.WriteString("All players folded\n")
@@ -148,7 +154,7 @@ func settlementRound(game *database.Texas) error {
 			buf.WriteString(fmt.Sprintf(", half all pot: %d\n", game.Pot))
 		}
 		for _, winner := range winners {
-			winner.Amount += game.Pot / uint(len(winners))
+			winner.Add(game.Pot / uint(len(winners)))
 		}
 	}
 	buf.WriteString("Please room creator to start a new game\n")

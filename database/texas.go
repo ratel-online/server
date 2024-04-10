@@ -19,7 +19,7 @@ type Texas struct {
 	AllIn        int            `json:"allIn"`
 }
 
-func (g *Texas) delete() {
+func (g *Texas) Clean() {
 	if g != nil {
 		for _, p := range g.Players {
 			close(p.State)
@@ -54,11 +54,28 @@ func (g *Texas) BBPlayer() *TexasPlayer {
 	return g.Players[g.BB]
 }
 
+func (g *Texas) Bet(player *TexasPlayer, amount uint) {
+	if amount > 0 {
+		player.Bet(amount)
+		g.Pot += amount
+		if player.Amount() == 0 {
+			player.AllIn = true
+			g.AllIn++
+		}
+	}
+	if g.MaxBetPlayer == nil {
+		g.MaxBetPlayer = player
+	}
+	if player.Bets > g.MaxBetAmount {
+		g.MaxBetAmount = player.Bets
+		g.MaxBetPlayer = player
+	}
+}
+
 type TexasPlayer struct {
 	ID     int64        `json:"id"`
 	Name   string       `json:"name"`
 	State  chan int     `json:"state"`
-	Amount uint         `json:"amount"`
 	Hand   model.Pokers `json:"hand"`
 	Bets   uint         `json:"bets"`
 	Folded bool         `json:"folded"`
@@ -71,4 +88,17 @@ func (p *TexasPlayer) Reset() {
 	p.AllIn = false
 	p.Hand = nil
 	p.State = make(chan int, 1)
+}
+
+func (p *TexasPlayer) Amount() uint {
+	return GetPlayer(p.ID).Amount
+}
+
+func (p *TexasPlayer) Bet(amount uint) {
+	p.Bets += amount
+	GetPlayer(p.ID).Amount -= amount
+}
+
+func (p *TexasPlayer) Add(amount uint) {
+	GetPlayer(p.ID).Amount += amount
 }

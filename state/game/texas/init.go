@@ -5,15 +5,14 @@ import (
 	"github.com/ratel-online/server/database"
 )
 
-func Init(room *database.Room) (database.RoomGame, error) {
+func Init(room *database.Room) (game database.RoomGame, err error) {
 	if room.Game != nil {
-		game, err := Reset(room)
-		if err != nil {
-			return nil, err
-		}
-		return game, nextRound(game.(*database.Texas))
+		return resetGame(room)
 	}
+	return createGame(room)
+}
 
+func createGame(room *database.Room) (database.RoomGame, error) {
 	base := poker.GetTexasBase()
 	base.Shuffle(len(base), 1)
 
@@ -24,15 +23,13 @@ func Init(room *database.Room) (database.RoomGame, error) {
 	for playerId := range roomPlayers {
 		player := database.GetPlayer(playerId)
 		players = append(players, &database.TexasPlayer{
-			ID:     playerId,
-			Name:   player.Name,
-			State:  make(chan int, 1),
-			Hand:   base[index*2 : (index+1)*2],
-			Amount: 10000,
+			ID:    playerId,
+			Name:  player.Name,
+			State: make(chan int, 1),
+			Hand:  base[index*2 : (index+1)*2],
 		})
 		index++
 	}
-
 	game := &database.Texas{
 		Room:         room,
 		Players:      players,
@@ -46,7 +43,7 @@ func Init(room *database.Room) (database.RoomGame, error) {
 	return game, nextRound(game)
 }
 
-func Reset(room *database.Room) (database.RoomGame, error) {
+func resetGame(room *database.Room) (database.RoomGame, error) {
 	base := poker.GetTexasBase()
 	base.Shuffle(len(base), 1)
 	game := room.Game.(*database.Texas)
@@ -63,8 +60,7 @@ func Reset(room *database.Room) (database.RoomGame, error) {
 			index++
 		}
 	}
-
-	return &database.Texas{
+	newGame := &database.Texas{
 		Room:         room,
 		Players:      players,
 		Pot:          0,
@@ -73,7 +69,8 @@ func Reset(room *database.Room) (database.RoomGame, error) {
 		Pool:         base[len(players)*2:],
 		MaxBetAmount: 20,
 		Round:        "start",
-	}, nil
+	}
+	return newGame, nextRound(newGame)
 }
 
 func nextPlayer(current *database.Player, game *database.Texas, state int) error {

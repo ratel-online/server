@@ -82,7 +82,6 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 				continue
 			}
 			access = true
-			room.Lock()
 			switch room.Type {
 			default:
 				room.Game, err = game.InitGame(room)
@@ -96,12 +95,10 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 				room.Game, err = texas.Init(room)
 			}
 			if err != nil {
-				room.Unlock()
 				_ = player.WriteError(err)
 				return access, err
 			}
 			room.State = consts.RoomStateRunning
-			room.Unlock()
 			break
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
@@ -135,18 +132,18 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("Room ID: %d\n", room.ID))
-	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Score", "Title"))
+	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Amount", "Title"))
 	for playerId := range database.RoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"
 		}
 		player := database.GetPlayer(playerId)
-		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Score, title))
+		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Amount, title))
 	}
 	buf.WriteString("\nSettings:\n")
 	switch room.Type {
-	case consts.GameTypeUno, consts.GameTypeMahjong:
+	case consts.GameTypeUno, consts.GameTypeMahjong, consts.GameTypeTexas:
 	default:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))

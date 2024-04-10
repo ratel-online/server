@@ -65,10 +65,8 @@ func (g *Mahjong) Exit(player *database.Player) consts.StateID {
 	}
 	database.Broadcast(player.RoomID, fmt.Sprintf("player %s exit, game over! \n", player.Name))
 	database.LeaveRoom(player.RoomID, player.ID)
-	room.Lock()
 	room.Game = nil
 	room.State = consts.RoomStateWaiting
-	room.Unlock()
 	return consts.StateHome
 }
 
@@ -80,10 +78,8 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 	}
 	if game.Game.Deck().NoTiles() {
 		database.Broadcast(room.ID, "Game over but no winners!!! \n")
-		room.Lock()
 		room.Game = nil
 		room.State = consts.RoomStateWaiting
-		room.Unlock()
 		for _, playerId := range game.PlayerIDs {
 			game.States[playerId] <- stateWaiting
 		}
@@ -137,11 +133,9 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		tiles := p.Tiles()
 		sort.Ints(tiles)
 		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
-		room.Lock()
 		room.Game = nil
 		room.Banker = p.ID()
 		room.State = consts.RoomStateWaiting
-		room.Unlock()
 		for _, playerId := range game.PlayerIDs {
 			game.States[playerId] <- stateWaiting
 		}
@@ -174,11 +168,9 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 			sort.Ints(tiles)
 			database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
 		}
-		room.Lock()
 		room.Game = nil
 		room.Banker = gameState.CanWin[rand.Intn(len(gameState.CanWin))].ID()
 		room.State = consts.RoomStateWaiting
-		room.Unlock()
 		for _, playerId := range game.PlayerIDs {
 			game.States[playerId] <- stateWaiting
 		}

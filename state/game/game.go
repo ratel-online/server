@@ -306,10 +306,8 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s played %s, won the game! \n", player.Name, sells.OaaString()))
 			room := database.GetRoom(player.RoomID)
 			if room != nil {
-				room.Lock()
 				room.Game = nil
 				room.State = consts.RoomStateWaiting
-				room.Unlock()
 			}
 			for _, playerId := range game.Players {
 				game.States[playerId] <- stateWaiting
