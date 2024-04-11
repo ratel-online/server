@@ -1,7 +1,7 @@
 # Ratel-Online
 [![Go Reference](https://pkg.go.dev/badge/github.com/ratel-online/server.svg)](https://pkg.go.dev/github.com/ratel-online/server)
 
-命令行在线多人棋牌游戏！支持斗地主，跑得快,UNO,麻将等模式！
+命令行在线多人棋牌游戏！支持斗地主，跑得快, 德州扑克等模式！
 ## 客户端
 - 浏览器在线：[http://ratel.lde.ng/](http://ratel.lde.ng/)
 - 客户端下载：[https://github.com/ratel-online/client/releases](https://github.com/ratel-online/client/releases)
@@ -10,12 +10,11 @@
 - QQ群：[948365095](https://jq.qq.com/?_wv=1027&k=OhGYB1EC)
 ## 玩法介绍
 ### 模式
-- **Classic**: 经典版斗地主模式
-- **LaiZi**: 癞子版斗地主模式
-- **Skill**: 癞子版技能大招模式
-- **RunFast**: 跑得快模式
-- **Uno**: Uno模式
-- **Mahjong**: 麻将模式
+- 经典版斗地主模式
+- 癞子版斗地主模式
+- 癞子版技能大招模式
+- 跑得快模式
+- 德州扑克
 
 ### 斗地主类规则
 游戏人数2~6人不等，超过3人2副牌，超过5人3副牌，规则参考欢乐斗地主。
@@ -48,11 +47,8 @@
 - 连队：`3344`
 - 飞机：`jjjqqq3457`
 
-### Uno规则
-具体参考: [https://zh.m.wikipedia.org/zh-tw/UNO](https://zh.m.wikipedia.org/zh-tw/UNO)
-
-### 麻将规则
-具体规则有待补充
+### 德州扑克
+// 待补充
 
 ### 演示
 视频教程：[https://www.bilibili.com/video/BV16Y411b7BD](https://www.bilibili.com/video/BV16Y411b7BD)
