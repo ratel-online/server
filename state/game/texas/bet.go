@@ -13,6 +13,7 @@ import (
 func bet(player *database.Player, game *database.Texas) error {
 	texasPlayer := game.Player(player.ID)
 	if game.AllIn == len(game.Players) ||
+		game.AllIn+game.Folded == len(game.Players) ||
 		(game.MaxBetPlayer != nil && game.MaxBetPlayer.ID == player.ID) {
 		return nextRound(game)
 	}
