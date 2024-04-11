@@ -81,24 +81,11 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 				}
 				continue
 			}
-			access = true
-			switch room.Type {
-			default:
-				room.Game, err = game.InitGame(room)
-			case consts.GameTypeUno:
-				room.Game, err = game.InitUnoGame(room)
-			case consts.GameTypeRunFast:
-				room.Game, err = game.InitRunFastGame(room, rule.RunFastRules)
-			case consts.GameTypeMahjong:
-				room.Game, err = game.InitMahjongGame(room)
-			case consts.GameTypeTexas:
-				room.Game, err = texas.Init(room)
-			}
+			err = startGame(player, room)
 			if err != nil {
-				_ = player.WriteError(err)
 				return access, err
 			}
-			room.State = consts.RoomStateRunning
+			access = true
 			break
 		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
 			tags := strings.Split(signal, " ")
@@ -127,6 +114,29 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		}
 	}
 	return access, nil
+}
+
+func startGame(player *database.Player, room *database.Room) (err error) {
+	room.Lock()
+	defer room.Unlock()
+	switch room.Type {
+	default:
+		room.Game, err = game.InitGame(room)
+	case consts.GameTypeUno:
+		room.Game, err = game.InitUnoGame(room)
+	case consts.GameTypeRunFast:
+		room.Game, err = game.InitRunFastGame(room, rule.RunFastRules)
+	case consts.GameTypeMahjong:
+		room.Game, err = game.InitMahjongGame(room)
+	case consts.GameTypeTexas:
+		room.Game, err = texas.Init(room)
+	}
+	if err != nil {
+		_ = player.WriteError(err)
+		return err
+	}
+	room.State = consts.RoomStateRunning
+	return nil
 }
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {

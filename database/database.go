@@ -273,8 +273,7 @@ func broadcast(room *Room, msg string, exclude ...int64) {
 	for _, exc := range exclude {
 		excludeSet[exc] = true
 	}
-	roomPlayers := getRoomPlayers(room.ID)
-	for playerId := range roomPlayers {
+	for playerId := range getRoomPlayers(room.ID) {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
 			_ = player.WriteString(">> " + msg)
 		}
@@ -286,8 +285,6 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	if room == nil {
 		return
 	}
-	room.Lock()
-	defer room.Unlock()
 	broadcast(room, msg, exclude...)
 }
 
