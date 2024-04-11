@@ -48,17 +48,29 @@ func resetGame(room *database.Room) (database.RoomGame, error) {
 	base.Shuffle(len(base), 1)
 	game := room.Game.(*database.Texas)
 
-	players := make([]*database.TexasPlayer, 0)
-	index := 0
-
-	roomPlayers := database.RoomPlayers(room.ID)
+	texasPlayers := make(map[int64]*database.TexasPlayer)
 	for _, texasPlayer := range game.Players {
-		if roomPlayers[texasPlayer.ID] {
+		texasPlayers[texasPlayer.ID] = texasPlayer
+	}
+
+	index := 0
+	roomPlayers := database.RoomPlayers(room.ID)
+	players := make([]*database.TexasPlayer, 0)
+	for playerId := range roomPlayers {
+		if texasPlayer, ok := texasPlayers[playerId]; ok {
 			texasPlayer.Reset()
 			texasPlayer.Hand = base[index*2 : (index+1)*2]
 			players = append(players, texasPlayer)
-			index++
+		} else {
+			player := database.GetPlayer(playerId)
+			players = append(players, &database.TexasPlayer{
+				ID:    playerId,
+				Name:  player.Name,
+				State: make(chan int, 1),
+				Hand:  base[index*2 : (index+1)*2],
+			})
 		}
+		index++
 	}
 	newGame := &database.Texas{
 		Room:         room,
