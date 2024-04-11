@@ -7,7 +7,7 @@ require (
 	github.com/feel-easy/mahjong v0.0.0-20220721030133-7a0f4032c008
 	github.com/feel-easy/uno v0.0.0-20220721061415-e6a3189cfd70
 	github.com/gorilla/websocket v1.4.2
-	github.com/ratel-online/core v0.0.0-20240411045052-840504c4e7fc
+	github.com/ratel-online/core v0.0.0-20240411101817-d5cb908bcf49
 )
 
 require (
