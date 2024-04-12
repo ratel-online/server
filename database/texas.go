@@ -72,6 +72,29 @@ func (g *Texas) Bet(player *TexasPlayer, amount uint) {
 	}
 }
 
+func (g *Texas) RoundEnd(currentPlayerId int64) bool {
+	if g.AllIn == len(g.Players) ||
+		g.AllIn+g.Folded == len(g.Players) ||
+		(g.MaxBetPlayer != nil && g.MaxBetPlayer.ID == currentPlayerId) {
+		return true
+	}
+	// all players except one folded or allin
+	if g.AllIn+g.Folded == len(g.Players)-1 {
+		isEnd := true
+		for _, p := range g.Players {
+			if p.Folded {
+				continue
+			}
+			if p.Bets != g.MaxBetAmount {
+				isEnd = false
+				break
+			}
+		}
+		return isEnd
+	}
+	return false
+}
+
 type TexasPlayer struct {
 	ID     int64        `json:"id"`
 	Name   string       `json:"name"`

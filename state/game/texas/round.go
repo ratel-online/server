@@ -159,7 +159,7 @@ func settlementRound(game *database.Texas) error {
 			winner.Add(game.Pot / uint(len(winners)))
 		}
 	}
-	buf.WriteString("Please room creator to start a new game\n")
+	buf.WriteString(fmt.Sprintf("Please room owner %s to start a new game\n", database.GetPlayer(game.Room.Creator).Name))
 	database.Broadcast(game.Room.ID, buf.String())
 
 	room := game.Room

@@ -19,7 +19,6 @@ func createGame(room *database.Room) (database.RoomGame, error) {
 	index := 0
 	roomPlayers := database.RoomPlayers(room.ID)
 	players := make([]*database.TexasPlayer, 0)
-	bigBlind, smallBlind := 0, 1
 	for playerId := range roomPlayers {
 		player := database.GetPlayer(playerId)
 		players = append(players, &database.TexasPlayer{
@@ -34,8 +33,8 @@ func createGame(room *database.Room) (database.RoomGame, error) {
 		Room:         room,
 		Players:      players,
 		Pot:          0,
-		BB:           bigBlind,
-		SB:           smallBlind,
+		BB:           0,
+		SB:           1,
 		Pool:         base[len(players)*2:],
 		MaxBetAmount: 20,
 		Round:        "start",
@@ -77,7 +76,7 @@ func resetGame(room *database.Room) (database.RoomGame, error) {
 		Players:      players,
 		Pot:          0,
 		BB:           (game.BB + 1) % len(players),
-		SB:           (game.SB + 1) % len(players),
+		SB:           (game.BB + 2) % len(players),
 		Pool:         base[len(players)*2:],
 		MaxBetAmount: 20,
 		Round:        "start",
