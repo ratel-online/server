@@ -128,7 +128,9 @@ func settlementRound(game *database.Texas) error {
 				return err
 			}
 			buf.WriteString(fmt.Sprintf("%s: %s, type: %s, score: %d\n", player.Name, player.Hand.TexasString(), faces.Type, faces.Score))
-			if maxFaces == nil || (maxFaces.Type < faces.Type || maxFaces.Score < faces.Score) {
+			if maxFaces == nil ||
+				maxFaces.Type < faces.Type ||
+				(maxFaces.Type == faces.Type && maxFaces.Score < faces.Score) {
 				maxFaces = faces
 				maxPlayers = []int64{player.ID}
 				continue
