@@ -3,7 +3,7 @@
 
 命令行在线多人棋牌游戏！支持斗地主，跑得快, 德州扑克等模式！
 ## 客户端
-- 浏览器在线：[http://ratel.lde.ng/](http://ratel.lde.ng/)
+- 浏览器在线：[http://ratel.isnico.com/](http://ratel.isnico.com/)
 - 客户端下载：[https://github.com/ratel-online/client/releases](https://github.com/ratel-online/client/releases)
 
 ## 社区
