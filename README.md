@@ -5,7 +5,9 @@
 ## 客户端
 - 浏览器在线：[http://ratel.isnico.com/](http://ratel.isnico.com/)
 - 客户端下载：[https://github.com/ratel-online/client/releases](https://github.com/ratel-online/client/releases)
-
+## 服务器
+- Websocket: 192.252.182.94:9998
+- TCP: 192.252.182.94:9999
 ## 社区
 - QQ群：[948365095](https://jq.qq.com/?_wv=1027&k=OhGYB1EC)
 ## 玩法介绍
