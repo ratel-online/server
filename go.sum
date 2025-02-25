@@ -53,6 +53,8 @@ github.com/ratel-online/core v0.0.0-20240411101817-d5cb908bcf49 h1:yESHztiCxllI2
 github.com/ratel-online/core v0.0.0-20240411101817-d5cb908bcf49/go.mod h1:8SYaPGDk9dVGnUIEkanZvV1ErTqd8OdedKNCwyXgRjI=
 github.com/ratel-online/core v0.0.0-20240412044054-42ffde55324d h1:F8Qcc9aUnNv5716ITYXlYKxuoWYDMTXAbBVwjDUmrsI=
 github.com/ratel-online/core v0.0.0-20240412044054-42ffde55324d/go.mod h1:8SYaPGDk9dVGnUIEkanZvV1ErTqd8OdedKNCwyXgRjI=
+github.com/ratel-online/core v0.0.0-20250225062905-81b6faff6d25 h1:9vdciSkTnXNoZkTqOe9rSP40PGRvNk/OzYxPCmWGh1c=
+github.com/ratel-online/core v0.0.0-20250225062905-81b6faff6d25/go.mod h1:8SYaPGDk9dVGnUIEkanZvV1ErTqd8OdedKNCwyXgRjI=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
 github.com/spf13/cast v1.6.0 h1:GEiTHELF+vaR5dhz3VqZfFSzZjYbgeKDpBxQVS4GYJ0=
 github.com/spf13/cast v1.6.0/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
