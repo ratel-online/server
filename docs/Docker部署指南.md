@@ -24,8 +24,10 @@ graph TD
 ### 前置要求
 
 - Docker 20.10+
-- Docker Compose 2.0+
+- Docker Compose 2.0+ 或 Docker 20.10+（内置 compose 插件）
 - Git
+
+> 注意：新版 Docker 已内置 compose 插件，可以使用 `docker compose` 命令。Makefile 会自动检测并使用可用的命令。
 
 ### 快速部署
 
