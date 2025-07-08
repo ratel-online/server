@@ -1,8 +1,19 @@
 .PHONY: help build run stop clean logs shell test prod-build prod-up prod-down
 
+# 检测 Docker Compose 命令
+DOCKER_COMPOSE := $(shell which docker-compose 2>/dev/null)
+ifeq ($(DOCKER_COMPOSE),)
+    DOCKER_COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "")
+endif
+ifeq ($(DOCKER_COMPOSE),)
+    $(error "Docker Compose 未安装。请安装 docker-compose 或升级到支持 'docker compose' 的 Docker 版本")
+endif
+
 # 默认目标
 help:
 	@echo "Ratel游戏服务器 Docker 管理命令"
+	@echo ""
+	@echo "当前使用的 Docker Compose 命令: $(DOCKER_COMPOSE)"
 	@echo ""
 	@echo "开发环境命令:"
 	@echo "  make build       - 构建Docker镜像"
@@ -22,25 +33,25 @@ help:
 
 # 开发环境命令
 build:
-	docker-compose build
+	$(DOCKER_COMPOSE) build
 
 run:
-	docker-compose up -d
+	$(DOCKER_COMPOSE) up -d
 	@echo "服务已启动："
 	@echo "  WebSocket: http://localhost:9998"
 	@echo "  TCP: localhost:9999"
 
 stop:
-	docker-compose down
+	$(DOCKER_COMPOSE) down
 
 logs:
-	docker-compose logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 shell:
-	docker-compose exec ratel-server sh
+	$(DOCKER_COMPOSE) exec ratel-server sh
 
 clean:
-	docker-compose down -v
+	$(DOCKER_COMPOSE) down -v
 	docker rmi ratel-server:latest || true
 
 # 生产环境命令
@@ -48,14 +59,14 @@ prod-build:
 	docker build -t ratel-server:latest .
 
 prod-up:
-	docker-compose -f docker-compose.prod.yaml up -d
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yaml up -d
 	@echo "生产环境已启动："
 	@echo "  WebSocket: http://localhost:9998"
 	@echo "  TCP: localhost:9999"
 	@echo "  HTTP: http://localhost:80"
 
 prod-down:
-	docker-compose -f docker-compose.prod.yaml down
+	$(DOCKER_COMPOSE) -f docker-compose.prod.yaml down
 
 # 测试命令
 test:
