@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  ratel-server:
+    image: ratel-server:latest
+    container_name: ratel-server-prod
+    restart: always
+    ports:
+      - "9998:9998"  # WebSocket端口
+      - "9999:9999"  # TCP端口
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      # 持久化日志
+      - ./logs:/app/logs:rw
+      # 如果需要自定义配置文件，可以挂载配置目录
+      # - ./config:/app/config:ro
+    networks:
+      - ratel-network
+    command: ["./ratel-server", "-w", "9998", "-t", "9999"]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9998"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          cpus: '4'
+          memory: 1G
+        reservations:
+          cpus: '1'
+          memory: 256M
+
+  # 可选：添加Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: ratel-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx:rw
+    networks:
+      - ratel-network
+    depends_on:
+      - ratel-server
+
+networks:
+  ratel-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

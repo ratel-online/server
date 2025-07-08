@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  ratel-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ratel-server:latest
+    container_name: ratel-server
+    restart: unless-stopped
+    ports:
+      - "9998:9998"  # WebSocket端口
+      - "9999:9999"  # TCP端口
+    environment:
+      - TZ=Asia/Shanghai
+    # volumes:
+    #   # 如果需要持久化日志，可以取消下面的注释
+    #   - ./logs:/app/logs
+    networks:
+      - ratel-network
+    command: ["./ratel-server", "-w", "9998", "-t", "9999"]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9998"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+
+networks:
+  ratel-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 
