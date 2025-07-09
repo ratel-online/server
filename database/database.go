@@ -68,7 +68,7 @@ func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 		ID:     info.ID,
 		IP:     conn.IP(),
 		Name:   strings.Desensitize(info.Name),
-		Amount: 10000,
+		Amount: 2000,
 	}
 	player.Conn(conn)                  // 初始化play对象
 	players.Set(info.ID, player)       // 写入用户池
