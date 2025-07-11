@@ -1,0 +1,38 @@
+# Git相关
+.git
+.gitignore
+
+# 文档和说明
+*.md
+docs/
+demo.gif
+
+# 开发相关
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 测试文件
+*_test.go
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+
+# 构建产物
+ratel-server
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Docker相关
+Dockerfile
+docker-compose.yaml
+.dockerignore 

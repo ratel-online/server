@@ -14,9 +14,9 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v5
       with:
         go-version: 1.17
 
@@ -27,15 +27,15 @@ jobs:
           go build -x -v
       
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.3.1
+      uses: actions/upload-artifact@v4
+      if: ${{ matrix.os  == 'windows-latest' }}
       with:
         name: server-${{ matrix.os }}
         path: server.exe
-        if: ${{ matrix.os  == 'windows-latest' }}
         
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.3.1
+      uses: actions/upload-artifact@v4
+      if: ${{ matrix.os != 'windows-latest' }}
       with:
         name: server-${{ matrix.os }}
         path: server
-        if: ${{ matrix.os != 'windows-latest' }}

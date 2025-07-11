@@ -31,8 +31,8 @@ func preFlopRound(game *database.Texas) error {
 	for id := range database.RoomPlayers(game.Room.ID) {
 		player := database.GetPlayer(id)
 		if player.Amount < 100 {
-			player.Amount += 10000
-			database.Broadcast(game.Room.ID, fmt.Sprintf("%s is too poor, system give him 10000\n", player.Name))
+			player.Amount += 2000
+			database.Broadcast(game.Room.ID, fmt.Sprintf("%s is too poor, system give him 2000\n", player.Name))
 		}
 	}
 
