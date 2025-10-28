@@ -22,6 +22,7 @@ var players = hashmap.New() // 存储连接过服务器的全部用户
 var connPlayers = hashmap.New()
 var rooms = hashmap.New()
 var roomPlayers = hashmap.New()
+var roomKickedPlayers = hashmap.New()
 var roomPropsSetter = map[string]func(r *Room, v string){
 	consts.RoomPropsSkill: func(r *Room, v string) {
 		r.EnableSkill = v == "on"
@@ -65,13 +66,13 @@ func init() {
 
 func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 	player := &Player{
-		ID:     info.ID,
+		ID:     conn.ID(),
 		IP:     conn.IP(),
 		Name:   strings.Desensitize(info.Name),
 		Amount: 2000,
 	}
 	player.Conn(conn)                  // 初始化play对象
-	players.Set(info.ID, player)       // 写入用户池
+	players.Set(conn.ID(), player)     // 写入用户池
 	connPlayers.Set(conn.ID(), player) // 写入连接用户池
 	return player
 }
@@ -160,6 +161,20 @@ func getRoomPlayers(roomId int64) map[int64]bool {
 	return nil
 }
 
+func ExistRoomPlayer(roomId, playerId int64) bool {
+	room := getRoom(roomId)
+	if room != nil {
+		room.Lock()
+		defer room.Unlock()
+		playersIds := getRoomPlayers(roomId)
+		if playersIds != nil {
+			return playersIds[playerId]
+		}
+		return false
+	}
+	return false
+}
+
 // 加入房间
 func JoinRoom(roomId, playerId int64) error {
 	// 资源检查
@@ -175,6 +190,10 @@ func JoinRoom(roomId, playerId int64) error {
 	// 加锁防止并发异常
 	room.Lock()
 	defer room.Unlock()
+
+	if hasKicked(roomId, playerId) {
+		return consts.ErrorsJoinFailForKicked
+	}
 
 	room.ActiveTime = time.Now()
 
@@ -207,6 +226,31 @@ func LeaveRoom(roomId, playerId int64) {
 		defer room.Unlock()
 		leaveRoom(room, getPlayer(playerId))
 	}
+}
+
+func Kicking(roomId, playerId int64) {
+	room := getRoom(roomId)
+	if room != nil {
+		room.Lock()
+		defer room.Unlock()
+		leaveRoom(room, getPlayer(playerId))
+
+		kickedPlayers, ok := roomKickedPlayers.Get(roomId)
+		if !ok {
+			kickedPlayers = map[int64]bool{}
+			roomKickedPlayers.Set(roomId, kickedPlayers)
+		}
+		kickedPlayers.(map[int64]bool)[playerId] = true
+	}
+}
+
+func hasKicked(roomId, playerId int64) bool {
+	kickedPlayers, ok := roomKickedPlayers.Get(roomId)
+	if !ok {
+		return false
+	}
+	_, exists := kickedPlayers.(map[int64]bool)[playerId]
+	return exists
 }
 
 func leaveRoom(room *Room, player *Player) {

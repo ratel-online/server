@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/ratel-online/server/state/game/texas"
+	"github.com/spf13/cast"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
-	access, err := waitingForStart(player, room)
+	access, err := s.waitingForStart(player, room)
 	if err != nil {
 		return 0, err
 	}
@@ -55,7 +56,16 @@ func (*waiting) Exit(player *database.Player) consts.StateID {
 	return consts.StateHome
 }
 
-func waitingForStart(player *database.Player, room *database.Room) (bool, error) {
+func (*waiting) Kicking(player *database.Player) {
+	room := database.GetRoom(player.RoomID)
+	if room != nil {
+		database.Broadcast(room.ID, fmt.Sprintf("%s has been kicked!\n", player.Name))
+		database.Kicking(room.ID, player.ID)
+		database.Broadcast(room.ID, fmt.Sprintf("room current has %d players\n", room.Players))
+	}
+}
+
+func (s *waiting) waitingForStart(player *database.Player, room *database.Room) (bool, error) {
 	access := false
 	//对局类别
 	player.StartTransaction()
@@ -65,52 +75,71 @@ func waitingForStart(player *database.Player, room *database.Room) (bool, error)
 		if err != nil && err != consts.ErrorsTimeout {
 			return access, err
 		}
+
+		if !database.ExistRoomPlayer(room.ID, player.ID) {
+			return false, consts.ErrorsPlayerNotInRoom
+		}
+
 		if room.State == consts.RoomStateRunning {
 			access = true
 			break
 		}
-		signal = strings.ToLower(signal)
-		if signal == "ls" || signal == "v" {
-			viewRoomPlayers(room, player)
-		} else if (signal == "start" || signal == "s") && room.Creator == player.ID && room.Players > 1 {
-			//跑得快限制必须三人
-			if room.Type == consts.GameTypeRunFast && room.Players != 3 {
-				err := player.WriteError(consts.ErrorsGamePlayersInvalid)
-				if err != nil {
-					return false, err
-				}
+		signal = strings.TrimSpace(strings.ToLower(signal))
+		if signal == "" {
+			continue
+		}
+
+		segments := strings.Split(signal, " ")
+		if len(segments) == 1 {
+			if segments[0] == "ls" || segments[0] == "v" {
+				viewRoomPlayers(room, player)
 				continue
-			}
-			err = startGame(player, room)
-			if err != nil {
-				return access, err
-			}
-			access = true
-			break
-		} else if strings.HasPrefix(signal, "set ") && room.Creator == player.ID {
-			tags := strings.Split(signal, " ")
-			if len(tags) == 3 {
-				//跑得快只允许修改房间名和是否开启聊天
-				if room.Type == consts.GameTypeRunFast {
-					if tags[1] == "pwd" || tags[1] == "ct" {
-						database.SetRoomProps(room, tags[1], tags[2])
+			} else if segments[0] == "start" || signal == "s" {
+				if room.Creator == player.ID {
+					if room.Players <= 1 {
+						_ = player.WriteError(consts.ErrorsGamePlayersInsufficient)
+						continue
 					}
-				} else {
-					database.SetRoomProps(room, tags[1], tags[2])
+					if room.Type == consts.GameTypeRunFast && room.Players != 3 {
+						_ = player.WriteError(consts.ErrorsGamePlayersInvalid)
+						continue
+					}
+					err = startGame(player, room)
+					if err != nil {
+						return access, err
+					}
+					access = true
+					break
 				}
-				continue
 			}
-			if room.EnableChat {
-				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
-			} else {
-				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
+		} else if len(segments) == 2 {
+			if segments[0] == "kicking" || segments[0] == "kill" || segments[0] == "k" {
+				if room.Creator == player.ID {
+					kickedId := cast.ToInt64(segments[1])
+					if kickedId == player.ID {
+						_ = player.WriteError(consts.ErrorsCannotKickYourself)
+						continue
+					}
+
+					kickedPlayer := database.GetPlayer(kickedId)
+					if kickedPlayer == nil || kickedPlayer.RoomID != room.ID {
+						_ = player.WriteError(consts.ErrorsPlayerNotInRoom)
+						continue
+					}
+
+					s.Kicking(kickedPlayer)
+					continue
+				}
 			}
-		} else if len(signal) > 0 {
-			if room.EnableChat {
-				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
-			} else {
-				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
-			}
+		} else if len(segments) == 3 {
+			database.SetRoomProps(room, segments[1], segments[2])
+			continue
+		}
+
+		if room.EnableChat {
+			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, signal))
+		} else {
+			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
 		}
 	}
 	return access, nil
@@ -142,14 +171,14 @@ func startGame(player *database.Player, room *database.Room) (err error) {
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("Room ID: %d\n", room.ID))
-	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Amount", "Title"))
+	buf.WriteString("Players:\n")
 	for playerId := range database.RoomPlayers(room.ID) {
 		title := "player"
 		if playerId == room.Creator {
 			title = "owner"
 		}
 		player := database.GetPlayer(playerId)
-		buf.WriteString(fmt.Sprintf("%-20s%-10d%-10s\n", player.Name, player.Amount, title))
+		buf.WriteString(fmt.Sprintf("%s [%s], score: %d, id: %d\n", player.Name, title, player.Amount, player.ID))
 	}
 	buf.WriteString("\nSettings:\n")
 	switch room.Type {
