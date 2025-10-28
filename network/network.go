@@ -28,12 +28,12 @@ func handle(rwc protocol.ReadWriteCloser) error {
 	}()
 	log.Info("new player connected! ")
 	authInfo, err := loginAuth(c)
-	if err != nil || authInfo.ID == 0 {
+	if err != nil {
 		_ = c.Write(protocol.ErrorPacket(err))
 		return err
 	}
 	player := database.Connected(c, authInfo)
-	log.Infof("player auth accessed, ip %s, %d:%s\n", player.IP, authInfo.ID, authInfo.Name)
+	log.Infof("player auth accessed, ip %s, %d:%s\n", player.IP, player.ID, authInfo.Name)
 	go state.Run(player)
 	defer player.Offline()
 	return player.Listening()
