@@ -21,6 +21,8 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	if room == nil {
 		return 0, consts.ErrorsExist
 	}
+	s.Backfill(room)
+
 	access, err := s.waitingForStart(player, room)
 	if err != nil {
 		return 0, err
@@ -42,7 +44,7 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 	return s.Exit(player), nil
 }
 
-func (*waiting) Exit(player *database.Player) consts.StateID {
+func (s *waiting) Exit(player *database.Player) consts.StateID {
 	room := database.GetRoom(player.RoomID)
 	if room != nil {
 		isOwner := room.Creator == player.ID
@@ -52,12 +54,19 @@ func (*waiting) Exit(player *database.Player) consts.StateID {
 			newOwner := database.GetPlayer(room.Creator)
 			database.Broadcast(room.ID, fmt.Sprintf("%s become new owner\n", newOwner.Name))
 		}
-		newPlayer := database.Backfill(room.ID)
-		if newPlayer != nil {
-			database.Broadcast(room.ID, fmt.Sprintf("%s has joined room! room current has %d players\n", newPlayer.Name, room.Players))
-		}
+		s.Backfill(room)
 	}
 	return consts.StateHome
+}
+
+func (*waiting) Backfill(room *database.Room) {
+	if room.State == consts.RoomStateRunning {
+		return
+	}
+	newPlayer := database.Backfill(room.ID)
+	if newPlayer != nil {
+		database.Broadcast(room.ID, fmt.Sprintf("%s has joined room! room current has %d players\n", newPlayer.Name, room.Players))
+	}
 }
 
 func (*waiting) Kicking(player *database.Player) {

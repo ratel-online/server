@@ -217,13 +217,8 @@ func JoinRoom(roomId, playerId int64) error {
 
 	room.ActiveTime = time.Now()
 
-	// 房间状态检查
-	if room.State == consts.RoomStateRunning {
-		return consts.ErrorsJoinFailForRoomRunning
-	}
-
-	//房间人数检查
-	if room.Players >= room.MaxPlayers {
+	//房间人数及状态检查
+	if room.Players >= room.MaxPlayers || room.State == consts.RoomStateRunning {
 		spectatorsIds := getRoomSpectators(roomId)
 		spectatorsIds[playerId] = len(spectatorsIds)
 		player.RoomID = roomId
