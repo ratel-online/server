@@ -260,7 +260,7 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 		//聊天開啓才能說話
 		if invalid {
 			if game.Room.EnableChat {
-				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+				database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: %s\n", player.Name, player.Role, ans))
 				continue
 			} else {
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))

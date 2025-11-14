@@ -32,6 +32,14 @@ func (s *runeSequence) next() rune {
 	return currentRune
 }
 
+type Role string
+
+const (
+	RolePlayer    Role = "player"
+	RoleOwner     Role = "owner"
+	RoleSpectator Role = "spectator"
+)
+
 type Player struct {
 	ID     int64  `json:"id"`
 	IP     string `json:"ip"`
@@ -40,6 +48,7 @@ type Player struct {
 	Type   int    `json:"type"`
 	Amount uint   `json:"amount"`
 	RoomID int64  `json:"roomId"`
+	Role   Role   `json:"role"`
 
 	conn   *network.Conn
 	data   chan *protocol.Packet

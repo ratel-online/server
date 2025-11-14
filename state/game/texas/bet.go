@@ -103,7 +103,7 @@ func bet(player *database.Player, game *database.Texas) error {
 			game.Bet(texasPlayer, betAmount)
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s all in, bet %d\n", player.Name, betAmount))
 		default:
-			database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+			database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: %s\n", player.Name, player.Role, ans))
 			continue
 		}
 		break

@@ -97,6 +97,7 @@ var (
 	ErrorsTimeout                 = NewErr(1, false, "Timeout. ")
 	ErrorsInputInvalid            = NewErr(1, false, "Input invalid. ")
 	ErrorsChatUnopened            = NewErr(1, false, "Chat disabled. ")
+	ErrorsChatUnopenedDuringGame  = NewErr(1, false, "Chat disabled during game. ")
 	ErrorsAuthFail                = NewErr(1, true, "Auth fail. ")
 	ErrorsRoomInvalid             = NewErr(1, true, "Room invalid. ")
 	ErrorsGameTypeInvalid         = NewErr(1, false, "Game type invalid. ")
@@ -113,8 +114,7 @@ var (
 	ErrorsGamePlayersInsufficient = NewErr(1, false, "Game players insufficient. ")
 	ErrorsCannotKickYourself      = NewErr(1, false, "Cannot kick yourself. ")
 	ErrorsPlayerNotInRoom         = NewErr(1, true, "Player not in room. ")
-
-	GameTypes = map[int]string{
+	GameTypes                     = map[int]string{
 		GameTypeClassic: "斗地主",
 		GameTypeLaiZi:   "斗地主-癞子版",
 		GameTypeSkill:   "斗地主-大招版",
