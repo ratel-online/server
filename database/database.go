@@ -22,6 +22,7 @@ var players = hashmap.New() // 存储连接过服务器的全部用户
 var connPlayers = hashmap.New()
 var rooms = hashmap.New()
 var roomPlayers = hashmap.New()
+var roomSpectators = hashmap.New()
 var roomKickedPlayers = hashmap.New()
 var roomPropsSetter = map[string]func(r *Room, v string){
 	consts.RoomPropsSkill: func(r *Room, v string) {
@@ -104,8 +105,9 @@ func CreateRoom(creator int64, t int) *Room {
 	case consts.GameTypeTexas:
 		room.MaxPlayers = 10
 	}
-	rooms.Set(room.ID, room)
 	roomPlayers.Set(room.ID, map[int64]bool{})
+	roomSpectators.Set(room.ID, map[int64]int{})
+	rooms.Set(room.ID, room)
 	return room
 }
 
@@ -113,6 +115,7 @@ func deleteRoom(room *Room) {
 	if room != nil {
 		rooms.Del(room.ID)
 		roomPlayers.Del(room.ID)
+		roomSpectators.Del(room.ID)
 		if room.Game != nil {
 			room.Game.Clean()
 		}
@@ -161,14 +164,31 @@ func getRoomPlayers(roomId int64) map[int64]bool {
 	return nil
 }
 
-func ExistRoomPlayer(roomId, playerId int64) bool {
+func getRoomSpectators(roomId int64) map[int64]int {
+	if v, ok := roomSpectators.Get(roomId); ok {
+		return v.(map[int64]int)
+	}
+	return nil
+}
+
+func IsValidPlayer(roomId, playerId int64) bool {
 	room := getRoom(roomId)
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
 		playersIds := getRoomPlayers(roomId)
 		if playersIds != nil {
-			return playersIds[playerId]
+			_, exists := playersIds[playerId]
+			if exists {
+				return true
+			}
+		}
+		spectatorsIds := getRoomSpectators(roomId)
+		if spectatorsIds != nil {
+			_, exists := spectatorsIds[playerId]
+			if exists {
+				return true
+			}
 		}
 		return false
 	}
@@ -204,18 +224,21 @@ func JoinRoom(roomId, playerId int64) error {
 
 	//房间人数检查
 	if room.Players >= room.MaxPlayers {
-		return consts.ErrorsRoomPlayersIsFull
-	}
-
-	playersIds := getRoomPlayers(roomId)
-	if playersIds != nil {
+		spectatorsIds := getRoomSpectators(roomId)
+		spectatorsIds[playerId] = len(spectatorsIds)
+		player.RoomID = roomId
+		player.Role = RoleSpectator
+	} else {
+		playersIds := getRoomPlayers(roomId)
 		playersIds[playerId] = true
 		room.Players++
 		player.RoomID = roomId
-	} else {
-		deleteRoom(room)
-		return consts.ErrorsRoomInvalid
+		player.Role = RolePlayer
+		if room.Creator == playerId {
+			player.Role = RoleOwner
+		}
 	}
+
 	return nil
 }
 
@@ -226,6 +249,52 @@ func LeaveRoom(roomId, playerId int64) {
 		defer room.Unlock()
 		leaveRoom(room, getPlayer(playerId))
 	}
+}
+
+func Backfill(roomId int64) *Player {
+	room := getRoom(roomId)
+	if room != nil {
+		room.Lock()
+		defer room.Unlock()
+		return backfill(room)
+	}
+	return nil
+}
+
+func backfill(room *Room) *Player {
+	if room.Players >= room.MaxPlayers {
+		return nil
+	}
+	spectatorsIds := getRoomSpectators(room.ID)
+	if len(spectatorsIds) == 0 {
+		return nil
+	}
+	spectators := make([]struct {
+		id    int64
+		index int
+	}, 0)
+
+	for id, index := range spectatorsIds {
+		spectators = append(spectators, struct {
+			id    int64
+			index int
+		}{id: id, index: index})
+	}
+	sort.Slice(spectators, func(i, j int) bool {
+		return spectators[i].index < spectators[j].index
+	})
+
+	playerId := spectators[0].id
+
+	delete(spectatorsIds, playerId)
+	playersIds := getRoomPlayers(room.ID)
+	playersIds[playerId] = true
+	room.Players++
+	player := getPlayer(playerId)
+	if player != nil {
+		player.Role = RolePlayer
+	}
+	return player
 }
 
 func Kicking(roomId, playerId int64) {
@@ -262,28 +331,26 @@ func leaveRoom(room *Room, player *Player) {
 	if _, ok := playersIds[player.ID]; ok {
 		room.Players--
 		player.RoomID = 0
+		player.Role = ""
 		delete(playersIds, player.ID)
 		if len(playersIds) > 0 && room.Creator == player.ID {
 			for k := range playersIds {
 				room.Creator = k
+				if p := getPlayer(k); p != nil {
+					p.Role = RoleOwner
+				}
 				break
 			}
 		}
 	}
-	if len(playersIds) == 0 {
-		deleteRoom(room)
+	spectatorsIds := getRoomSpectators(room.ID)
+	if _, ok := spectatorsIds[player.ID]; ok {
+		player.RoomID = 0
+		player.Role = ""
+		delete(spectatorsIds, player.ID)
 	}
-}
-
-func offline(roomId, playerId int64) {
-	room := getRoom(roomId)
-	if room != nil {
-		room.Lock()
-		defer room.Unlock()
-		if room.State == consts.RoomStateWaiting {
-			leaveRoom(room, getPlayer(playerId))
-		}
-		roomCancel(room)
+	if len(playersIds) == 0 && len(spectatorsIds) == 0 {
+		deleteRoom(room)
 	}
 }
 
@@ -301,6 +368,13 @@ func roomCancel(room *Room) {
 			break
 		}
 	}
+	spectatorIds := getRoomSpectators(room.ID)
+	for id := range spectatorIds {
+		if getPlayer(id).online {
+			living = true
+			break
+		}
+	}
 	if !living {
 		log.Infof("room %d is not living, removed.\n", room.ID)
 		deleteRoom(room)
@@ -311,6 +385,10 @@ func RoomPlayers(roomId int64) map[int64]bool {
 	return getRoomPlayers(roomId)
 }
 
+func RoomSpectators(roomId int64) map[int64]int {
+	return getRoomSpectators(roomId)
+}
+
 func broadcast(room *Room, msg string, exclude ...int64) {
 	room.ActiveTime = time.Now()
 	excludeSet := map[int64]bool{}
@@ -318,6 +396,11 @@ func broadcast(room *Room, msg string, exclude ...int64) {
 		excludeSet[exc] = true
 	}
 	for playerId := range getRoomPlayers(room.ID) {
+		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
+			_ = player.WriteString(">> " + msg)
+		}
+	}
+	for playerId := range getRoomSpectators(room.ID) {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
 			_ = player.WriteString(">> " + msg)
 		}
