@@ -58,6 +58,8 @@ func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	}
 	if room.State != consts.RoomStateRunning {
 		database.Broadcast(roomId, fmt.Sprintf("%s [%s] joined room! room current has %d players\n", player.Name, player.Role, room.Players))
+	} else {
+		_ = player.WriteString("You have joined a running game, please wait for the game to finish.\n")
 	}
 	return consts.StateWaiting, nil
 }
