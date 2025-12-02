@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/feel-easy/mahjong/card"
@@ -33,6 +34,14 @@ type OP struct {
 	operation int
 	tiles     []int
 }
+
+func circled(n int) string {
+	if n >= 1 && n <= 20 {
+		return string(rune(0x2460 + n - 1))
+	}
+	return strconv.Itoa(n)
+}
+
 type MahjongPlayer struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -68,43 +77,46 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 	p.WriteString(buf.String())
 	askBuf := bytes.Buffer{}
 	tileOptions := make(map[string]*OP)
-	runeSequence := runeSequence{}
+	labelCounter := 1
 	if pvs, ok := gameState.SpecialPrivileges[int(p.ID)]; ok {
 		for _, pv := range pvs {
 			switch pv {
 			case consts.GANG:
 				askBuf.WriteString("You can 杠!!!\n")
-				label := string(runeSequence.next())
+				label := strconv.Itoa(labelCounter)
 				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
 				tileOptions[label] = &OP{
 					operation: consts.GANG,
 					tiles:     append(ts, gameState.LastPlayedTile),
 				}
-				askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+				askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), tile.ToTileString(ts)))
+				labelCounter++
 			case consts.PENG:
 				askBuf.WriteString("You can 碰!!!\n")
-				label := string(runeSequence.next())
+				label := strconv.Itoa(labelCounter)
 				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile}
 				tileOptions[label] = &OP{
 					operation: consts.PENG,
 					tiles:     append(ts, gameState.LastPlayedTile),
 				}
-				askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+				askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), tile.ToTileString(ts)))
+				labelCounter++
 			case consts.CHI:
 				askBuf.WriteString("You can 吃!!!\n")
 				for _, ts := range card.CanChiTiles(tiles, gameState.LastPlayedTile) {
-					label := string(runeSequence.next())
+					label := strconv.Itoa(labelCounter)
 					tileOptions[label] = &OP{
 						operation: consts.CHI,
 						tiles:     append(ts, gameState.LastPlayedTile),
 					}
-					askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, tile.ToTileString(ts)))
+					askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), tile.ToTileString(ts)))
+					labelCounter++
 				}
 			}
 		}
 	}
-	label := string(runeSequence.next())
-	askBuf.WriteString(fmt.Sprintf("%s:%s \n", label, "no"))
+	label := strconv.Itoa(labelCounter)
+	askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), "no"))
 	tileOptions[label] = &OP{
 		operation: 0,
 		tiles:     []int{},
@@ -119,7 +131,7 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 				p.WriteString("Don't quit a good game！\n")
 				selectedLabel = "E"
 			case rconsts.ErrorsTimeout:
-				selectedLabel = "A"
+				selectedLabel = "1"
 			default:
 				return 0, nil, err
 			}
@@ -142,13 +154,17 @@ func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 	p.WriteString(buf.String())
 	askBuf := bytes.Buffer{}
 	askBuf.WriteString("Select a tile to play:\n")
-	runeSequence := runeSequence{}
 	tileOptions := make(map[string]int)
 	sort.Ints(tiles)
-	for _, i := range tiles {
-		label := string(runeSequence.next())
+	for idx, i := range tiles {
+		label := strconv.Itoa(idx + 1)
 		tileOptions[label] = i
-		askBuf.WriteString(fmt.Sprintf("%s:%s ", label, tile.Tile(i).String()))
+		askBuf.WriteString(fmt.Sprintf("%s. %-6s", circled(idx+1), tile.Tile(i).String()))
+		if (idx+1)%6 == 0 {
+			askBuf.WriteString("\n")
+		} else {
+			askBuf.WriteString("  ")
+		}
 	}
 	askBuf.WriteString("\n")
 	for {
@@ -161,7 +177,7 @@ func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 				p.WriteString("Don't quit a good game！\n")
 				selectedLabel = "E"
 			case rconsts.ErrorsTimeout:
-				selectedLabel = "A"
+				selectedLabel = "1"
 			default:
 				return 0, err
 			}
