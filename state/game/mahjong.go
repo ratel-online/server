@@ -3,6 +3,8 @@ package game
 import (
 	"bytes"
 	"fmt"
+	"sort"
+
 	"github.com/feel-easy/mahjong/card"
 	mjconsts "github.com/feel-easy/mahjong/consts"
 	"github.com/feel-easy/mahjong/event"
@@ -13,7 +15,6 @@ import (
 	"github.com/ratel-online/core/util/rand"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
-	"sort"
 )
 
 type Mahjong struct{}
@@ -92,11 +93,16 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 		return nil
 	}
 	if card.CanGang(p.GetShowCardTiles(), p.LastTile()) {
-		showCard := p.FindShowCard(p.LastTile())
-		showCard.ModifyPongToKong(mjconsts.GANG, false)
-		p.TryBottomDecking(game.Game.Deck())
-		game.States[p.ID()] <- stateTakeCard
-		return nil
+		_ = player.WriteString("You can 加杠, do it? (y/n)\n")
+		ans, err := player.AskForString(consts.PlayMahjongTimeout)
+		if err == nil && (ans == "y" || ans == "Y") {
+			showCard := p.FindShowCard(p.LastTile())
+			showCard.ModifyPongToKong(mjconsts.GANG, false)
+			p.TryBottomDecking(game.Game.Deck())
+			game.States[p.ID()] <- stateTakeCard
+			return nil
+		}
+		// choose not to add kong, continue normal flow
 	}
 	gameState := game.Game.ExtractState(p)
 	if len(gameState.SpecialPrivileges) > 0 {
