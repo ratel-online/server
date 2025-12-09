@@ -243,6 +243,7 @@ type Room struct {
 	EnableSkill       bool      `json:"enableSkill"`
 	EnableLandlord    bool      `json:"enableLandlord"`
 	EnableDontShuffle bool      `json:"enableDontShuffle"`
+	EnableShowIP      bool      `json:"enableShowIP"`
 }
 
 func (r *Room) Model() model.Room {

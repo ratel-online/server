@@ -191,34 +191,44 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	buf.WriteString("Players:\n")
 	for playerId := range database.RoomPlayers(room.ID) {
 		player := database.GetPlayer(playerId)
-		buf.WriteString(fmt.Sprintf("%s [%s], score: %d, id: %d\n", player.Name, player.Role, player.Amount, player.ID))
+		if room.EnableShowIP {
+			buf.WriteString(fmt.Sprintf("%s [%s], score: %d, id: %d, ip: %s\n", player.Name, player.Role, player.Amount, player.ID, maskIP(player.IP)))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s [%s], score: %d, id: %d\n", player.Name, player.Role, player.Amount, player.ID))
+		}
 	}
 
 	buf.WriteString("\nSpectators:\n")
 	for spectatorId := range database.RoomSpectators(room.ID) {
 		spectator := database.GetPlayer(spectatorId)
-		buf.WriteString(fmt.Sprintf("%s [spectator], score: %d, id: %d\n", spectator.Name, spectator.Amount, spectator.ID))
+		if room.EnableShowIP {
+			buf.WriteString(fmt.Sprintf("%s [spectator], score: %d, id: %d, ip: %s\n", spectator.Name, spectator.Amount, spectator.ID, maskIP(spectator.IP)))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s [spectator], score: %d, id: %d\n", spectator.Name, spectator.Amount, spectator.ID))
+		}
 	}
 
 	buf.WriteString("\nSettings:\n")
 	switch room.Type {
 	case consts.GameTypeUno, consts.GameTypeMahjong:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 	case consts.GameTypeTexas:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 	default:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)))
-	}
-	pwd := room.Password
-	if pwd != "" {
-		if room.Creator != currPlayer.ID {
-			pwd = "********"
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)+",", "ip:", sprintPropsState(room.EnableShowIP)))
+		pwd := room.Password
+		if pwd != "" {
+			if room.Creator != currPlayer.ID {
+				pwd = "********"
+			}
+		} else {
+			pwd = "off"
 		}
-	} else {
-		pwd = "off"
+		buf.WriteString(fmt.Sprintf("%-5s%-20v\n", "pwd", pwd))
 	}
-	buf.WriteString(fmt.Sprintf("%-5s%-20v\n", "pwd", pwd))
 	_ = currPlayer.WriteString(buf.String())
 }
 
@@ -227,4 +237,12 @@ func sprintPropsState(on bool) string {
 		return "on"
 	}
 	return "off"
+}
+
+func maskIP(ip string) string {
+	parts := strings.Split(ip, ".")
+	if len(parts) == 4 {
+		return parts[0] + "." + parts[1] + ".*.*"
+	}
+	return "*.*.*.*"
 }
