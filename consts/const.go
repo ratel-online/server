@@ -120,10 +120,10 @@ var (
 		GameTypeSkill:   "斗地主-大招版",
 		GameTypeRunFast: "跑得快",
 		//GameTypeUno:     "Uno",
-		//GameTypeMahjong: "Mahjong",
-		GameTypeTexas: "德州扑克",
+		GameTypeMahjong: "Mahjong",
+		GameTypeTexas:   "德州扑克",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeTexas}
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeMahjong, GameTypeTexas}
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",
