@@ -71,6 +71,7 @@ const (
 	RoomPropsPassword   = "pwd"
 	RoomPropsPlayerNum  = "pn"
 	RoomPropsChat       = "ct"
+	RoomPropsShowIP     = "ip"
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
@@ -119,11 +120,11 @@ var (
 		GameTypeLaiZi:   "斗地主-癞子版",
 		GameTypeSkill:   "斗地主-大招版",
 		GameTypeRunFast: "跑得快",
-		//GameTypeUno:     "Uno",
-		//GameTypeMahjong: "Mahjong",
-		GameTypeTexas: "德州扑克",
+		GameTypeUno:     "Uno",
+		GameTypeMahjong: "Mahjong",
+		GameTypeTexas:   "德州扑克",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeTexas}
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeTexas, GameTypeUno, GameTypeMahjong}
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",
