@@ -20,10 +20,14 @@ type Network interface {
 func handle(rwc protocol.ReadWriteCloser) error {
 	// 给新进入的用户分配资源
 	c := network.Wrapper(rwc)
+	var player *database.Player
 	defer func() {
 		err := c.Close()
 		if err != nil {
 			log.Error(err)
+		}
+		if player != nil {
+			player.Offline()
 		}
 	}()
 	log.Info("new player connected! ")
@@ -32,10 +36,9 @@ func handle(rwc protocol.ReadWriteCloser) error {
 		_ = c.Write(protocol.ErrorPacket(err))
 		return err
 	}
-	player := database.Connected(c, authInfo)
+	player = database.Connected(c, authInfo)
 	log.Infof("player auth accessed, ip %s, %d:%s\n", player.IP, player.ID, authInfo.Name)
 	go state.Run(player)
-	defer player.Offline()
 	return player.Listening()
 }
 

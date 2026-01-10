@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ratel-online/core/log"
+	log "github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
 	"github.com/ratel-online/core/protocol"
@@ -81,6 +81,9 @@ func (p *Player) Offline() {
 		}
 		roomCancel(room)
 	}
+	// 从全局哈希表中删除玩家，释放资源
+	players.Del(p.ID)
+	connPlayers.Del(p.ID)
 }
 
 func (p *Player) Listening() error {
@@ -91,7 +94,13 @@ func (p *Player) Listening() error {
 			return err
 		}
 		if p.read {
-			p.data <- pack
+			select {
+			case p.data <- pack:
+				// 数据包成功发送到通道
+			default:
+				// 通道已满，丢弃数据包，避免阻塞
+				log.Error(fmt.Sprintf("Player %d data channel full, dropping packet",p.ID,))
+			}
 		}
 	}
 }
