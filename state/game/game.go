@@ -3,11 +3,12 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"github.com/ratel-online/core/util/rand"
-	"github.com/ratel-online/server/rule"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ratel-online/core/util/rand"
+	"github.com/ratel-online/server/rule"
 
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
@@ -45,7 +46,7 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 		}
 		game.Pokers[player.ID].SortByOaaValue()
 	} else {
-		buf.WriteString(fmt.Sprintf("Game starting!\n"))
+		buf.WriteString("Game starting!\n")
 	}
 	if game.Room.EnableSkill {
 		buf.WriteString(fmt.Sprintf("Got skill %s\n", skill.Skills[consts.SkillID(game.Skills[player.ID])].Name()))

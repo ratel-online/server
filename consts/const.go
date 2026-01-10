@@ -19,6 +19,7 @@ const (
 	StateRunFastGame
 	StateUnoGame
 	StateMahjongGame
+	StateBullfightGame
 	StateTexasGame
 )
 
@@ -49,13 +50,14 @@ const (
 	RoomStateWaiting = 1
 	RoomStateRunning = 2
 
-	GameTypeClassic = 1
-	GameTypeLaiZi   = 2
-	GameTypeSkill   = 3
-	GameTypeRunFast = 4
-	GameTypeTexas   = 5
-	GameTypeMahjong = 6
-	GameTypeUno     = 7
+	GameTypeClassic   = 1
+	GameTypeLaiZi     = 2
+	GameTypeSkill     = 3
+	GameTypeRunFast   = 4
+	GameTypeTexas     = 5
+	GameTypeUno       = 6
+	GameTypeMahjong   = 7
+	GameTypeBullfight = 8
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
@@ -71,7 +73,6 @@ const (
 	RoomPropsPassword   = "pwd"
 	RoomPropsPlayerNum  = "pn"
 	RoomPropsChat       = "ct"
-	RoomPropsShowIP     = "ip"
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
@@ -120,12 +121,12 @@ var (
 		GameTypeLaiZi:   "斗地主-癞子版",
 		GameTypeSkill:   "斗地主-大招版",
 		GameTypeRunFast: "跑得快",
-		GameTypeTexas:   "德州扑克",
 		//GameTypeUno:     "Uno",
-		GameTypeMahjong: "Mahjong",
-		
+		GameTypeMahjong:   "Mahjong",
+		GameTypeTexas:     "德州扑克",
+		GameTypeBullfight: "斗牛",
 	}
-	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeTexas,GameTypeMahjong}
+	GameTypesIds = []int{GameTypeClassic, GameTypeLaiZi, GameTypeSkill, GameTypeRunFast, GameTypeMahjong, GameTypeTexas, GameTypeBullfight}
 	RoomStates   = map[int]string{
 		RoomStateWaiting: "Waiting",
 		RoomStateRunning: "Running",

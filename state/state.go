@@ -1,8 +1,9 @@
 package state
 
 import (
-	"github.com/ratel-online/server/state/game/texas"
 	"strings"
+
+	"github.com/ratel-online/server/state/game/texas"
 
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/util/async"
@@ -23,6 +24,7 @@ func init() {
 	register(consts.StateUnoGame, &game.Uno{})
 	register(consts.StateRunFastGame, &game.RunFastGame{})
 	register(consts.StateMahjongGame, &game.Mahjong{})
+	register(consts.StateBullfightGame, &game.Niuniu{})
 	register(consts.StateTexasGame, &texas.Texas{})
 }
 
@@ -43,6 +45,7 @@ func Run(player *database.Player) {
 		}
 		log.Infof("player %s state machine break up.\n", player)
 	}()
+
 	for {
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)

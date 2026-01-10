@@ -3,10 +3,11 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"github.com/ratel-online/core/util/rand"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ratel-online/core/util/rand"
 
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
@@ -26,7 +27,7 @@ func (g *RunFastGame) Next(player *database.Player) (consts.StateID, error) {
 	}
 	game := room.Game.(*database.Game)
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("Game starting!\n"))
+	buf.WriteString("Game starting!\n")
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
 	_ = player.WriteString(buf.String())
 	for {

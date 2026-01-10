@@ -52,9 +52,6 @@ var roomPropsSetter = map[string]func(r *Room, v string){
 		}
 		r.MaxPlayers = n
 	},
-	consts.RoomPropsShowIP: func(r *Room, v string) {
-		r.EnableShowIP = v == "on"
-	},
 }
 
 func init() {
@@ -91,7 +88,6 @@ func CreateRoom(creator int64, t int) *Room {
 		MaxPlayers:     consts.MaxPlayers,
 		EnableLandlord: true,
 		EnableChat:     true,
-		EnableShowIP:   false,
 	}
 	switch room.Type {
 	case consts.GameTypeLaiZi:
