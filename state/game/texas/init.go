@@ -86,6 +86,8 @@ func resetGame(room *database.Room) (database.RoomGame, error) {
 
 func nextPlayer(current *database.Player, game *database.Texas, state int) error {
 	next := game.NextPlayer(current.ID)
-	next.State <- state
+	if next != nil {
+		next.State <- state
+	}
 	return nil
 }
