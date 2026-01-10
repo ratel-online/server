@@ -1,6 +1,7 @@
 package texas
 
 import (
+	"time"
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
@@ -24,17 +25,30 @@ func (g *Texas) Next(player *database.Player) (consts.StateID, error) {
 		if room.State == consts.RoomStateWaiting {
 			return consts.StateWaiting, nil
 		}
-		switch <-game.Player(player.ID).State {
-		case stateBet:
-			err := bet(player, game)
-			if err != nil {
-				log.Error(err)
-				return 0, err
+		texasPlayer := game.Player(player.ID)
+		if texasPlayer == nil {
+			return 0, player.WriteError(consts.ErrorsExist)
+		}
+		select {
+		case state, ok := <-texasPlayer.State:
+			if !ok {
+				return 0, consts.ErrorsChanClosed
 			}
-		case stateWaiting:
-			return consts.StateWaiting, nil
-		default:
-			return 0, consts.ErrorsChanClosed
+			switch state {
+			case stateBet:
+				err := bet(player, game)
+				if err != nil {
+					log.Error(err)
+					return 0, err
+				}
+			case stateWaiting:
+				return consts.StateWaiting, nil
+			default:
+				return 0, consts.ErrorsChanClosed
+			}
+		case <-time.After(5 * time.Second):
+			// 防止通道阻塞导致的死锁
+			return 0, consts.ErrorsTimeout
 		}
 	}
 }

@@ -28,11 +28,18 @@ func (g *Texas) Clean() {
 }
 
 func (g *Texas) NextPlayer(id int64) *TexasPlayer {
+	if g == nil || len(g.Players) == 0 {
+		return nil
+	}
 	idx := -1
 	for i, a := range g.Players {
 		if a.ID == id {
 			idx = i
+			break
 		}
+	}
+	if idx == -1 {
+		return g.Players[0]
 	}
 	return g.Players[(idx+1)%len(g.Players)]
 }
