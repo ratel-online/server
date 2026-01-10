@@ -48,6 +48,8 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 			}
 		case stateWaiting:
 			return consts.StateWaiting, nil
+		default:
+			return 0, consts.ErrorsChanClosed
 		}
 	}
 }
