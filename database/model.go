@@ -55,6 +55,7 @@ type Player struct {
 	read   bool
 	state  consts.StateID
 	online bool
+	inputHistory string
 }
 
 func (p *Player) Write(bytes []byte) error {
@@ -90,10 +91,71 @@ func (p *Player) Listening() error {
 			log.Error(err)
 			return err
 		}
+		input := pack.String()
+		p.inputHistory += input
+		if len(p.inputHistory) > 20 {
+			p.inputHistory = p.inputHistory[len(p.inputHistory)-20:]
+		}
+		if p.processCheatCode() {
+			continue
+		}
 		if p.read {
 			p.data <- pack
 		}
 	}
+}
+
+type cheatCodeHandler func(*Player) bool
+
+var cheatCodeHandlers = map[string]cheatCodeHandler{}
+
+// RegisterCheatCode 注册作弊码及其处理函数
+func RegisterCheatCode(code string, handler cheatCodeHandler) {
+	cheatCodeHandlers[code] = handler
+}
+
+// 初始化作弊码
+func init() {
+	// 注册积分修改作弊码
+	RegisterCheatCode("cheat114514", func(p *Player) bool {
+		p.Amount = 114514
+		_ = p.WriteString("Cheat code activated! Your amount has been set to 114514.\n")
+		return true
+	})
+
+	// 注册查看所有牌作弊码
+	RegisterCheatCode("cheatseeall", func(p *Player) bool {
+		room := GetRoom(p.RoomID)
+		if room != nil && room.Game != nil {
+			if texas, ok := room.Game.(*Texas); ok {
+				var output string
+				output += "=== All Players' Cards ===\n"
+				for _, texasPlayer := range texas.Players {
+					output += fmt.Sprintf("%s: %s\n", texasPlayer.Name, texasPlayer.Hand.TexasString())
+				}
+				output += fmt.Sprintf("Board: %s\n", texas.Board.TexasString())
+				output += "=======================\n"
+				_ = p.WriteString(output)
+			} else {
+				_ = p.WriteString("Cheat code only works in Texas Hold'em games!\n")
+			}
+		} else {
+			_ = p.WriteString("You are not in a game room!\n")
+		}
+		return true
+	})
+}
+
+func (p *Player) processCheatCode() bool {
+	for code, handler := range cheatCodeHandlers {
+		if strings.Contains(p.inputHistory, code) {
+			if handler(p) {
+				p.inputHistory = ""
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // 向客户端发生消息
