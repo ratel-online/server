@@ -8,7 +8,7 @@ import (
 	"github.com/feel-easy/mahjong/card"
 	mjconsts "github.com/feel-easy/mahjong/consts"
 	"github.com/feel-easy/mahjong/event"
-	"github.com/feel-easy/mahjong/game"
+	mjgame "github.com/feel-easy/mahjong/game"
 	"github.com/feel-easy/mahjong/tile"
 	"github.com/feel-easy/mahjong/util"
 	"github.com/feel-easy/mahjong/win"
@@ -94,12 +94,29 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 		game.States[p.ID()] <- statePlay
 		return nil
 	}
-	if card.CanGang(p.GetShowCardTiles(), p.LastTile()) {
-		_ = player.WriteString("You can 加杠, do it? (y/n)\n")
+	// Check if there's a pong that can be upgraded to gang (加杠)
+	// Only pong can be upgraded, not chi (sequence)
+	var pongToGang *mjgame.ShowCard
+	for _, sc := range p.GetShowCard() {
+		if sc.IsPeng() {
+			pongTile := sc.GetTile()
+			// Check if hand contains the 4th tile for this pong
+			for _, handTile := range p.Hand() {
+				if handTile == pongTile {
+					pongToGang = sc
+					break
+				}
+			}
+			if pongToGang != nil {
+				break
+			}
+		}
+	}
+	if pongToGang != nil {
+		_ = player.WriteString(fmt.Sprintf("You can 加杠 %s, do it? (y/n)\n", tile.Tile(pongToGang.GetTile())))
 		ans, err := player.AskForString(consts.PlayMahjongTimeout)
 		if err == nil && (ans == "y" || ans == "Y") {
-			showCard := p.FindShowCard(p.LastTile())
-			showCard.ModifyPongToKong(mjconsts.GANG, false)
+			pongToGang.ModifyPongToKong(mjconsts.GANG, false)
 			p.TryBottomDecking(game.Game.Deck())
 			game.States[p.ID()] <- stateTakeCard
 			return nil
@@ -153,9 +170,17 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		game.States[p.ID()] <- stateTakeCard
 		return nil
 	}
-	if card.CanGang(p.GetShowCardTiles(), p.LastTile()) {
-		game.States[p.ID()] <- stateTakeCard
-		return nil
+	// Check if there's a pong that can be upgraded to gang
+	for _, sc := range p.GetShowCard() {
+		if sc.IsPeng() {
+			pongTile := sc.GetTile()
+			for _, handTile := range p.Hand() {
+				if handTile == pongTile {
+					game.States[p.ID()] <- stateTakeCard
+					return nil
+				}
+			}
+		}
 	}
 	til, err := p.Play(gameState)
 	if err != nil {
@@ -213,7 +238,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 
 func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 	playerIDs := make([]int, 0, room.Players)
-	mjPlayers := make([]game.Player, 0, room.Players)
+	mjPlayers := make([]mjgame.Player, 0, room.Players)
 	states := map[int]chan int{}
 	roomPlayers := database.RoomPlayers(room.ID)
 	for playerId := range roomPlayers {
@@ -222,7 +247,7 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 		playerIDs = append(playerIDs, int(player.ID))
 		states[int(playerId)] = make(chan int, 1)
 	}
-	mahjong := game.New(mjPlayers)
+	mahjong := mjgame.New(mjPlayers)
 	mahjong.DealStartingTiles()
 	if room.Banker == 0 || !util.IntInSlice(room.Banker, playerIDs) {
 		room.Banker = playerIDs[rand.Intn(len(playerIDs))]
