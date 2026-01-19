@@ -126,7 +126,7 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[MahjongPlayer.Take] Player %d loop count: %d", mp.ID, loopCount)
+			log.Infof("[MahjongPlayer.Take] Player %d loop count: %d\n", mp.ID, loopCount)
 		}
 		p = getPlayer(p.ID)
 		p.WriteString(askBuf.String())
@@ -177,7 +177,7 @@ func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[MahjongPlayer.Play] Player %d loop count: %d", mp.ID, loopCount)
+			log.Infof("[MahjongPlayer.Play] Player %d loop count: %d\n", mp.ID, loopCount)
 		}
 		p = GetPlayer(p.ID)
 		p.WriteString(askBuf.String())

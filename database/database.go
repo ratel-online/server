@@ -63,7 +63,7 @@ func init() {
 		for {
 			loopCount++
 			if loopCount%60 == 0 {
-				log.Infof("[database.init] Room cleanup loop count: %d (running for %d hours)", loopCount, loopCount/60)
+				log.Infof("[database.init] Room cleanup loop count: %d (running for %d hours)\n", loopCount, loopCount/60)
 			}
 			time.Sleep(1 * time.Minute)
 			rooms.Foreach(func(e *hashmap.Entry) {

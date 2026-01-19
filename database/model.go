@@ -88,7 +88,7 @@ func (p *Player) Listening() error {
 	for {
 		loopCount++
 		if loopCount%1000 == 0 {
-			log.Infof("[Player.Listening] Player %d loop count: %d, online: %v", p.ID, loopCount, p.online)
+			log.Infof("[Player.Listening] Player %d loop count: %d, online: %v\n", p.ID, loopCount, p.online)
 		}
 		pack, err := p.conn.Read()
 		if err != nil {

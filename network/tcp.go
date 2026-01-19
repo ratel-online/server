@@ -26,7 +26,7 @@ func (t Tcp) Serve() error {
 	for {
 		loopCount++
 		if loopCount%1000 == 0 {
-			log.Infof("[Tcp.Serve] Accept loop count: %d", loopCount)
+			log.Infof("[Tcp.Serve] Accept loop count: %d\n", loopCount)
 		}
 		conn, err := listener.Accept()
 		if err != nil {

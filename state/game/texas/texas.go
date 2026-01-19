@@ -1,10 +1,11 @@
 package texas
 
 import (
+	"time"
+
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
-	"time"
 )
 
 var (
@@ -25,10 +26,10 @@ func (g *Texas) Next(player *database.Player) (consts.StateID, error) {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[Texas.Next] Player %d (Room %d) loop count: %d, room.State: %d", player.ID, player.RoomID, loopCount, room.State)
+			log.Infof("[Texas.Next] Player %d (Room %d) loop count: %d, room.State: %d\n", player.ID, player.RoomID, loopCount, room.State)
 		}
 		if room.State == consts.RoomStateWaiting {
-			log.Infof("[Texas.Next] Player %d exiting, room state changed to waiting, loop count: %d", player.ID, loopCount)
+			log.Infof("[Texas.Next] Player %d exiting, room state changed to waiting, loop count: %d\n", player.ID, loopCount)
 			return consts.StateWaiting, nil
 		}
 		texasPlayer := game.Player(player.ID)

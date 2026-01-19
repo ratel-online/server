@@ -35,13 +35,13 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[Mahjong.Next] Player %d (Room %d) loop count: %d, room.State: %d", player.ID, player.RoomID, loopCount, room.State)
+			log.Infof("[Mahjong.Next] Player %d (Room %d) loop count: %d, room.State: %d\n", player.ID, player.RoomID, loopCount, room.State)
 		}
 		if room.State == int(consts.StateWaiting) {
-			log.Infof("[Mahjong.Next] Player %d exiting, room state changed to waiting, loop count: %d", player.ID, loopCount)
+			log.Infof("[Mahjong.Next] Player %d exiting, room state changed to waiting, loop count: %d\n", player.ID, loopCount)
 			return consts.StateWaiting, nil
 		}
-		log.Infof("[Mahjong.Next] Player %d waiting for state, loop count: %d", player.ID, loopCount)
+		log.Infof("[Mahjong.Next] Player %d waiting for state, loop count: %d\n", player.ID, loopCount)
 		state := <-game.States[int(player.ID)]
 		switch state {
 		case statePlay:
@@ -145,10 +145,10 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 		for {
 			loopCount++
 			if loopCount%100 == 0 {
-				log.Infof("[handleTake] Player %d (Room %d) finding originally player loop count: %d, current: %d, originally: %d", p.ID(), room.ID, loopCount, p.ID(), gameState.OriginallyPlayer.ID())
+				log.Infof("[handleTake] Player %d (Room %d) finding originally player loop count: %d, current: %d, originally: %d\n", p.ID(), room.ID, loopCount, p.ID(), gameState.OriginallyPlayer.ID())
 			}
 			if gameState.OriginallyPlayer.ID() == p.ID() {
-				log.Infof("[handleTake] Player %d found originally player, loop count: %d", p.ID(), loopCount)
+				log.Infof("[handleTake] Player %d found originally player, loop count: %d\n", p.ID(), loopCount)
 				p.TryTopDecking(game.Game.Deck())
 				game.States[p.ID()] <- statePlay
 				return nil
@@ -242,10 +242,10 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 		for {
 			loopCount++
 			if loopCount%100 == 0 {
-				log.Infof("[handlePlayMahjong] Player %d (Room %d) finding privilege player loop count: %d, current: %d, target: %d", pc.ID(), room.ID, loopCount, pc.ID(), pvID)
+				log.Infof("[handlePlayMahjong] Player %d (Room %d) finding privilege player loop count: %d, current: %d, target: %d\n", pc.ID(), room.ID, loopCount, pc.ID(), pvID)
 			}
 			if pc.ID() == pvID {
-				log.Infof("[handlePlayMahjong] Player %d found privilege player, loop count: %d", pc.ID(), loopCount)
+				log.Infof("[handlePlayMahjong] Player %d found privilege player, loop count: %d\n", pc.ID(), loopCount)
 				game.States[pc.ID()] <- stateTakeCard
 				return nil
 			}
@@ -276,10 +276,10 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[InitMahjongGame] Room %d finding banker loop count: %d, current: %d, target: %d", room.ID, loopCount, mahjong.Current().ID(), room.Banker)
+			log.Infof("[InitMahjongGame] Room %d finding banker loop count: %d, current: %d, target: %d\n", room.ID, loopCount, mahjong.Current().ID(), room.Banker)
 		}
 		if mahjong.Current().ID() == room.Banker {
-			log.Infof("[InitMahjongGame] Room %d found banker, loop count: %d", room.ID, loopCount)
+			log.Infof("[InitMahjongGame] Room %d found banker, loop count: %d\n", room.ID, loopCount)
 			break
 		}
 		mahjong.Next()

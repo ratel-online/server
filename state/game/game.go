@@ -3,11 +3,12 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"github.com/ratel-online/core/util/rand"
-	"github.com/ratel-online/server/rule"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ratel-online/core/util/rand"
+	"github.com/ratel-online/server/rule"
 
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
@@ -56,13 +57,13 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[Game.Next] Player %d (Room %d) loop count: %d, room.State: %d", player.ID, player.RoomID, loopCount, room.State)
+			log.Infof("[Game.Next] Player %d (Room %d) loop count: %d, room.State: %d\n", player.ID, player.RoomID, loopCount, room.State)
 		}
 		if room.State == consts.RoomStateWaiting {
-			log.Infof("[Game.Next] Player %d exiting, room state changed to waiting, loop count: %d", player.ID, loopCount)
+			log.Infof("[Game.Next] Player %d exiting, room state changed to waiting, loop count: %d\n", player.ID, loopCount)
 			return consts.StateWaiting, nil
 		}
-		log.Infof("[Game.Next] Player %d waiting for state, loop count: %d", player.ID, loopCount)
+		log.Infof("[Game.Next] Player %d waiting for state, loop count: %d\n", player.ID, loopCount)
 		state := <-game.States[player.ID]
 		switch state {
 		case stateRob:
@@ -154,7 +155,7 @@ func handleRob(player *database.Player, game *database.Game) error {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[handleRob] Player %d (Room %d) loop count: %d, timeout: %v, FirstRob: %d, LastRob: %d", player.ID, player.RoomID, loopCount, timeout, game.FirstRob, game.LastRob)
+			log.Infof("[handleRob] Player %d (Room %d) loop count: %d, timeout: %v, FirstRob: %d, LastRob: %d\n", player.ID, player.RoomID, loopCount, timeout, game.FirstRob, game.LastRob)
 		}
 		before := time.Now().Unix()
 		_ = player.WriteString("Are you want to become landlord? (y or n)\n")
@@ -196,7 +197,7 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[playing] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, timeout: %v", player.ID, player.RoomID, loopCount, master, playTimes, timeout)
+			log.Infof("[playing] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, timeout: %v\n", player.ID, player.RoomID, loopCount, master, playTimes, timeout)
 		}
 		buf := bytes.Buffer{}
 		buf.WriteString("\n")

@@ -109,7 +109,7 @@ func (up *UnoPlayer) PickColor(gameState game.State) color.Color {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[UnoPlayer.PickColor] Player %d loop count: %d", up.ID, loopCount)
+			log.Infof("[UnoPlayer.PickColor] Player %d loop count: %d\n", up.ID, loopCount)
 		}
 		p = getPlayer(p.ID)
 		p.WriteString(fmt.Sprintf(
@@ -158,7 +158,7 @@ func (up *UnoPlayer) Play(playableCards []card.Card, gameState game.State) (card
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[UnoPlayer.Play] Player %d loop count: %d", up.ID, loopCount)
+			log.Infof("[UnoPlayer.Play] Player %d loop count: %d\n", up.ID, loopCount)
 		}
 		p = getPlayer(p.ID)
 		p.WriteString(cardSelectionMessage)

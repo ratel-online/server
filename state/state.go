@@ -47,7 +47,7 @@ func Run(player *database.Player) {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[State.Run] Player %d loop count: %d, current state: %d", player.ID, loopCount, player.GetState())
+			log.Infof("[State.Run] Player %d loop count: %d, current state: %d\n", player.ID, loopCount, player.GetState())
 		}
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)

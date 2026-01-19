@@ -29,7 +29,7 @@ func bet(player *database.Player, game *database.Texas) error {
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[bet] Player %d (Room %d) loop count: %d, timeout: %v", player.ID, player.RoomID, loopCount, timeout)
+			log.Infof("[bet] Player %d (Room %d) loop count: %d, timeout: %v\n", player.ID, player.RoomID, loopCount, timeout)
 		}
 		before := time.Now().Unix()
 
