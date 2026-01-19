@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/rule"
@@ -83,7 +84,12 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 	//对局类别
 	player.StartTransaction()
 	defer player.StopTransaction()
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[waitingForStart] Player %d (Room %d) loop count: %d, room.State: %d, access: %v", player.ID, player.RoomID, loopCount, room.State, access)
+		}
 		signal, err := player.AskForStringWithoutTransaction(time.Second)
 		if err != nil && err != consts.ErrorsTimeout {
 			return access, err

@@ -9,6 +9,7 @@ import (
 	"github.com/feel-easy/uno/card/color"
 	"github.com/feel-easy/uno/event"
 	"github.com/feel-easy/uno/game"
+	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 )
 
@@ -104,7 +105,12 @@ func (up *UnoPlayer) OnPlayerPassed(payload event.PlayerPassedPayload) {
 
 func (up *UnoPlayer) PickColor(gameState game.State) color.Color {
 	p := getPlayer(int64(up.ID))
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[UnoPlayer.PickColor] Player %d loop count: %d", up.ID, loopCount)
+		}
 		p = getPlayer(p.ID)
 		p.WriteString(fmt.Sprintf(
 			"Select a color: %s, %s, %s or %s ? \n",
@@ -148,7 +154,12 @@ func (up *UnoPlayer) Play(playableCards []card.Card, gameState game.State) (card
 		cardSelectionLines = append(cardSelectionLines, fmt.Sprintf("%s %s", label, card))
 	}
 	cardSelectionMessage := strings.Join(cardSelectionLines, " \n ") + " \n "
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[UnoPlayer.Play] Player %d loop count: %d", up.ID, loopCount)
+		}
 		p = getPlayer(p.ID)
 		p.WriteString(cardSelectionMessage)
 		selectedLabel, err := p.AskForString(consts.PlayTimeout)

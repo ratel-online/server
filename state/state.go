@@ -43,7 +43,12 @@ func Run(player *database.Player) {
 		}
 		log.Infof("player %s state machine break up.\n", player)
 	}()
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[State.Run] Player %d loop count: %d, current state: %d", player.ID, loopCount, player.GetState())
+		}
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)
 		if err != nil {

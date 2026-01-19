@@ -59,7 +59,12 @@ var roomPropsSetter = map[string]func(r *Room, v string){
 
 func init() {
 	async.Async(func() {
+		loopCount := 0
 		for {
+			loopCount++
+			if loopCount%60 == 0 {
+				log.Infof("[database.init] Room cleanup loop count: %d (running for %d hours)", loopCount, loopCount/60)
+			}
 			time.Sleep(1 * time.Minute)
 			rooms.Foreach(func(e *hashmap.Entry) {
 				roomCancel(e.Value().(*Room))

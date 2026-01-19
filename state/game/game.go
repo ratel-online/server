@@ -52,10 +52,17 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 	}
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
 	_ = player.WriteString(buf.String())
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[Game.Next] Player %d (Room %d) loop count: %d, room.State: %d", player.ID, player.RoomID, loopCount, room.State)
+		}
 		if room.State == consts.RoomStateWaiting {
+			log.Infof("[Game.Next] Player %d exiting, room state changed to waiting, loop count: %d", player.ID, loopCount)
 			return consts.StateWaiting, nil
 		}
+		log.Infof("[Game.Next] Player %d waiting for state, loop count: %d", player.ID, loopCount)
 		state := <-game.States[player.ID]
 		switch state {
 		case stateRob:
@@ -143,7 +150,12 @@ func handleRob(player *database.Player, game *database.Game) error {
 	}
 
 	timeout := consts.RobTimeout
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[handleRob] Player %d (Room %d) loop count: %d, timeout: %v, FirstRob: %d, LastRob: %d", player.ID, player.RoomID, loopCount, timeout, game.FirstRob, game.LastRob)
+		}
 		before := time.Now().Unix()
 		_ = player.WriteString("Are you want to become landlord? (y or n)\n")
 		ans, err := player.AskForString(timeout)
@@ -180,7 +192,12 @@ func handleRob(player *database.Player, game *database.Game) error {
 
 func playing(player *database.Player, game *database.Game, master bool, playTimes int) error {
 	timeout := game.PlayTimeOut[player.ID]
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[playing] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, timeout: %v", player.ID, player.RoomID, loopCount, master, playTimes, timeout)
+		}
 		buf := bytes.Buffer{}
 		buf.WriteString("\n")
 		if !master && len(game.LastPokers) > 0 {

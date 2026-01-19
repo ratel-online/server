@@ -3,11 +3,13 @@ package texas
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/spf13/cast"
-	"strings"
-	"time"
 )
 
 func bet(player *database.Player, game *database.Texas) error {
@@ -23,7 +25,12 @@ func bet(player *database.Player, game *database.Texas) error {
 	database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn to bet\n", player.Name), player.ID)
 
 	timeout := consts.BetTimeout
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[bet] Player %d (Room %d) loop count: %d, timeout: %v", player.ID, player.RoomID, loopCount, timeout)
+		}
 		before := time.Now().Unix()
 
 		buf := bytes.Buffer{}

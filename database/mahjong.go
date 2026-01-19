@@ -12,6 +12,7 @@ import (
 	"github.com/feel-easy/mahjong/event"
 	"github.com/feel-easy/mahjong/game"
 	"github.com/feel-easy/mahjong/tile"
+	"github.com/ratel-online/core/log"
 	rconsts "github.com/ratel-online/server/consts"
 )
 
@@ -121,7 +122,12 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 		operation: 0,
 		tiles:     []int{},
 	}
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[MahjongPlayer.Take] Player %d loop count: %d", mp.ID, loopCount)
+		}
 		p = getPlayer(p.ID)
 		p.WriteString(askBuf.String())
 		selectedLabel, err := p.AskForString(consts.PlayMahjongTimeout)
@@ -167,7 +173,12 @@ func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 		}
 	}
 	askBuf.WriteString("\n")
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[MahjongPlayer.Play] Player %d loop count: %d", mp.ID, loopCount)
+		}
 		p = GetPlayer(p.ID)
 		p.WriteString(askBuf.String())
 		selectedLabel, err := p.AskForString(rconsts.PlayMahjongTimeout)

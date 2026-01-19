@@ -3,10 +3,11 @@ package game
 import (
 	"bytes"
 	"fmt"
-	"github.com/ratel-online/core/util/rand"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ratel-online/core/util/rand"
 
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
@@ -29,10 +30,17 @@ func (g *RunFastGame) Next(player *database.Player) (consts.StateID, error) {
 	buf.WriteString(fmt.Sprintf("Game starting!\n"))
 	buf.WriteString(fmt.Sprintf("Your pokers: %s\n", game.Pokers[player.ID].String()))
 	_ = player.WriteString(buf.String())
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[RunFastGame.Next] Player %d (Room %d) loop count: %d, room.State: %d", player.ID, player.RoomID, loopCount, room.State)
+		}
 		if room.State == consts.RoomStateWaiting {
+			log.Infof("[RunFastGame.Next] Player %d exiting, room state changed to waiting, loop count: %d", player.ID, loopCount)
 			return consts.StateWaiting, nil
 		}
+		log.Infof("[RunFastGame.Next] Player %d waiting for state, loop count: %d", player.ID, loopCount)
 		state := <-game.States[player.ID]
 		switch state {
 		case stateRob:
@@ -65,7 +73,12 @@ func (g *RunFastGame) Exit(player *database.Player) consts.StateID {
 
 func runFastPlaying(player *database.Player, game *database.Game, master bool, playTimes int) error {
 	timeout := game.PlayTimeOut[player.ID]
+	loopCount := 0
 	for {
+		loopCount++
+		if loopCount%100 == 0 {
+			log.Infof("[runFastPlaying] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, timeout: %v", player.ID, player.RoomID, loopCount, master, playTimes, timeout)
+		}
 		buf := bytes.Buffer{}
 		buf.WriteString("\n")
 		if !master && len(game.LastPokers) > 0 {
@@ -109,6 +122,7 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 
 		ans = strings.ToLower(ans)
 		if ans == "" {
+			log.Infof("[runFastPlaying] Player %d empty input, loop count: %d", player.ID, loopCount)
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 			continue
 		} else if ans == "ls" || ans == "v" {
