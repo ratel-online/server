@@ -96,11 +96,17 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 		}
 		return nil
 	}
+	// Check if there's a dark gang (暗杠)
 	if t, ok := card.HaveGang(p.Hand()); ok {
-		p.DarkGang(t)
-		p.TryBottomDecking(game.Game.Deck())
-		game.States[p.ID()] <- statePlay
-		return nil
+		_ = player.WriteString(fmt.Sprintf("You can 暗杠 %s, do it? (y/n)\n", tile.Tile(t)))
+		ans, err := player.AskForString(consts.PlayMahjongTimeout)
+		if err == nil && (ans == "y" || ans == "Y") {
+			p.DarkGang(t)
+			p.TryBottomDecking(game.Game.Deck())
+			game.States[p.ID()] <- statePlay
+			return nil
+		}
+		// choose not to dark gang, continue normal flow
 	}
 	// Check if there's a pong that can be upgraded to gang (加杠)
 	// Only pong can be upgraded, not chi (sequence)
