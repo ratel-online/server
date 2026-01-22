@@ -137,7 +137,8 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 				p.WriteString("Don't quit a good game！\n")
 				selectedLabel = "E"
 			case rconsts.ErrorsTimeout:
-				selectedLabel = "1"
+				// Default to "no" action (skip peng/chi/gang) on timeout
+				selectedLabel = label
 			default:
 				return 0, nil, err
 			}
@@ -188,7 +189,8 @@ func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 				p.WriteString("Don't quit a good game！\n")
 				selectedLabel = "E"
 			case rconsts.ErrorsTimeout:
-				selectedLabel = "1"
+				// Default to the last tile (least likely to be useful) on timeout
+				selectedLabel = strconv.Itoa(len(tiles))
 			default:
 				return 0, err
 			}
