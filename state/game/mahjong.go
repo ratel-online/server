@@ -114,14 +114,16 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 	for _, sc := range p.GetShowCard() {
 		if sc.IsPeng() {
 			pongTile := sc.GetTile()
-			// Check if hand contains the 4th tile for this pong
+			// Count how many of this tile are in hand
+			count := 0
 			for _, handTile := range p.Hand() {
 				if handTile == pongTile {
-					pongToGang = sc
-					break
+					count++
 				}
 			}
-			if pongToGang != nil {
+			// If exactly 1 tile in hand, we can add kong
+			if count == 1 {
+				pongToGang = sc
 				break
 			}
 		}
@@ -139,19 +141,60 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 	}
 	gameState := game.Game.ExtractState(p)
 	if len(gameState.SpecialPrivileges) > 0 {
-		_, ok, err := p.Take(gameState, game.Game.Deck(), game.Game.Pile())
+		op, ok, err := p.Take(gameState, game.Game.Deck(), game.Game.Pile())
 		if err != nil {
 			return err
 		}
 		if ok {
-			game.States[p.ID()] <- statePlay
-			return nil
+			// Player successfully performed chi/peng/gang
+			// Now find who should play next
+			// Only the originally triggered player (who drew the winning tile) gets priority
+
+			// For CHI: next player plays immediately (after discarding from draw)
+			// For PENG/GANG: if not the originally player, skip to next
+			//                if is the originally player, they get turn to play
+
+			loopCount := 0
+			maxIterations := len(game.PlayerIDs) + 1
+			for {
+				loopCount++
+				if loopCount%100 == 0 {
+					log.Infof("[handleTake] Player %d (Room %d) finding play turn loop count: %d, current: %d, originally: %d, op: %d\n", p.ID(), room.ID, loopCount, p.ID(), gameState.OriginallyPlayer.ID(), op)
+				}
+				if loopCount > maxIterations {
+					log.Errorf("[handleTake] Player %d exceeded max iterations, defaulting to originally player\n", p.ID())
+					game.States[gameState.OriginallyPlayer.ID()] <- statePlay
+					return nil
+				}
+
+				// CHI: current player always plays after chi
+				if op == mjconsts.CHI {
+					game.States[p.ID()] <- statePlay
+					return nil
+				}
+
+				// PENG/GANG: only originally player plays
+				if p.ID() == gameState.OriginallyPlayer.ID() {
+					game.States[p.ID()] <- statePlay
+					return nil
+				}
+
+				p = game.Game.Next()
+			}
 		}
+		// Player chose not to operate, continue to next player
 		loopCount := 0
+		maxIterations := len(game.PlayerIDs) + 1
 		for {
 			loopCount++
 			if loopCount%100 == 0 {
-				log.Infof("[handleTake] Player %d (Room %d) finding originally player loop count: %d, current: %d, originally: %d\n", p.ID(), room.ID, loopCount, p.ID(), gameState.OriginallyPlayer.ID())
+				log.Infof("[handleTake] Player %d (Room %d) finding next taker loop count: %d, current: %d, originally: %d\n", p.ID(), room.ID, loopCount, p.ID(), gameState.OriginallyPlayer.ID())
+			}
+			if loopCount > maxIterations {
+				log.Errorf("[handleTake] Player %d exceeded max iterations looking for next player\n", p.ID())
+				// Fallback: give turn to originally player
+				game.States[gameState.OriginallyPlayer.ID()] <- stateTakeCard
+				return nil
 			}
 			if gameState.OriginallyPlayer.ID() == p.ID() {
 				log.Infof("[handleTake] Player %d found originally player, loop count: %d\n", p.ID(), loopCount)
@@ -194,11 +237,17 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 	for _, sc := range p.GetShowCard() {
 		if sc.IsPeng() {
 			pongTile := sc.GetTile()
+			// Count how many of this tile are in hand
+			count := 0
 			for _, handTile := range p.Hand() {
 				if handTile == pongTile {
-					game.States[p.ID()] <- stateTakeCard
-					return nil
+					count++
 				}
+			}
+			// If exactly 1 tile in hand, we can add kong
+			if count == 1 {
+				game.States[p.ID()] <- stateTakeCard
+				return nil
 			}
 		}
 	}
@@ -245,10 +294,17 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 			}
 		}
 		loopCount := 0
+		maxIterations := len(game.PlayerIDs) + 1
 		for {
 			loopCount++
 			if loopCount%100 == 0 {
 				log.Infof("[handlePlayMahjong] Player %d (Room %d) finding privilege player loop count: %d, current: %d, target: %d\n", pc.ID(), room.ID, loopCount, pc.ID(), pvID)
+			}
+			if loopCount > maxIterations {
+				log.Errorf("[handlePlayMahjong] Player %d exceeded max iterations looking for privilege player with ID %d\n", pc.ID(), pvID)
+				// Fallback: give turn to the privilege player directly
+				game.States[pvID] <- stateTakeCard
+				return nil
 			}
 			if pc.ID() == pvID {
 				log.Infof("[handlePlayMahjong] Player %d found privilege player, loop count: %d\n", pc.ID(), loopCount)
@@ -279,10 +335,17 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 		room.Banker = playerIDs[rand.Intn(len(playerIDs))]
 	}
 	loopCount := 0
+	maxIterations := len(playerIDs) + 1
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
 			log.Infof("[InitMahjongGame] Room %d finding banker loop count: %d, current: %d, target: %d\n", room.ID, loopCount, mahjong.Current().ID(), room.Banker)
+		}
+		if loopCount > maxIterations {
+			log.Errorf("[InitMahjongGame] Room %d exceeded max iterations looking for banker %d\n", room.ID, room.Banker)
+			// Banker not found, use current player as banker
+			room.Banker = mahjong.Current().ID()
+			break
 		}
 		if mahjong.Current().ID() == room.Banker {
 			log.Infof("[InitMahjongGame] Room %d found banker, loop count: %d\n", room.ID, loopCount)
