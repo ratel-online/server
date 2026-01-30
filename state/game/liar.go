@@ -196,6 +196,9 @@ func (g *Liar) handleChallenge(challenger *database.Player, game *database.Liar)
 		}
 	}
 
+	// 轮盘赌结束，重新抽取指示牌并对存活玩家重新发牌
+	g.resetRound(game)
+
 	// 由输家（如果还活着）或者输家的下一位存活者开始下一轮
 	nextID := loser.ID
 	if !game.Alive[nextID] {
@@ -214,6 +217,29 @@ func (g *Liar) pullTrigger(player *database.Player, game *database.Liar) bool {
 	}
 	database.Broadcast(game.Room.ID, fmt.Sprintf("咔哒。是空枪。%s 活了下来，长舒了一口气。\n", player.Name))
 	return false
+}
+
+func (g *Liar) resetRound(game *database.Liar) {
+	deck := initLiarDeck()
+	// 重新抽取指示牌
+	if len(deck) > 0 {
+		game.Target = &deck[0]
+		deck = deck[1:]
+	}
+
+	// 重新给存活玩家发放手牌
+	game.Hands = make(map[int64]model.Pokers)
+	aliveIdx := 0
+	for _, id := range game.PlayerIDs {
+		if game.Alive[id] {
+			// 确保每个人能分到5张牌（目前20张牌，3个玩家绰绰有余）
+			if len(deck) >= (aliveIdx+1)*5 {
+				game.Hands[id] = deck[aliveIdx*5 : (aliveIdx+1)*5]
+				aliveIdx++
+			}
+		}
+	}
+	database.Broadcast(game.Room.ID, "新的一轮开始了！指示牌已更新，存活玩家手牌已重新发放。\n")
 }
 
 func (g *Liar) handleGameEnd(player *database.Player, game *database.Liar) (consts.StateID, error) {
