@@ -103,6 +103,11 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 			}
 		}
 
+		if len(keys) > 3 {
+			_ = player.WriteString("一次最多只能出三张牌!\n")
+			continue
+		}
+
 		// 检查手牌是否足够
 		playedPokers := make(model.Pokers, 0)
 		tempHand := make(model.Pokers, len(game.Hands[player.ID]))
