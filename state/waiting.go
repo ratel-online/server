@@ -40,6 +40,8 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 			return consts.StateMahjongGame, nil
 		case consts.GameTypeTexas:
 			return consts.StateTexasGame, nil
+		case consts.GameTypeLiar:
+			return consts.StateLiarGame, nil
 		}
 	}
 	return s.Exit(player), nil

@@ -20,6 +20,7 @@ const (
 	StateUnoGame
 	StateMahjongGame
 	StateTexasGame
+	StateLiarGame
 )
 
 type SkillID int
@@ -56,6 +57,7 @@ const (
 	GameTypeTexas   = 5
 	GameTypeMahjong = 6
 	GameTypeUno     = 7
+	GameTypeLiar    = 8
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
@@ -123,6 +125,7 @@ var (
 		GameTypeTexas:   "德州扑克",
 		//GameTypeUno:     "Uno",
 		//GameTypeMahjong: "Mahjong",
+		GameTypeLiar:    "liar's bar",
 
 	}
 	GameTypesIds = []int{
@@ -132,6 +135,7 @@ var (
 		GameTypeRunFast,
 		GameTypeTexas,
 		//GameTypeMahjong,
+		GameTypeLiar,
 	}
 	RoomStates = map[int]string{
 		RoomStateWaiting: "Waiting",
