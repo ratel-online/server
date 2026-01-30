@@ -1,6 +1,6 @@
 module github.com/ratel-online/server
 
-go 1.17
+go 1.22
 
 require (
 	github.com/awesome-cap/hashmap v0.0.0-20211211100532-e3300ac4ae14
