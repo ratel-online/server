@@ -163,7 +163,7 @@ func (g *Liar) handleChallenge(challenger *database.Player, game *database.Liar)
 
 	isLying := false
 	for _, p := range game.LastPokers {
-		if p.Key != game.Target.Key {
+		if p.Key != game.Target.Key && p.Key != 14 && p.Key != 15 {
 			isLying = true
 			break
 		}
