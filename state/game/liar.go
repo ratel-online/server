@@ -82,11 +82,11 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 
 	for {
 		ans, err := player.AskForString(consts.PlayTimeout)
-		if err != nil {
-			// 超时自动出第一张牌
+		if err != nil || ans == "" {
+			// 超时或无输入自动出第一张牌
 			ans = poker.GetAlias(game.Hands[player.ID][0].Key)
 		}
-		ans = strings.ToLower(ans)
+		ans = strings.TrimSpace(strings.ToLower(ans))
 
 		// 处理质疑逻辑
 		if (ans == "c" || ans == "质疑") && hasLastMove {
@@ -103,36 +103,34 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 			}
 		}
 
-		if len(keys) == 0 {
-			_ = player.WriteError(consts.ErrorsInputInvalid)
-			continue
-		}
-
 		// 检查手牌是否足够
+		playedPokers := make(model.Pokers, 0)
 		tempHand := make(model.Pokers, len(game.Hands[player.ID]))
 		copy(tempHand, game.Hands[player.ID])
-		playedPokers := make(model.Pokers, 0)
-		valid := true
+		valid := len(keys) > 0
 
-		for _, key := range keys {
-			foundIdx := -1
-			for i, p := range tempHand {
-				if p.Key == key {
-					foundIdx = i
+		if valid {
+			for _, key := range keys {
+				foundIdx := -1
+				for i, p := range tempHand {
+					if p.Key == key {
+						foundIdx = i
+						break
+					}
+				}
+				if foundIdx != -1 {
+					playedPokers = append(playedPokers, tempHand[foundIdx])
+					tempHand = append(tempHand[:foundIdx], tempHand[foundIdx+1:]...)
+				} else {
+					valid = false
 					break
 				}
-			}
-			if foundIdx != -1 {
-				playedPokers = append(playedPokers, tempHand[foundIdx])
-				tempHand = append(tempHand[:foundIdx], tempHand[foundIdx+1:]...)
-			} else {
-				valid = false
-				break
 			}
 		}
 
 		if !valid {
-			_ = player.WriteString("你没有这些牌!\n")
+			// 如果不是有效的质疑或出牌操作，则视为聊天
+			database.BroadcastChat(player, fmt.Sprintf("%s 说: %s\n", player.Name, ans))
 			continue
 		}
 
