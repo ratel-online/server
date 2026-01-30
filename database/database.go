@@ -113,6 +113,8 @@ func CreateRoom(creator int64, t int) *Room {
 		room.EnableDontShuffle = true
 	case consts.GameTypeTexas:
 		room.MaxPlayers = 10
+	case consts.GameTypeLiar:
+		room.MaxPlayers = 4
 	}
 	roomPlayers.Set(room.ID, map[int64]bool{})
 	roomSpectators.Set(room.ID, map[int64]int{})

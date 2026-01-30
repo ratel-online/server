@@ -3,10 +3,11 @@ package state
 import (
 	"bytes"
 	"fmt"
-	"github.com/ratel-online/server/state/game/texas"
-	"github.com/spf13/cast"
 	"strings"
 	"time"
+
+	"github.com/ratel-online/server/state/game/texas"
+	"github.com/spf13/cast"
 
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
@@ -40,6 +41,8 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 			return consts.StateMahjongGame, nil
 		case consts.GameTypeTexas:
 			return consts.StateTexasGame, nil
+		case consts.GameTypeLiar:
+			return consts.StateLiarGame, nil
 		}
 	}
 	return s.Exit(player), nil
@@ -182,6 +185,8 @@ func startGame(player *database.Player, room *database.Room) (err error) {
 		room.Game, err = game.InitMahjongGame(room)
 	case consts.GameTypeTexas:
 		room.Game, err = texas.Init(room)
+	case consts.GameTypeLiar:
+		room.Game, err = game.InitLiarGame(room)
 	}
 	if err != nil {
 		_ = player.WriteError(err)
