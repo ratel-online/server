@@ -258,7 +258,7 @@ func (g *Liar) resetRound(game *database.Liar) {
 	aliveIdx := 0
 	for _, id := range game.PlayerIDs {
 		if game.Alive[id] {
-			// 确保每个人能分到5张牌（目前20张牌，3个玩家绰绰有余）
+			// 确保每个人能分到5张牌
 			if len(deck) >= (aliveIdx+1)*5 {
 				game.Hands[id] = deck[aliveIdx*5 : (aliveIdx+1)*5]
 				aliveIdx++
@@ -370,7 +370,7 @@ func InitLiarGame(room *database.Room) (*database.Liar, error) {
 	if len(deck) > 0 {
 		// 随机抽一张作为指示牌，通常不抽大小王作为基础指示牌，但用户没说，我们就直接从牌堆抽第一张
 		target = &deck[0]
-		//deck = deck[1:]
+		deck = deck[1:]
 	}
 
 	for i, id := range playerIDs {
@@ -399,10 +399,10 @@ func InitLiarGame(room *database.Room) (*database.Liar, error) {
 	}, nil
 }
 
-// 初始化牌堆：六张K，六张Q，六张A，一张大王(S)，一张小王(X)
+// 初始化牌堆：八张K，八张Q，八张A，一张大王(S)，一张小王(X)
 func initLiarDeck() model.Pokers {
 	keys := make([]int, 0)
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 8; i++ {
 		keys = append(keys, 1, 12, 13)
 	}
 	keys = append(keys, 14, 15)
