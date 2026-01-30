@@ -72,12 +72,27 @@ func (g *Liar) Next(player *database.Player) (consts.StateID, error) {
 }
 
 func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
+	// 如果玩家手牌为空，则跳过出牌
+	if len(game.Hands[player.ID]) == 0 {
+		nextID := g.getNextPlayer(game, player.ID)
+		game.States[nextID] <- liarStatePlay
+		return nil
+	}
+
+	// 如果只剩一人还有手牌，则此人自动质疑上家出牌
+	hasLastMove := game.LastPlayerID != 0 && game.LastPlayerID != player.ID
+	if g.getPlayersWithCardsCount(game) == 1 && hasLastMove {
+		_ = player.WriteString("\n[系统提示] 你是场上唯一拥有手牌的玩家，系统自动为你执行 [质疑] 操作！\n")
+		g.handleChallenge(player, game)
+		return nil
+	}
+
 	buf := bytes.Buffer{}
 	if game.Target != nil {
 		buf.WriteString(fmt.Sprintf("\n当前指示牌: %s\n", poker.GetDesc(game.Target.Key)))
 	}
 
-	hasLastMove := game.LastPlayerID != 0 && game.LastPlayerID != player.ID
+	//hasLastMove := game.LastPlayerID != 0 && game.LastPlayerID != player.ID
 	if hasLastMove {
 		lastPlayer := database.GetPlayer(game.LastPlayerID)
 		buf.WriteString(fmt.Sprintf("上家 %s 出了 %d 张牌。你可以选择 [质疑(c)] 或 [继续出牌(请输入牌面)]\n", lastPlayer.Name, len(game.LastPokers)))
@@ -170,7 +185,7 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 		}
 
 		// 游戏结束判定
-		if len(game.Hands[player.ID]) == 0 || g.getAliveCount(game) == 1 {
+		if g.getAliveCount(game) == 1 {
 			for _, id := range game.PlayerIDs {
 				game.States[id] <- liarStateGameEnd
 			}
@@ -293,6 +308,16 @@ func (g *Liar) getAliveCount(game *database.Liar) int {
 	count := 0
 	for _, id := range game.PlayerIDs {
 		if game.Alive[id] {
+			count++
+		}
+	}
+	return count
+}
+
+func (g *Liar) getPlayersWithCardsCount(game *database.Liar) int {
+	count := 0
+	for _, id := range game.PlayerIDs {
+		if game.Alive[id] && len(game.Hands[id]) > 0 {
 			count++
 		}
 	}
