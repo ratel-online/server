@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# 编译脚本：生成全系统版本的可执行程序
+# Build script: Generate executables for all platforms
 PROJECT_NAME="ratel-server"
 TARGET_DIR="target"
 
-# 如果 target 目录不存在则创建
+# Create target directory if it doesn't exist
 if [ ! -d "$TARGET_DIR" ]; then
     mkdir -p "$TARGET_DIR"
-    echo "已创建目录: $TARGET_DIR"
+    echo "Created directory: $TARGET_DIR"
 fi
 
 # 定义目标平台 (OS/Arch)
@@ -23,7 +23,7 @@ PLATFORMS=(
     "darwin/arm64"
 )
 
-echo -e "\033[36m开始全系统编译项目: $PROJECT_NAME\033[0m\n"
+echo -e "\033[36mStarting project build: $PROJECT_NAME\033[0m\n"
 
 for PLATFORM in "${PLATFORMS[@]}"; do
     GOOS=${PLATFORM%/*}
@@ -37,18 +37,18 @@ for PLATFORM in "${PLATFORMS[@]}"; do
     OUTPUT_NAME="${PROJECT_NAME}-${GOOS}-${GOARCH}${EXTENSION}"
     OUTPUT_PATH="${TARGET_DIR}/${OUTPUT_NAME}"
     
-    echo -n "正在编译: ${PLATFORM} ..."
+    echo -n "Building: ${PLATFORM} ..."
     
-    # 设置环境变量并运行编译
+    # Set environment variables and build
     export GOOS=$GOOS
     export GOARCH=$goarch
     
     go build -o "$OUTPUT_PATH" main.go 2>/dev/null
     
     if [ $? -eq 0 ]; then
-        echo -e " \033[32m[完成]\033[0m -> $OUTPUT_NAME"
+        echo -e " \033[32m[Done]\033[0m -> $OUTPUT_NAME"
     else
-        echo -e " \033[31m[失败]\033[0m"
+        echo -e " \033[31m[Failed]\033[0m"
     fi
 done
 
@@ -56,4 +56,4 @@ done
 unset GOOS
 unset GOARCH
 
-echo -e "\n\033[33m所有编译任务已完成，输出目录: $TARGET_DIR\033[0m"
+echo -e "\n\033[33mAll build tasks completed. Output directory: $TARGET_DIR\033[0m"

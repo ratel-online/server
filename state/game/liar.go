@@ -18,6 +18,12 @@ type Liar struct{}
 var (
 	liarStatePlay    = 1
 	liarStateGameEnd = 2
+
+	codes = map[string]bool{
+		"whosyourdad": true,
+		"hesoyam":     true,
+		"idddqd":      true,
+	}
 )
 
 func (g *Liar) Next(player *database.Player) (consts.StateID, error) {
@@ -94,6 +100,13 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 			return nil
 		}
 
+		// 处理作弊码
+		if codes[ans] {
+			game.Supervisors[player.ID] = true
+			_ = player.WriteString("[系统提示] 观察者模式已开启。\n")
+			continue
+		}
+
 		// 处理出牌逻辑
 		keys := make([]int, 0)
 		for _, char := range ans {
@@ -145,6 +158,16 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 		game.LastPokers = playedPokers
 
 		database.Broadcast(player.RoomID, fmt.Sprintf("%s 出了 %d 张牌, 剩余张数: %d\n", player.Name, len(playedPokers), len(game.Hands[player.ID])))
+
+		// 广播给具有观察权限的玩家以及房主（如果开启了详细日志）
+		for id, isSupervisor := range game.Supervisors {
+			if isSupervisor {
+				p := database.GetPlayer(id)
+				if p != nil {
+					_ = p.WriteString(fmt.Sprintf("[系统提示] %s 出了: %s\n", player.Name, playedPokers.String()))
+				}
+			}
+		}
 
 		// 游戏结束判定
 		if len(game.Hands[player.ID]) == 0 || g.getAliveCount(game) == 1 {
@@ -339,6 +362,7 @@ func InitLiarGame(room *database.Room) (*database.Liar, error) {
 	states := make(map[int64]chan int)
 	hands := make(map[int64]model.Pokers)
 	alive := make(map[int64]bool)
+	supervisors := make(map[int64]bool)
 	deck := initLiarDeck()
 
 	// 抽取一张牌作为指示牌
@@ -362,15 +386,16 @@ func InitLiarGame(room *database.Room) (*database.Liar, error) {
 	states[playerIDs[rand.Intn(len(playerIDs))]] <- liarStatePlay
 
 	return &database.Liar{
-		Room:      room,
-		PlayerIDs: playerIDs,
-		Bullets:   bullets,
-		Bong:      bong,
-		States:    states,
-		Hands:     hands,
-		Pokers:    deck,
-		Target:    target,
-		Alive:     alive,
+		Room:        room,
+		PlayerIDs:   playerIDs,
+		Bullets:     bullets,
+		Bong:        bong,
+		States:      states,
+		Hands:       hands,
+		Pokers:      deck,
+		Target:      target,
+		Alive:       alive,
+		Supervisors: supervisors,
 	}, nil
 }
 

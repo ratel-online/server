@@ -1,15 +1,15 @@
 # ==============================
-# Go 全平台交叉编译脚本（Windows）
+# Go Multi-platform Build Script
 # ==============================
 
 $projectName = "ratel-server"
 $mainFile    = "main.go"
 $targetDir   = "target"
 
-# 创建输出目录
+# Create output directory
 if (!(Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir | Out-Null
-    Write-Host "已创建目录: $targetDir" -ForegroundColor DarkGray
+    Write-Host "Created directory: $targetDir" -ForegroundColor DarkGray
 }
 
 # 目标平台列表
@@ -27,7 +27,7 @@ $platforms = @(
     @{ os = "darwin";  arch = "arm64" }
 )
 
-Write-Host "`n开始 Go 全平台编译：$projectName`n" -ForegroundColor Cyan
+Write-Host "`nStarting Go multi-platform build: $projectName`n" -ForegroundColor Cyan
 
 foreach ($p in $platforms) {
     $goos   = $p.os
@@ -38,9 +38,9 @@ foreach ($p in $platforms) {
     $outputName = "$projectName-$goos-$goarch$ext"
     $outputPath = Join-Path $targetDir $outputName
 
-    Write-Host "▶ 编译 $goos/$goarch ..." -NoNewline
+    Write-Host "> Building $goos/$goarch ..." -NoNewline
 
-    # 关键环境变量
+    # Environment variables
     $env:GOOS = $goos
     $env:GOARCH = $goarch
     $env:CGO_ENABLED = "0"
@@ -49,9 +49,9 @@ foreach ($p in $platforms) {
         -o $outputPath $mainFile 2>$null
 
     if ($LASTEXITCODE -eq 0) {
-        Write-Host " 成功 -> $outputName" -ForegroundColor Green
+        Write-Host " Success -> $outputName" -ForegroundColor Green
     } else {
-        Write-Host " 失败" -ForegroundColor Red
+        Write-Host " Failed" -ForegroundColor Red
     }
 }
 
@@ -60,4 +60,4 @@ $env:GOOS = ""
 $env:GOARCH = ""
 $env:CGO_ENABLED = ""
 
-Write-Host "`n所有平台编译完成，输出目录：$targetDir" -ForegroundColor Yellow
+Write-Host "`nAll platforms build completed. Output directory: $targetDir" -ForegroundColor Yellow
