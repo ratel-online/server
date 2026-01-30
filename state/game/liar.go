@@ -370,7 +370,7 @@ func InitLiarGame(room *database.Room) (*database.Liar, error) {
 	if len(deck) > 0 {
 		// 随机抽一张作为指示牌，通常不抽大小王作为基础指示牌，但用户没说，我们就直接从牌堆抽第一张
 		target = &deck[0]
-		deck = deck[1:]
+		//deck = deck[1:]
 	}
 
 	for i, id := range playerIDs {
