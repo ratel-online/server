@@ -2,7 +2,9 @@ package state
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 )
@@ -44,10 +46,13 @@ func askForGameType(player *database.Player) (gameType int, err error) {
 	}
 	gameType, err = player.AskForInt()
 	if err != nil {
+		if errors.Is(err, consts.ErrorsExist) {
+			return 0, err
+		}
 		_ = player.WriteError(consts.ErrorsGameTypeInvalid)
 		return 0, consts.ErrorsGameTypeInvalid
 	}
-	// 游戏类型输入非法
+	// check game type.
 	if _, ok := consts.GameTypes[gameType]; !ok {
 		_ = player.WriteError(consts.ErrorsGameTypeInvalid)
 		return 0, consts.ErrorsGameTypeInvalid
