@@ -56,8 +56,8 @@ const (
 	GameTypeRunFast = 4
 	GameTypeTexas   = 5
 	GameTypeMahjong = 6
-	GameTypeUno     = 7
-	GameTypeLiar    = 8
+	GameTypeLiar    = 7
+	GameTypeUno     = 8
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
