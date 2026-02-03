@@ -124,9 +124,8 @@ var (
 		GameTypeRunFast: "跑得快",
 		GameTypeTexas:   "德州扑克",
 		//GameTypeUno:     "Uno",
-		//GameTypeMahjong: "Mahjong",
+		GameTypeMahjong: "Mahjong",
 		GameTypeLiar:    "liar's bar",
-
 	}
 	GameTypesIds = []int{
 		GameTypeClassic,
@@ -134,7 +133,7 @@ var (
 		GameTypeSkill,
 		GameTypeRunFast,
 		GameTypeTexas,
-		//GameTypeMahjong,
+		GameTypeMahjong,
 		GameTypeLiar,
 	}
 	RoomStates = map[int]string{
