@@ -67,13 +67,14 @@ const (
 
 // Room properties.
 const (
-	RoomPropsDotShuffle = "ds"
-	RoomPropsLaiZi      = "lz"
-	RoomPropsSkill      = "sk"
-	RoomPropsPassword   = "pwd"
-	RoomPropsPlayerNum  = "pn"
-	RoomPropsChat       = "ct"
-	RoomPropsShowIP     = "ip"
+	RoomPropsDotShuffle    = "ds"
+	RoomPropsLaiZi         = "lz"
+	RoomPropsSkill         = "sk"
+	RoomPropsPassword      = "pwd"
+	RoomPropsPlayerNum     = "pn"
+	RoomPropsChat          = "ct"
+	RoomPropsShowIP        = "ip"
+	RoomPropsJokerAsTarget = "jt"
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
