@@ -91,16 +91,15 @@ func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
 
 func CreateRoom(creator int64, t int) *Room {
 	room := &Room{
-		ID:                  atomic.AddInt64(&roomIds, 1),
-		Type:                t,
-		State:               consts.RoomStateWaiting,
-		Creator:             creator,
-		ActiveTime:          time.Now(),
-		MaxPlayers:          consts.MaxPlayers,
-		EnableLandlord:      true,
-		EnableChat:          true,
-		EnableShowIP:        false,
-		EnableJokerAsTarget: true,
+		ID:             atomic.AddInt64(&roomIds, 1),
+		Type:           t,
+		State:          consts.RoomStateWaiting,
+		Creator:        creator,
+		ActiveTime:     time.Now(),
+		MaxPlayers:     consts.MaxPlayers,
+		EnableLandlord: true,
+		EnableChat:     true,
+		EnableShowIP:   false,
 	}
 	switch room.Type {
 	case consts.GameTypeLaiZi:
@@ -119,6 +118,7 @@ func CreateRoom(creator int64, t int) *Room {
 		room.MaxPlayers = 10
 	case consts.GameTypeLiar:
 		room.MaxPlayers = 4
+		room.EnableJokerAsTarget = true
 	}
 	roomPlayers.Set(room.ID, map[int64]bool{})
 	roomSpectators.Set(room.ID, map[int64]int{})
