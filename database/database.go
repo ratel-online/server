@@ -55,6 +55,9 @@ var roomPropsSetter = map[string]func(r *Room, v string){
 	consts.RoomPropsShowIP: func(r *Room, v string) {
 		r.EnableShowIP = v == "on"
 	},
+	consts.RoomPropsJokerAsTarget: func(r *Room, v string) {
+		r.EnableJokerAsTarget = v == "on"
+	},
 }
 
 func init() {
@@ -163,8 +166,51 @@ func getPlayer(playerId int64) *Player {
 }
 
 func SetRoomProps(room *Room, k, v string) {
+	// 根据房间类型限制可设置的属性
+	allowedProps := getAllowedPropsByGameType(room.Type)
+
+	// 检查属性是否允许设置
+	if !allowedProps[k] {
+		return // 不允许的属性直接返回，不执行设置
+	}
+
 	if setter, ok := roomPropsSetter[k]; ok {
 		setter(room, v)
+	}
+}
+
+// 根据游戏类型返回允许设置的属性列表
+func getAllowedPropsByGameType(gameType int) map[string]bool {
+	switch gameType {
+	case consts.GameTypeLiar:
+		// 对于骗子酒馆，只允许设置指示牌规则和显示IP
+		return map[string]bool{
+			consts.RoomPropsJokerAsTarget: true,
+			consts.RoomPropsShowIP:        true,
+		}
+	case consts.GameTypeUno, consts.GameTypeMahjong:
+		// 对于Uno和麻将，只允许设置显示IP
+		return map[string]bool{
+			consts.RoomPropsShowIP: true,
+		}
+	case consts.GameTypeTexas:
+		// 对于德州扑克，允许设置玩家数量和显示IP
+		return map[string]bool{
+			consts.RoomPropsPlayerNum: true,
+			consts.RoomPropsShowIP:    true,
+		}
+	default:
+		// 其他游戏类型允许所有常规属性
+		return map[string]bool{
+			consts.RoomPropsLaiZi:         true,
+			consts.RoomPropsDotShuffle:    true,
+			consts.RoomPropsSkill:         true,
+			consts.RoomPropsPassword:      true,
+			consts.RoomPropsPlayerNum:     true,
+			consts.RoomPropsChat:          true,
+			consts.RoomPropsShowIP:        true,
+			consts.RoomPropsJokerAsTarget: true,
+		}
 	}
 }
 
