@@ -122,12 +122,31 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 			continue
 		}
 
-		// 处理出牌逻辑
+		// 检查输入是否只包含有效的牌面字符(q,k,a,s,x)和空格
+		isValidPokerInput := true
+		for _, char := range ans {
+			charStr := string(char)
+			if charStr != " " && poker.GetKey(charStr) == 0 {
+				isValidPokerInput = false
+				break
+			}
+		}
+
+		if !isValidPokerInput {
+			// 如果输入包含非牌面字符，则作为聊天消息
+			database.BroadcastChat(player, fmt.Sprintf("%s 说: %s\n", player.Name, ans))
+			continue
+		}
+
+		// 解析有效的牌面字符
 		keys := make([]int, 0)
 		for _, char := range ans {
-			key := poker.GetKey(string(char))
-			if key != 0 {
-				keys = append(keys, key)
+			charStr := string(char)
+			if charStr != " " { // 忽略空格
+				key := poker.GetKey(charStr)
+				if key != 0 {
+					keys = append(keys, key)
+				}
 			}
 		}
 
