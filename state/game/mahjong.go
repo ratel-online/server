@@ -101,12 +101,17 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 		_ = player.WriteString(fmt.Sprintf("You can 暗杠 %s, do it? (y/n)\n", tile.Tile(t)))
 		ans, err := player.AskForString(consts.PlayMahjongTimeout)
 		if err == nil && (ans == "y" || ans == "Y") {
+			p.RemoveTiles([]card.ID{t, t, t, t})
 			p.DarkGang(t)
 			p.TryBottomDecking(game.Game.Deck())
 			game.States[p.ID()] <- statePlay
 			return nil
 		}
 		// choose not to dark gang, continue normal flow
+		if len(p.Hand())%3 == 2 {
+			game.States[p.ID()] <- statePlay
+			return nil
+		}
 	}
 	// Check if there's a pong that can be upgraded to gang (加杠)
 	// Only pong can be upgraded, not chi (sequence)
@@ -132,12 +137,17 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 		_ = player.WriteString(fmt.Sprintf("You can 加杠 %s, do it? (y/n)\n", tile.Tile(pongToGang.GetTile())))
 		ans, err := player.AskForString(consts.PlayMahjongTimeout)
 		if err == nil && (ans == "y" || ans == "Y") {
+			p.RemoveTile(pongToGang.GetTile())
 			pongToGang.ModifyPongToKong(mjconsts.GANG, false)
 			p.TryBottomDecking(game.Game.Deck())
 			game.States[p.ID()] <- stateTakeCard
 			return nil
 		}
 		// choose not to add kong, continue normal flow
+		if len(p.Hand())%3 == 2 {
+			game.States[p.ID()] <- statePlay
+			return nil
+		}
 	}
 	gameState := game.Game.ExtractState(p)
 	if len(gameState.SpecialPrivileges) > 0 {
@@ -205,6 +215,12 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 			p = game.Game.Next()
 		}
 	}
+	// If hand size is 3n+2 (e.g. 14), we already drew a card (e.g. from Gang replacement).
+	// Don't draw again.
+	if len(p.Hand())%3 == 2 {
+		game.States[p.ID()] <- statePlay
+		return nil
+	}
 	p.TryTopDecking(game.Game.Deck())
 	game.States[p.ID()] <- statePlay
 	return nil
@@ -219,8 +235,8 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 	gameState := game.Game.ExtractState(p)
 	if win.CanWin(p.Hand(), p.GetShowCardTiles()) {
 		tiles := p.Tiles()
-		sort.Ints(tiles)
-		database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
+		sort.Slice(tiles, func(i, j int) bool { return tiles[i] < tiles[j] })
+		database.Broadcast(room.ID, fmt.Sprintf("%s 自摸 %s! \n%s \n", p.Name(), tile.Tile(p.LastTile()), tile.ToTileString(tiles)))
 		room.Game = nil
 		room.Banker = p.ID()
 		room.State = consts.RoomStateWaiting
@@ -267,8 +283,8 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 	if len(gameState.CanWin) > 0 {
 		for _, p := range gameState.CanWin {
 			tiles := append(p.Tiles(), gameState.LastPlayedTile)
-			sort.Ints(tiles)
-			database.Broadcast(room.ID, fmt.Sprintf("%s wins! \n%s \n", p.Name(), tile.ToTileString(tiles)))
+			sort.Slice(tiles, func(i, j int) bool { return tiles[i] < tiles[j] })
+			database.Broadcast(room.ID, fmt.Sprintf("%s 抓炮 %s! \n%s \n", p.Name(), tile.Tile(gameState.LastPlayedTile), tile.ToTileString(tiles)))
 		}
 		room.Game = nil
 		room.Banker = gameState.CanWin[rand.Intn(len(gameState.CanWin))].ID()

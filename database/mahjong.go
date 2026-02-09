@@ -33,7 +33,7 @@ func (game *Mahjong) Clean() {
 
 type OP struct {
 	operation int
-	tiles     []int
+	tiles     []card.ID
 }
 
 func circled(n int) string {
@@ -69,7 +69,7 @@ func (mp *MahjongPlayer) OnPlayTile(payload event.PlayTilePayload) {
 	Broadcast(p.RoomID, fmt.Sprintf("%s PlayTile %s !\n", payload.PlayerName, tile.Tile(payload.Tile)), p.ID)
 }
 
-func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, error) {
+func (mp *MahjongPlayer) Take(tiles []card.ID, gameState game.State) (int, []card.ID, error) {
 	p := GetPlayer(mp.ID)
 	Broadcast(p.RoomID, fmt.Sprintf("It's %s take mahjong! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}
@@ -85,7 +85,7 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 			case consts.GANG:
 				askBuf.WriteString("You can 杠!!!\n")
 				label := strconv.Itoa(labelCounter)
-				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
+				ts := []card.ID{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
 				tileOptions[label] = &OP{
 					operation: consts.GANG,
 					tiles:     append(ts, gameState.LastPlayedTile),
@@ -95,7 +95,7 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 			case consts.PENG:
 				askBuf.WriteString("You can 碰!!!\n")
 				label := strconv.Itoa(labelCounter)
-				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile}
+				ts := []card.ID{gameState.LastPlayedTile, gameState.LastPlayedTile}
 				tileOptions[label] = &OP{
 					operation: consts.PENG,
 					tiles:     append(ts, gameState.LastPlayedTile),
@@ -120,7 +120,7 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 	askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), "no"))
 	tileOptions[label] = &OP{
 		operation: 0,
-		tiles:     []int{},
+		tiles:     []card.ID{},
 	}
 	loopCount := 0
 	for {
@@ -152,7 +152,7 @@ func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, er
 	}
 }
 
-func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
+func (mp *MahjongPlayer) Play(tiles []card.ID, gameState game.State) (card.ID, error) {
 	p := GetPlayer(mp.ID)
 	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
 	buf := bytes.Buffer{}
@@ -161,8 +161,8 @@ func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
 	p.WriteString(buf.String())
 	askBuf := bytes.Buffer{}
 	askBuf.WriteString("Select a tile to play:\n")
-	tileOptions := make(map[string]int)
-	sort.Ints(tiles)
+	tileOptions := make(map[string]card.ID)
+	sort.Slice(tiles, func(i, j int) bool { return tiles[i] < tiles[j] })
 	for idx, i := range tiles {
 		label := strconv.Itoa(idx + 1)
 		tileOptions[label] = i
