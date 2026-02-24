@@ -122,12 +122,31 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 			continue
 		}
 
-		// 处理出牌逻辑
+		// 检查输入是否只包含有效的牌面字符(q,k,a,s,x)和空格
+		isValidPokerInput := true
+		for _, char := range ans {
+			charStr := string(char)
+			if charStr != " " && poker.GetKey(charStr) == 0 {
+				isValidPokerInput = false
+				break
+			}
+		}
+
+		if !isValidPokerInput {
+			// 如果输入包含非牌面字符，则作为聊天消息
+			database.BroadcastChat(player, fmt.Sprintf("%s 说: %s\n", player.Name, ans))
+			continue
+		}
+
+		// 解析有效的牌面字符
 		keys := make([]int, 0)
 		for _, char := range ans {
-			key := poker.GetKey(string(char))
-			if key != 0 {
-				keys = append(keys, key)
+			charStr := string(char)
+			if charStr != " " { // 忽略空格
+				key := poker.GetKey(charStr)
+				if key != 0 {
+					keys = append(keys, key)
+				}
 			}
 		}
 
@@ -262,11 +281,8 @@ func (g *Liar) pullTrigger(player *database.Player, game *database.Liar) bool {
 
 func (g *Liar) resetRound(game *database.Liar) {
 	deck := initLiarDeck()
-	// 重新抽取指示牌
-	if len(deck) > 0 {
-		game.Target = &deck[0]
-		deck = deck[1:]
-	}
+	// 根据游戏设置重新抽取指示牌
+	game.Target = selectTargetBasedOnSetting(deck, game.AllowJokers)
 
 	// 重新给存活玩家发放手牌
 	game.Hands = make(map[int64]model.Pokers)
@@ -390,14 +406,12 @@ func InitLiarGame(room *database.Room) (*database.Liar, error) {
 	supervisors := make(map[int64]bool)
 	deck := initLiarDeck()
 
-	// 抽取一张牌作为指示牌
+	// 抽取一张牌作为指示牌，根据房间设置决定是否允许大小王
 	var target *model.Poker
-	if len(deck) > 0 {
-		// 随机抽一张作为指示牌，通常不抽大小王作为基础指示牌，但用户没说，我们就直接从牌堆抽第一张
-		target = &deck[0]
-		deck = deck[1:]
-	}
-
+	// 从房间设置中获取是否允许大小王作为指示牌
+	// 使用 EnableJokerAsTarget 字段作为指示牌规则设置：启用时从牌堆随机抽取大小王，禁用时从Q/K/A三张牌中随机选取
+	allowJokers := room.EnableJokerAsTarget
+	target = selectTargetBasedOnSetting(deck, allowJokers)
 	for i, id := range playerIDs {
 		bullets[id] = rand.Intn(6) + 1
 		bong[id] = 0
@@ -421,6 +435,7 @@ func InitLiarGame(room *database.Room) (*database.Liar, error) {
 		Target:      target,
 		Alive:       alive,
 		Supervisors: supervisors,
+		AllowJokers: room.EnableJokerAsTarget, // 保存房间设置以供后续轮次使用
 	}, nil
 }
 
@@ -434,4 +449,19 @@ func initLiarDeck() model.Pokers {
 	pokers := poker.GetPokers(keys...)
 	pokers.Shuffle(len(pokers), 1)
 	return pokers
+}
+
+// 根据设置抽取指示牌，如果允许大小王则从整个牌堆中抽取，否则从QKA中随机选择
+func selectTargetBasedOnSetting(deck model.Pokers, allowJokers bool) *model.Poker {
+	if allowJokers && len(deck) > 0 {
+		// 如果允许大小王，则从整个牌堆中抽取第一张牌
+		return &deck[0]
+	} else {
+		// 如果不允许大小王，则从QKA中随机选择一张作为指示牌
+		// Q=12, K=13, A=1
+		targetKeys := []int{1, 12, 13}
+		selectedKey := targetKeys[rand.Intn(len(targetKeys))]
+		poker := poker.GetPokers(selectedKey)
+		return &poker[0]
+	}
 }

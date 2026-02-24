@@ -20,6 +20,7 @@ type Liar struct {
 	LastPlayerID int64                  `json:"lastPlayerId"`
 	LastPokers   model.Pokers           `json:"lastPokers"`
 	Supervisors  map[int64]bool         `json:"supervisors"`
+	AllowJokers  bool                   `json:"allowJokers"`
 }
 
 func (l *Liar) Clean() {

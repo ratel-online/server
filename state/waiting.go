@@ -226,10 +226,14 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	case consts.GameTypeTexas:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+	case consts.GameTypeLiar:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "jt:", sprintPropsState(room.EnableJokerAsTarget)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 	default:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)+",", "ds:", sprintPropsState(room.EnableDontShuffle)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "sk:", sprintPropsState(room.EnableSkill)+",", "pn:", room.MaxPlayers))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "ct:", sprintPropsState(room.EnableChat)+",", "ip:", sprintPropsState(room.EnableShowIP)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "ds:", sprintPropsState(room.EnableDontShuffle)+",", "sk:", sprintPropsState(room.EnableSkill)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "pn:", room.MaxPlayers, "ct:", sprintPropsState(room.EnableChat)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 		pwd := room.Password
 		if pwd != "" {
 			if room.Creator != currPlayer.ID {
