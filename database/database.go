@@ -190,8 +190,9 @@ func getAllowedPropsByGameType(gameType int) map[string]bool {
 			consts.RoomPropsShowIP:        true,
 		}
 	case consts.GameTypeUno, consts.GameTypeMahjong:
-		// 对于Uno和麻将，只允许设置显示IP
+		// 对于Uno和麻将，允许设置玩家数量和显示IP
 		return map[string]bool{
+			consts.RoomPropsPlayerNum: true,
 			consts.RoomPropsShowIP: true,
 		}
 	case consts.GameTypeTexas:
