@@ -232,23 +232,24 @@ type RoomGame interface {
 type Room struct {
 	sync.Mutex
 
-	ID                int64     `json:"id"`
-	Type              int       `json:"type"`
-	Game              RoomGame  `json:"gameId"`
-	State             int       `json:"state"`
-	Players           int       `json:"players"`
-	Banker            int       `json:"banker"`
-	Robots            int       `json:"robots"`
-	Creator           int64     `json:"creator"`
-	ActiveTime        time.Time `json:"activeTime"`
-	MaxPlayers        int       `json:"maxPlayers"`
-	Password          string    `json:"password"`
-	EnableChat        bool      `json:"enableChat"`
-	EnableLaiZi       bool      `json:"enableLaiZi"`
-	EnableSkill       bool      `json:"enableSkill"`
-	EnableLandlord    bool      `json:"enableLandlord"`
-	EnableDontShuffle bool      `json:"enableDontShuffle"`
-	EnableShowIP      bool      `json:"enableShowIP"`
+	ID                  int64     `json:"id"`
+	Type                int       `json:"type"`
+	Game                RoomGame  `json:"gameId"`
+	State               int       `json:"state"`
+	Players             int       `json:"players"`
+	Banker              int       `json:"banker"`
+	Robots              int       `json:"robots"`
+	Creator             int64     `json:"creator"`
+	ActiveTime          time.Time `json:"activeTime"`
+	MaxPlayers          int       `json:"maxPlayers"`
+	Password            string    `json:"password"`
+	EnableChat          bool      `json:"enableChat"`
+	EnableLaiZi         bool      `json:"enableLaiZi"`
+	EnableSkill         bool      `json:"enableSkill"`
+	EnableLandlord      bool      `json:"enableLandlord"`
+	EnableDontShuffle   bool      `json:"enableDontShuffle"`
+	EnableShowIP        bool      `json:"enableShowIP"`
+	EnableJokerAsTarget bool      `json:"enableJokerAsTarget"`
 }
 
 func (r *Room) Model() model.Room {

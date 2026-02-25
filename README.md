@@ -9,7 +9,7 @@
 - Websocket: 192.252.182.94:9998
 - TCP: 192.252.182.94:9999
 ## 社区
-- QQ Group: [1055724673](https://qm.qq.com/q/OzIN57ylc6)
+- QQ Group: [948365095](https://qm.qq.com/q/tRPNbC6NtC)
 - Telegram: [ratel-server](https://t.me/ratel_server)
 ## 玩法介绍
 ### 模式
