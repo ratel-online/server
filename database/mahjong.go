@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/feel-easy/mahjong/card"
-	"github.com/feel-easy/mahjong/consts"
-	"github.com/feel-easy/mahjong/event"
-	"github.com/feel-easy/mahjong/game"
-	"github.com/feel-easy/mahjong/tile"
+	"github.com/mikodream/mahjong/card"
+	"github.com/mikodream/mahjong/consts"
+	"github.com/mikodream/mahjong/event"
+	"github.com/mikodream/mahjong/game"
+	"github.com/mikodream/mahjong/tile"
 	"github.com/ratel-online/core/log"
 	rconsts "github.com/ratel-online/server/consts"
 )
