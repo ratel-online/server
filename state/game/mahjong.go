@@ -244,7 +244,6 @@ func handleTake(room *database.Room, player *database.Player, game *database.Mah
 		// Player chose not to operate (or failed).
 		// We need to find the next player who might have a privilege, or the originally player to draw.
 		loopCount := 0
-		maxIterations := len(game.PlayerIDs) + 1
 		for {
 			loopCount++
 			if loopCount > maxIterations {
@@ -336,7 +335,7 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 	if len(gameState.SpecialPrivileges) > 0 {
 		pvID := pc.ID()
 		flag := false
-		for _, i := range []int{mjconsts.GANG, mjconsts.PENG, mjconsts.CHI} {
+		for _, i := range []int{mjconsts.PENG, mjconsts.CHI} {
 			for id, pvs := range gameState.SpecialPrivileges {
 				if util.IntInSlice(i, pvs) {
 					pvID = id
@@ -349,17 +348,10 @@ func handlePlayMahjong(room *database.Room, player *database.Player, game *datab
 			}
 		}
 		loopCount := 0
-		maxIterations := len(game.PlayerIDs) + 1
 		for {
 			loopCount++
 			if loopCount%100 == 0 {
 				log.Infof("[handlePlayMahjong] Player %d (Room %d) finding privilege player loop count: %d, current: %d, target: %d\n", pc.ID(), room.ID, loopCount, pc.ID(), pvID)
-			}
-			if loopCount > maxIterations {
-				log.Errorf("[handlePlayMahjong] Player %d exceeded max iterations looking for privilege player with ID %d\n", pc.ID(), pvID)
-				// Fallback: give turn to the privilege player directly
-				game.States[pvID] <- stateTakeCard
-				return nil
 			}
 			if pc.ID() == pvID {
 				log.Infof("[handlePlayMahjong] Player %d found privilege player, loop count: %d\n", pc.ID(), loopCount)
@@ -390,17 +382,10 @@ func InitMahjongGame(room *database.Room) (*database.Mahjong, error) {
 		room.Banker = playerIDs[rand.Intn(len(playerIDs))]
 	}
 	loopCount := 0
-	maxIterations := len(playerIDs) + 1
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
 			log.Infof("[InitMahjongGame] Room %d finding banker loop count: %d, current: %d, target: %d\n", room.ID, loopCount, mahjong.Current().ID(), room.Banker)
-		}
-		if loopCount > maxIterations {
-			log.Errorf("[InitMahjongGame] Room %d exceeded max iterations looking for banker %d\n", room.ID, room.Banker)
-			// Banker not found, use current player as banker
-			room.Banker = mahjong.Current().ID()
-			break
 		}
 		if mahjong.Current().ID() == room.Banker {
 			log.Infof("[InitMahjongGame] Room %d found banker, loop count: %d\n", room.ID, loopCount)
