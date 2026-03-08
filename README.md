@@ -1,7 +1,7 @@
 # Ratel-Online
 [![Go Reference](https://pkg.go.dev/badge/github.com/ratel-online/server.svg)](https://pkg.go.dev/github.com/ratel-online/server)
 
-命令行在线多人棋牌游戏！支持斗地主，跑得快, 德州扑克等模式！
+命令行在线多人棋牌游戏！支持斗地主，跑得快, 德州扑克, 麻将, 骗子酒馆, Uno 等模式！
 ## 客户端
 - 浏览器在线：[http://ratel.isnico.com/](http://ratel.isnico.com/)
 - 客户端下载：[https://github.com/ratel-online/client/releases](https://github.com/ratel-online/client/releases)
@@ -18,6 +18,9 @@
 - 癞子版技能大招模式
 - 跑得快模式
 - 德州扑克
+- 麻将(存在问题)
+- 骗子酒馆
+- Uno(开发中)
 
 ### 德州扑克规则
 游戏人数2~10人不等，每人发2张底牌，5张公共牌，最终组合5张牌中最大的牌型。
@@ -62,8 +65,27 @@
 - 连队：`3344`
 - 飞机：`jjjqqq3457`
 
-### 德州扑克
-// 待补充
+### 麻将规则
+支持经典中国麻将玩法，包含吃、碰、杠、胡等基本操作。
+
+### 骗子酒馆规则
+游戏人数2~4人不等，每人5张牌，一张指示牌。
+
+游戏目标：通过撒谎和质疑，成为最后一个存活的玩家。
+
+游戏规则：
+- 每个玩家有一把装有1-6发子弹的左轮手枪
+- 玩家可以出牌（声称是指示牌或大小王）
+- 下家可以选择质疑或继续出牌
+- 如果质疑成功，撒谎者扣动扳机；如果质疑失败，质疑者扣动扳机
+- 被击中的玩家淘汰，最后存活的玩家获胜
+
+游戏指令：
+- 输入牌面（如 `k`, `q`, `a`, `s`, `x`）：出牌
+- `c` 或 `质疑`：质疑上家
+
+### Uno规则
+经典Uno卡牌游戏，支持多人游戏。
 
 ### 演示
 视频教程：[https://www.bilibili.com/video/BV16Y411b7BD](https://www.bilibili.com/video/BV16Y411b7BD)
@@ -76,9 +98,10 @@
 
 房间指令：
 - `s`：房间内开始游戏
-- `set ds on`： 开启不洗牌模式-
-- `set ct off`： 关闭聊天
+- `set ds on`： 开启不洗牌模式
 - `set ds off`： 关闭不洗牌模式
+- `set ct off`： 关闭聊天
+- `set ct on`： 开启聊天
 - `set sk on`： 开启技能模式
 - `set sk off`： 关闭技能模式
 - `set lz on`： 开启癞子模式
@@ -86,6 +109,11 @@
 - `set pwd xxxx`：设置密码，例如密码为"xxxx"
 - `set pwd off`：取消密码
 - `set pn 6`: 设置房间人数上限，例如最大6个人(默认为3人)
+- `set ip on`： 开启显示IP
+- `set ip off`： 关闭显示IP
+- `set jt on`： 开启允许大小王作为指示牌（骗子酒馆专用）
+- `set jt off`： 关闭允许大小王作为指示牌（骗子酒馆专用）
+- `k <玩家ID>` 或 `kicking <玩家ID>` 或 `kill <玩家ID>`：房主踢出指定玩家
 - 其余的会转为聊天内容
 
 游戏指令：
