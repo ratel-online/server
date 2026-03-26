@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/util/poker"
+	"github.com/ratel-online/server/bot"
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 )
@@ -33,6 +34,7 @@ func preFlopRound(game *database.Texas) error {
 		if player.Amount < 100 {
 			player.Amount += 2000
 			database.Broadcast(game.Room.ID, fmt.Sprintf("%s is too poor, system give him 2000\n", player.Name))
+			bot.SendGroupMessage(bot.GroupID, fmt.Sprintf("%s is too poor, system give him 2000", player.Name))
 		}
 	}
 
