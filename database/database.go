@@ -188,30 +188,32 @@ func getAllowedPropsByGameType(gameType int) map[string]bool {
 		return map[string]bool{
 			consts.RoomPropsJokerAsTarget: true,
 			consts.RoomPropsShowIP:        true,
+			consts.RoomPropsPassword:      true,
 		}
 	case consts.GameTypeUno, consts.GameTypeMahjong:
 		// 对于Uno和麻将，允许设置玩家数量和显示IP
 		return map[string]bool{
 			consts.RoomPropsPlayerNum: true,
-			consts.RoomPropsShowIP: true,
+			consts.RoomPropsShowIP:    true,
+			consts.RoomPropsPassword:  true,
 		}
 	case consts.GameTypeTexas:
 		// 对于德州扑克，允许设置玩家数量和显示IP
 		return map[string]bool{
 			consts.RoomPropsPlayerNum: true,
 			consts.RoomPropsShowIP:    true,
+			consts.RoomPropsPassword:  true,
 		}
 	default:
 		// 其他游戏类型允许所有常规属性
 		return map[string]bool{
-			consts.RoomPropsLaiZi:         true,
-			consts.RoomPropsDotShuffle:    true,
-			consts.RoomPropsSkill:         true,
-			consts.RoomPropsPassword:      true,
-			consts.RoomPropsPlayerNum:     true,
-			consts.RoomPropsChat:          true,
-			consts.RoomPropsShowIP:        true,
-			consts.RoomPropsJokerAsTarget: true,
+			consts.RoomPropsLaiZi:      true,
+			consts.RoomPropsDotShuffle: true,
+			consts.RoomPropsSkill:      true,
+			consts.RoomPropsPassword:   true,
+			consts.RoomPropsPlayerNum:  true,
+			consts.RoomPropsChat:       true,
+			consts.RoomPropsShowIP:     true,
 		}
 	}
 }
