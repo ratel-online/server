@@ -6,11 +6,12 @@ require (
 	github.com/awesome-cap/hashmap v0.0.0-20211211100532-e3300ac4ae14
 	github.com/feel-easy/mahjong v0.0.0-20220721030133-7a0f4032c008
 	github.com/feel-easy/uno v0.0.0-20220721061415-e6a3189cfd70
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/ratel-online/core v0.0.0-20250225062905-81b6faff6d25
 )
 
 require (
+	github.com/Szzrain/Milky-go-sdk v1.0.1 // indirect
 	github.com/awesome-cap/im v0.0.0-20210720090440-7556eb92965d // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
