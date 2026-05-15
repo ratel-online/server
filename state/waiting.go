@@ -42,8 +42,10 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		case consts.GameTypeTexas:
 			return consts.StateTexasGame, nil
 		case consts.GameTypeLiar:
-			return consts.StateLiarGame, nil
-		}
+		return consts.StateLiarGame, nil
+	case consts.GameTypeUndercover:
+		return consts.StateUndercoverGame, nil
+	}
 	}
 	return s.Exit(player), nil
 }
@@ -123,9 +125,13 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 						continue
 					}
 					if room.Type == consts.GameTypeRunFast && room.Players != 3 {
-						_ = player.WriteError(consts.ErrorsGamePlayersInvalid)
-						continue
-					}
+				_ = player.WriteError(consts.ErrorsGamePlayersInvalid)
+				continue
+			}
+			if room.Type == consts.GameTypeUndercover && room.Players < 3 {
+				_ = player.WriteString("谁是卧底游戏至少需要3名玩家！\n")
+				continue
+			}
 					err = startGame(player, room)
 					if err != nil {
 						return access, err
@@ -187,6 +193,8 @@ func startGame(player *database.Player, room *database.Room) (err error) {
 		room.Game, err = texas.Init(room)
 	case consts.GameTypeLiar:
 		room.Game, err = game.InitLiarGame(room)
+	case consts.GameTypeUndercover:
+		room.Game, err = game.InitUndercoverGame(room)
 	}
 	if err != nil {
 		_ = player.WriteError(err)
@@ -229,10 +237,15 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	case consts.GameTypeLiar:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "jt:", sprintPropsState(room.EnableJokerAsTarget)))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+	case consts.GameTypeUndercover:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ucn:", room.UndercoverNum))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "bwm:", sprintPropsState(room.BlankWordMode)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 	default:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "ds:", sprintPropsState(room.EnableDontShuffle)+",", "sk:", sprintPropsState(room.EnableSkill)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v%-5s%-5v\n", "pn:", room.MaxPlayers, "ct:", sprintPropsState(room.EnableChat)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v, %-5s%-5v\n", "ds:", sprintPropsState(room.EnableDontShuffle), "sk:", sprintPropsState(room.EnableSkill)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v, %-5s%-5v\n", "pn:", room.MaxPlayers, "ct:", sprintPropsState(room.EnableChat)))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 		pwd := room.Password
 		if pwd != "" {

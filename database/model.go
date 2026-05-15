@@ -250,6 +250,8 @@ type Room struct {
 	EnableDontShuffle   bool      `json:"enableDontShuffle"`
 	EnableShowIP        bool      `json:"enableShowIP"`
 	EnableJokerAsTarget bool      `json:"enableJokerAsTarget"`
+	UndercoverNum       int       `json:"undercoverNum"`  // 卧底数量
+	BlankWordMode       bool      `json:"blankWordMode"`  // 空白词模式
 }
 
 func (r *Room) Model() model.Room {
