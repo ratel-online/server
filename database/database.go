@@ -58,6 +58,19 @@ var roomPropsSetter = map[string]func(r *Room, v string){
 	consts.RoomPropsJokerAsTarget: func(r *Room, v string) {
 		r.EnableJokerAsTarget = v == "on"
 	},
+	consts.RoomPropsUndercoverNum: func(r *Room, v string) {
+		n, _ := strconv.Atoi(v)
+		if n < 1 {
+			n = 1
+		}
+		if n >= r.Players {
+			n = r.Players - 1
+		}
+		r.UndercoverNum = n
+	},
+	consts.RoomPropsBlankWordMode: func(r *Room, v string) {
+		r.BlankWordMode = v == "on"
+	},
 }
 
 func init() {
@@ -119,6 +132,10 @@ func CreateRoom(creator int64, t int) *Room {
 	case consts.GameTypeLiar:
 		room.MaxPlayers = 4
 		room.EnableJokerAsTarget = true
+	case consts.GameTypeUndercover:
+		room.MaxPlayers = 6
+		room.UndercoverNum = 1
+		room.BlankWordMode = false
 	}
 	roomPlayers.Set(room.ID, map[int64]bool{})
 	roomSpectators.Set(room.ID, map[int64]int{})
@@ -187,6 +204,15 @@ func getAllowedPropsByGameType(gameType int) map[string]bool {
 		// 对于骗子酒馆，只允许设置指示牌规则和显示IP
 		return map[string]bool{
 			consts.RoomPropsJokerAsTarget: true,
+			consts.RoomPropsShowIP:        true,
+			consts.RoomPropsPassword:      true,
+		}
+	case consts.GameTypeUndercover:
+		// 对于谁是卧底，允许设置玩家数量、卧底数量、空白词模式和显示IP
+		return map[string]bool{
+			consts.RoomPropsPlayerNum:     true,
+			consts.RoomPropsUndercoverNum: true,
+			consts.RoomPropsBlankWordMode: true,
 			consts.RoomPropsShowIP:        true,
 			consts.RoomPropsPassword:      true,
 		}

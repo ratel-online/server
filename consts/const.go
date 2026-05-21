@@ -21,6 +21,7 @@ const (
 	StateMahjongGame
 	StateTexasGame
 	StateLiarGame
+	StateUndercoverGame
 )
 
 type SkillID int
@@ -56,8 +57,9 @@ const (
 	GameTypeRunFast = 4
 	GameTypeTexas   = 5
 	GameTypeMahjong = 6
-	GameTypeLiar    = 7
-	GameTypeUno     = 8
+	GameTypeLiar       = 7
+	GameTypeUno        = 8
+	GameTypeUndercover = 9
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
@@ -67,14 +69,16 @@ const (
 
 // Room properties.
 const (
-	RoomPropsDotShuffle    = "ds"
-	RoomPropsLaiZi         = "lz"
-	RoomPropsSkill         = "sk"
-	RoomPropsPassword      = "pwd"
-	RoomPropsPlayerNum     = "pn"
-	RoomPropsChat          = "ct"
-	RoomPropsShowIP        = "ip"
-	RoomPropsJokerAsTarget = "jt"
+	RoomPropsDotShuffle     = "ds"
+	RoomPropsLaiZi          = "lz"
+	RoomPropsSkill          = "sk"
+	RoomPropsPassword       = "pwd"
+	RoomPropsPlayerNum      = "pn"
+	RoomPropsChat           = "ct"
+	RoomPropsShowIP         = "ip"
+	RoomPropsJokerAsTarget  = "jt"
+	RoomPropsUndercoverNum  = "ucn" // 卧底数量
+	RoomPropsBlankWordMode  = "bwm" // 空白词模式
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
@@ -118,15 +122,15 @@ var (
 	ErrorsGamePlayersInsufficient = NewErr(1, false, "Game players insufficient. ")
 	ErrorsCannotKickYourself      = NewErr(1, false, "Cannot kick yourself. ")
 	ErrorsPlayerNotInRoom         = NewErr(1, true, "Player not in room. ")
-	GameTypes                     = map[int]string{
-		GameTypeClassic: "斗地主",
-		GameTypeLaiZi:   "斗地主-癞子版",
-		GameTypeSkill:   "斗地主-大招版",
-		GameTypeRunFast: "跑得快",
-		GameTypeTexas:   "德州扑克",
-		//GameTypeUno:     "Uno",
-		GameTypeMahjong: "Mahjong",
-		GameTypeLiar:    "liar's bar",
+	GameTypes = map[int]string{
+		GameTypeClassic:    "斗地主",
+		GameTypeLaiZi:      "斗地主-癞子版",
+		GameTypeSkill:      "斗地主-大招版",
+		GameTypeRunFast:    "跑得快",
+		GameTypeTexas:      "德州扑克",
+		GameTypeMahjong:    "Mahjong",
+		GameTypeLiar:       "liar's bar",
+		GameTypeUndercover: "谁是卧底",
 	}
 	GameTypesIds = []int{
 		GameTypeClassic,
@@ -136,6 +140,7 @@ var (
 		GameTypeTexas,
 		GameTypeMahjong,
 		GameTypeLiar,
+		GameTypeUndercover,
 	}
 	RoomStates = map[int]string{
 		RoomStateWaiting: "Waiting",
