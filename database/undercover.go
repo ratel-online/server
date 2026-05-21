@@ -23,6 +23,8 @@ type Undercover struct {
 	UndercoverWord  string             `json:"undercoverWord"`  // 卧底词
 	IsClockwise     bool               `json:"isClockwise"`     // 是否正序发言
 	GameOver        bool               `json:"gameOver"`        // 游戏是否结束
+	VoteCounting    bool               `json:"voteCounting"`    // 是否正在计票，防止重复结算
+	VoteTargets     []int64            `json:"voteTargets"`     // 当前投票阶段允许被投票的玩家列表；为空表示所有存活玩家
 	TiebreakPlayers []int64            `json:"tiebreakPlayers"` // 平票需要补充描述的玩家列表
 }
 

@@ -15,6 +15,11 @@ import (
 
 type Undercover struct{}
 
+type undercoverStateSignal struct {
+	playerID int64
+	state    int
+}
+
 var (
 	undercoverStateDescribe = 1 // 描述阶段
 	undercoverStateVote     = 2 // 投票阶段
@@ -52,12 +57,16 @@ func (g *Undercover) Next(player *database.Player) (consts.StateID, error) {
 			return consts.StateWaiting, nil
 		}
 
-		if game.GameOver {
+		if g.isGameOver(game) {
 			return g.handleGameEnd(player, game)
 		}
 
 		log.Infof("[Undercover.Next] Player %d waiting for state, loop count: %d\n", player.ID, loopCount)
-		state := <-game.States[player.ID]
+		state, ok := <-game.States[player.ID]
+		if !ok {
+			log.Infof("[Undercover.Next] Player %d state channel closed, returning to waiting\n", player.ID)
+			return consts.StateWaiting, nil
+		}
 		switch state {
 		case undercoverStateDescribe:
 			err := g.handleDescribe(player, game)
@@ -73,20 +82,33 @@ func (g *Undercover) Next(player *database.Player) (consts.StateID, error) {
 			}
 		case undercoverStateGameEnd:
 			return g.handleGameEnd(player, game)
+		default:
+			return 0, consts.ErrorsChanClosed
 		}
 	}
 }
 
 // handleDescribe 处理描述阶段
 func (g *Undercover) handleDescribe(player *database.Player, game *database.Undercover) error {
+	game.Lock()
+	alive := game.Alive[player.ID]
+	word := game.Words[player.ID]
+	playerNumber := game.PlayerNumbers[player.ID]
+	_, alreadyDescribed := game.Descriptions[player.ID]
+	game.Unlock()
+
 	// 如果玩家已淘汰，跳过
-	if !game.Alive[player.ID] {
+	if !alive {
 		g.nextPlayerOrPhase(game)
+		return nil
+	}
+	if alreadyDescribed {
+		log.Infof("[Undercover.handleDescribe] Player %d already described, ignore duplicate describe signal\n", player.ID)
 		return nil
 	}
 
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("\n>>> 轮到你了！你的词是：【%s】\n", game.Words[player.ID]))
+	buf.WriteString(fmt.Sprintf("\n>>> 轮到你了！你的词是：【%s】\n", word))
 	buf.WriteString("请输入你对这个词的描述（输入 's' 或 '结束' 结束发言）：\n")
 	_ = player.WriteString(buf.String())
 
@@ -95,13 +117,17 @@ func (g *Undercover) handleDescribe(player *database.Player, game *database.Unde
 		if err != nil {
 			if err == consts.ErrorsTimeout {
 				_ = player.WriteString("发言超时，自动结束发言。\n")
-				game.Descriptions[player.ID] = "（超时无描述）"
+				g.recordDescription(game, player.ID, "（超时无描述）")
 				database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s: （超时无描述）\n",
-					game.PlayerNumbers[player.ID], player.Name))
+					playerNumber, player.Name))
 				g.nextPlayerOrPhase(game)
 				return nil
 			}
-			return err
+			g.recordDescription(game, player.ID, "（断线无描述）")
+			database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 断开连接，自动结束发言\n",
+				playerNumber, player.Name))
+			g.nextPlayerOrPhase(game)
+			return nil
 		}
 
 		ans = strings.TrimSpace(ans)
@@ -111,21 +137,25 @@ func (g *Undercover) handleDescribe(player *database.Player, game *database.Unde
 
 		// 检查是否结束发言
 		if ans == "s" || ans == "结束" || ans == "结束发言" {
-			game.Descriptions[player.ID] = "（结束发言）"
+			g.recordDescription(game, player.ID, "（结束发言）")
 			database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 结束了发言\n",
-				game.PlayerNumbers[player.ID], player.Name))
+				playerNumber, player.Name))
 			g.nextPlayerOrPhase(game)
 			return nil
 		}
 
 		// 广播描述，继续等待下一条输入
 		database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s: %s\n",
-			game.PlayerNumbers[player.ID], player.Name, ans))
+			playerNumber, player.Name, ans))
 	}
 }
 
 // nextPlayerOrPhase 切换到下一个玩家或进入投票阶段
 func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
+	broadcastMsg := ""
+	signals := make([]undercoverStateSignal, 0)
+
+	game.Lock()
 	// 检查是否在平票补充描述阶段
 	if len(game.TiebreakPlayers) > 0 {
 		// 平票补充描述阶段：只检查平票玩家是否都已描述
@@ -138,14 +168,17 @@ func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
 		}
 
 		if allTiebreakDescribed {
-			// 平票玩家都已描述完毕，清空平票列表，进入投票阶段
-			game.TiebreakPlayers = nil
-			database.Broadcast(game.Room.ID, "\n>>> 所有人请同时投票！\n")
-			for _, id := range game.PlayerIDs {
-				if game.Alive[id] {
-					game.States[id] <- undercoverStateVote
-				}
+			// 平票玩家都已描述完毕，进入平票 PK 投票阶段
+			if len(game.VoteTargets) == 0 {
+				game.VoteTargets = append([]int64(nil), game.TiebreakPlayers...)
 			}
+			game.TiebreakPlayers = nil
+			game.VoteCounting = false
+			broadcastMsg = "\n>>> 平票玩家描述结束，其他玩家请对平票玩家投票！\n"
+			signals = g.voteSignalsLocked(game)
+			game.Unlock()
+			database.Broadcast(game.Room.ID, broadcastMsg)
+			g.sendStateSignals(game, signals)
 			return
 		}
 
@@ -153,7 +186,9 @@ func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
 		nextIndex := g.getNextTiebreakIndex(game, game.TurnIndex)
 		game.TurnIndex = nextIndex
 		nextID := game.PlayerIDs[nextIndex]
-		game.States[nextID] <- undercoverStateDescribe
+		signals = append(signals, undercoverStateSignal{playerID: nextID, state: undercoverStateDescribe})
+		game.Unlock()
+		g.sendStateSignals(game, signals)
 		return
 	}
 
@@ -170,61 +205,63 @@ func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
 
 	if allDescribed {
 		// 进入投票阶段 - 通知所有存活玩家同时投票
-		database.Broadcast(game.Room.ID, "\n>>> 所有人请同时投票！\n")
-		for _, id := range game.PlayerIDs {
-			if game.Alive[id] {
-				game.States[id] <- undercoverStateVote
-			}
-		}
+		game.VoteTargets = nil
+		game.VoteCounting = false
+		broadcastMsg = "\n>>> 所有人请同时投票！\n"
+		signals = g.voteSignalsLocked(game)
+		game.Unlock()
+		database.Broadcast(game.Room.ID, broadcastMsg)
+		g.sendStateSignals(game, signals)
 		return
 	} else {
 		// 通知下一个存活玩家
 		game.TurnIndex = g.getNextAliveIndex(game, game.TurnIndex)
 		nextID := game.PlayerIDs[game.TurnIndex]
-		game.States[nextID] <- undercoverStateDescribe
+		signals = append(signals, undercoverStateSignal{playerID: nextID, state: undercoverStateDescribe})
 	}
+	game.Unlock()
+	g.sendStateSignals(game, signals)
 }
 
 // handleVote 处理投票阶段
 func (g *Undercover) handleVote(player *database.Player, game *database.Undercover) error {
-	// 如果玩家已淘汰或已投票，跳过
-	if !game.Alive[player.ID] {
+	targets, targetNumbers, voterNumber, canVote, alreadyVoted, tiebreakRestricted := g.voteOptions(game, player.ID)
+	if alreadyVoted {
+		_ = player.WriteString("你已投票，请等待其他玩家...\n")
 		return nil
 	}
-	if _, ok := game.Votes[player.ID]; ok {
-		_ = player.WriteString("你已投票，请等待其他玩家...\n")
+	if !canVote {
+		if tiebreakRestricted {
+			_ = player.WriteString("本轮平票 PK 由其他玩家投票，请等待结果...\n")
+		}
 		return nil
 	}
 
 	// 检查玩家是否在线
 	if !player.IsOnline() {
 		// 玩家离线，标记为已投票（空投票，不参与计票）
-		game.Votes[player.ID] = 0
-		database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 已离线，跳过投票\n",
-			game.PlayerNumbers[player.ID], player.Name))
-		g.checkAllVoted(game)
-		return nil
-	}
-
-	// 获取可投票的目标（存活玩家中排除自己）
-	targets := make([]int64, 0)
-	for _, id := range game.PlayerIDs {
-		if game.Alive[id] && id != player.ID {
-			targets = append(targets, id)
+		recorded, shouldCount := g.recordVote(game, player.ID, 0)
+		if recorded {
+			database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 已离线，跳过投票\n",
+				voterNumber, player.Name))
 		}
-	}
-
-	if len(targets) == 0 {
+		if shouldCount {
+			g.countVotes(game)
+		}
 		return nil
 	}
 
 	buf := bytes.Buffer{}
-	buf.WriteString("\n>>> 投票环节\n")
+	if tiebreakRestricted {
+		buf.WriteString("\n>>> 平票 PK 投票环节\n")
+	} else {
+		buf.WriteString("\n>>> 投票环节\n")
+	}
 	buf.WriteString("请选择你要投票的玩家编号：\n")
 	for _, id := range targets {
 		targetPlayer := database.GetPlayer(id)
 		if targetPlayer != nil {
-			buf.WriteString(fmt.Sprintf("  [%d] %s\n", game.PlayerNumbers[id], targetPlayer.Name))
+			buf.WriteString(fmt.Sprintf("  [%d] %s\n", targetNumbers[id], targetPlayer.Name))
 		}
 	}
 	buf.WriteString("\n直接输入数字投票（30秒内未投票将自动跳过）：")
@@ -235,17 +272,25 @@ func (g *Undercover) handleVote(player *database.Player, game *database.Undercov
 		if err != nil {
 			if err == consts.ErrorsTimeout {
 				// 超时跳过投票（不投票）
-				game.Votes[player.ID] = 0
-				database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 投票超时，跳过投票\n",
-					game.PlayerNumbers[player.ID], player.Name))
-				g.checkAllVoted(game)
+				recorded, shouldCount := g.recordVote(game, player.ID, 0)
+				if recorded {
+					database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 投票超时，跳过投票\n",
+						voterNumber, player.Name))
+				}
+				if shouldCount {
+					g.countVotes(game)
+				}
 				return nil
 			}
 			// 其他错误（如连接断开）也跳过投票
-			game.Votes[player.ID] = 0
-			database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 断开连接，跳过投票\n",
-				game.PlayerNumbers[player.ID], player.Name))
-			g.checkAllVoted(game)
+			recorded, shouldCount := g.recordVote(game, player.ID, 0)
+			if recorded {
+				database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 断开连接，跳过投票\n",
+					voterNumber, player.Name))
+			}
+			if shouldCount {
+				g.countVotes(game)
+			}
 			return nil
 		}
 
@@ -265,7 +310,7 @@ func (g *Undercover) handleVote(player *database.Player, game *database.Undercov
 		// 查找对应玩家
 		var targetID int64 = 0
 		for _, id := range targets {
-			if game.PlayerNumbers[id] == targetNum {
+			if targetNumbers[id] == targetNum {
 				targetID = id
 				break
 			}
@@ -277,42 +322,43 @@ func (g *Undercover) handleVote(player *database.Player, game *database.Undercov
 		}
 
 		// 记录投票
-		game.Votes[player.ID] = targetID
+		recorded, shouldCount := g.recordVote(game, player.ID, targetID)
+		if !recorded {
+			_ = player.WriteString("本轮投票状态已变化，请等待下一步...\n")
+			return nil
+		}
 		targetPlayer := database.GetPlayer(targetID)
+		targetName := fmt.Sprintf("%d号玩家", targetNumbers[targetID])
+		if targetPlayer != nil {
+			targetName = targetPlayer.Name
+		}
 		database.Broadcast(game.Room.ID, fmt.Sprintf("[%d号] %s 投票给了 [%d号] %s\n",
-			game.PlayerNumbers[player.ID], player.Name,
-			game.PlayerNumbers[targetID], targetPlayer.Name))
-		
-		// 检查是否所有玩家都已投票
-		g.checkAllVoted(game)
+			voterNumber, player.Name,
+			targetNumbers[targetID], targetName))
+
+		if shouldCount {
+			g.countVotes(game)
+		}
 		return nil
 	}
 }
 
 // checkAllVoted 检查是否所有存活玩家都已投票
 func (g *Undercover) checkAllVoted(game *database.Undercover) {
-	game.Lock()
-	defer game.Unlock()
-
-	aliveCount := 0
-	voteCount := 0
-	for _, id := range game.PlayerIDs {
-		if game.Alive[id] {
-			aliveCount++
-			if _, ok := game.Votes[id]; ok {
-				voteCount++
-			}
-		}
-	}
-
-	if voteCount >= aliveCount {
-		// 所有存活玩家已投票，开始计票
-		go g.countVotes(game)
+	if g.tryStartVoteCounting(game) {
+		g.countVotes(game)
 	}
 }
 
 // countVotes 计票并处理结果
 func (g *Undercover) countVotes(game *database.Undercover) {
+	result := bytes.Buffer{}
+	followMsg := ""
+	signals := make([]undercoverStateSignal, 0)
+	broadcastWords := false
+	roomID := game.Room.ID
+
+	game.Lock()
 	// 统计票数（跳过投票值为0的，表示跳过投票）
 	voteCount := make(map[int64]int)
 	skipCount := 0
@@ -339,93 +385,130 @@ func (g *Undercover) countVotes(game *database.Undercover) {
 			maxVotedPlayers = append(maxVotedPlayers, id)
 		}
 	}
+	sortInt64Slice(maxVotedPlayers)
 
-	buf := bytes.Buffer{}
-	buf.WriteString("\n========== 投票结果 ==========\n")
+	result.WriteString("\n========== 投票结果 ==========\n")
 	for id, count := range voteCount {
 		player := database.GetPlayer(id)
 		if player != nil {
-			buf.WriteString(fmt.Sprintf("[%d号] %s: %d票\n", game.PlayerNumbers[id], player.Name, count))
+			result.WriteString(fmt.Sprintf("[%d号] %s: %d票\n", game.PlayerNumbers[id], player.Name, count))
 		}
 	}
-	if skipCount > 0 {
-		buf.WriteString(fmt.Sprintf("跳过投票: %d人\n", skipCount))
+	if len(voteCount) == 0 {
+		result.WriteString("无有效得票\n")
 	}
-	database.Broadcast(game.Room.ID, buf.String())
+	if skipCount > 0 {
+		result.WriteString(fmt.Sprintf("跳过投票: %d人\n", skipCount))
+	}
 
-	if len(maxVotedPlayers) > 1 {
+	switch {
+	case len(maxVotedPlayers) == 0:
+		game.Round++
+		game.Descriptions = make(map[int64]string)
+		game.Votes = make(map[int64]int64)
+		game.VoteTargets = nil
+		game.TiebreakPlayers = nil
+		game.VoteCounting = false
+		if signal, ok := g.firstAliveDescribeSignalLocked(game); ok {
+			signals = append(signals, signal)
+		}
+		followMsg = "\n>>> 本轮无人获得有效票数，无人被淘汰，进入下一轮发言\n"
+	case len(maxVotedPlayers) > 1:
 		// 平票，加一轮描述
-		database.Broadcast(game.Room.ID, fmt.Sprintf("\n>>> 平票！[%d票] 平票玩家需要加一轮描述\n", maxVotes))
+		followMsg = fmt.Sprintf("\n>>> 平票！[%d票] 平票玩家需要加一轮描述\n", maxVotes)
 
 		// 设置平票玩家列表
-		game.TiebreakPlayers = maxVotedPlayers
+		game.TiebreakPlayers = append([]int64(nil), maxVotedPlayers...)
+		game.VoteTargets = append([]int64(nil), maxVotedPlayers...)
 		game.Votes = make(map[int64]int64)
+		game.Descriptions = make(map[int64]string) // 清空描述，准备新一轮描述
+		game.VoteCounting = false
 
 		// 找到第一个平票玩家的索引，从他开始描述
 		for i, id := range game.PlayerIDs {
 			if contains(maxVotedPlayers, id) {
 				game.TurnIndex = i
-				game.States[id] <- undercoverStateDescribe
-				return
+				signals = append(signals, undercoverStateSignal{playerID: id, state: undercoverStateDescribe})
+				break
 			}
 		}
-	} else {
+	default:
 		// 淘汰得票最高的玩家
 		eliminatedID := maxVotedPlayers[0]
 		eliminatedPlayer := database.GetPlayer(eliminatedID)
+		eliminatedName := fmt.Sprintf("%d号玩家", game.PlayerNumbers[eliminatedID])
+		if eliminatedPlayer != nil {
+			eliminatedName = eliminatedPlayer.Name
+		}
 		game.Alive[eliminatedID] = false
 
-		isUndercover := game.IsUndercover[eliminatedID]
-		isBlank := game.IsBlankWord[eliminatedID]
-
-		role := "平民"
-		if isUndercover {
-			role = "卧底"
-		} else if isBlank {
-			role = "空白词"
-		}
-
-		database.Broadcast(game.Room.ID, fmt.Sprintf("\n>>> [%d号] %s 被淘汰！身份是：%s\n",
-			game.PlayerNumbers[eliminatedID], eliminatedPlayer.Name, role))
+		role := g.roleOfPlayerLocked(game, eliminatedID)
+		followMsg = fmt.Sprintf("\n>>> [%d号] %s 被淘汰！身份是：%s\n",
+			game.PlayerNumbers[eliminatedID], eliminatedName, role)
 
 		// 检查游戏是否结束
-		if g.checkGameEnd(game) {
+		gameOver, gameOverMsg := g.checkGameEndLocked(game)
+		game.Votes = make(map[int64]int64)
+		game.VoteTargets = nil
+		game.TiebreakPlayers = nil
+		game.VoteCounting = false
+		if gameOver {
+			if gameOverMsg != "" {
+				followMsg += gameOverMsg
+			}
+			broadcastWords = true
 			// 通知所有玩家游戏结束
 			for _, id := range game.PlayerIDs {
-				game.States[id] <- undercoverStateGameEnd
+				signals = append(signals, undercoverStateSignal{playerID: id, state: undercoverStateGameEnd})
 			}
-			return
-		}
-
-		// 开始下一轮
-		game.Round++
-		game.Descriptions = make(map[int64]string)
-		game.Votes = make(map[int64]int64)
-		game.TiebreakPlayers = nil
-		game.TurnIndex = 0
-
-		// 通知第一个存活玩家开始描述
-		for _, id := range game.PlayerIDs {
-			if game.Alive[id] {
-				game.States[id] <- undercoverStateDescribe
-				return
+		} else {
+			// 开始下一轮
+			game.Round++
+			game.Descriptions = make(map[int64]string)
+			if signal, ok := g.firstAliveDescribeSignalLocked(game); ok {
+				signals = append(signals, signal)
 			}
 		}
 	}
+	game.Unlock()
+
+	database.Broadcast(roomID, result.String())
+	if followMsg != "" {
+		database.Broadcast(roomID, followMsg)
+	}
+	if broadcastWords {
+		g.broadcastAllWords(game)
+	}
+	g.sendStateSignals(game, signals)
 }
 
 // checkGameEnd 检查游戏是否结束
 func (g *Undercover) checkGameEnd(game *database.Undercover) bool {
+	game.Lock()
+	gameOver, gameOverMsg := g.checkGameEndLocked(game)
+	game.Unlock()
+	if gameOver && gameOverMsg != "" {
+		database.Broadcast(game.Room.ID, gameOverMsg)
+		g.broadcastAllWords(game)
+	}
+	return gameOver
+}
+
+func (g *Undercover) checkGameEndLocked(game *database.Undercover) (bool, string) {
+	if game.GameOver {
+		return true, ""
+	}
+
 	aliveUndercover := 0
 	aliveNormal := 0
 	aliveBlank := 0
 
 	for _, id := range game.PlayerIDs {
 		if game.Alive[id] {
-			if game.IsUndercover[id] {
-				aliveUndercover++
-			} else if game.IsBlankWord[id] {
+			if game.IsBlankWord[id] {
 				aliveBlank++
+			} else if game.IsUndercover[id] {
+				aliveUndercover++
 			} else {
 				aliveNormal++
 			}
@@ -435,21 +518,17 @@ func (g *Undercover) checkGameEnd(game *database.Undercover) bool {
 	// 所有卧底被淘汰，好人获胜
 	if aliveUndercover == 0 && aliveBlank == 0 {
 		game.GameOver = true
-		database.Broadcast(game.Room.ID, "\n🎉 游戏结束！好人获胜！所有卧底已被淘汰！\n")
-		g.broadcastAllWords(game)
-		return true
+		return true, "\n🎉 游戏结束！好人获胜！所有卧底已被淘汰！\n"
 	}
 
 	// 最后剩两人还存在卧底，卧底胜利
 	aliveTotal := aliveUndercover + aliveNormal + aliveBlank
 	if aliveTotal <= 2 && (aliveUndercover > 0 || aliveBlank > 0) {
 		game.GameOver = true
-		database.Broadcast(game.Room.ID, "\n🎉 游戏结束！卧底获胜！\n")
-		g.broadcastAllWords(game)
-		return true
+		return true, "\n🎉 游戏结束！卧底获胜！\n"
 	}
 
-	return false
+	return false, ""
 }
 
 // broadcastAllWords 广播所有人的词和身份
@@ -464,12 +543,12 @@ func (g *Undercover) broadcastAllWords(game *database.Undercover) {
 		if player != nil {
 			role := "平民"
 			word := game.NormalWord
-			if game.IsUndercover[id] {
-				role = "卧底"
-				word = game.UndercoverWord
-			} else if game.IsBlankWord[id] {
+			if game.IsBlankWord[id] {
 				role = "空白词"
 				word = "（空白）"
+			} else if game.IsUndercover[id] {
+				role = "卧底"
+				word = game.UndercoverWord
 			}
 			status := "存活"
 			if !game.Alive[id] {
@@ -708,4 +787,199 @@ func sortInt64Slice(slice []int64) {
 	sort.Slice(slice, func(i, j int) bool {
 		return slice[i] < slice[j]
 	})
+}
+
+func (g *Undercover) isGameOver(game *database.Undercover) bool {
+	game.Lock()
+	defer game.Unlock()
+	return game.GameOver
+}
+
+func (g *Undercover) voteOptions(game *database.Undercover, playerID int64) ([]int64, map[int64]int, int, bool, bool, bool) {
+	game.Lock()
+	defer game.Unlock()
+
+	targetNumbers := make(map[int64]int)
+	voterNumber := game.PlayerNumbers[playerID]
+	tiebreakRestricted := len(game.VoteTargets) > 0
+	if !game.Alive[playerID] {
+		return nil, targetNumbers, voterNumber, false, false, tiebreakRestricted
+	}
+	if _, ok := game.Votes[playerID]; ok {
+		return nil, targetNumbers, voterNumber, false, true, tiebreakRestricted
+	}
+	if !g.isEligibleVoterLocked(game, playerID) {
+		return nil, targetNumbers, voterNumber, false, false, tiebreakRestricted
+	}
+
+	targets := g.voteTargetsForPlayerLocked(game, playerID)
+	for _, id := range targets {
+		targetNumbers[id] = game.PlayerNumbers[id]
+	}
+	return targets, targetNumbers, voterNumber, len(targets) > 0, false, tiebreakRestricted
+}
+
+func (g *Undercover) recordVote(game *database.Undercover, voterID, targetID int64) (bool, bool) {
+	game.Lock()
+	defer game.Unlock()
+
+	if game.GameOver || !game.Alive[voterID] {
+		return false, false
+	}
+	if _, ok := game.Votes[voterID]; ok {
+		return false, false
+	}
+	if !g.isEligibleVoterLocked(game, voterID) {
+		return false, false
+	}
+	if targetID != 0 && !contains(g.voteTargetsForPlayerLocked(game, voterID), targetID) {
+		return false, false
+	}
+
+	game.Votes[voterID] = targetID
+	if g.allVotesInLocked(game) && !game.VoteCounting {
+		game.VoteCounting = true
+		return true, true
+	}
+	return true, false
+}
+
+func (g *Undercover) tryStartVoteCounting(game *database.Undercover) bool {
+	game.Lock()
+	defer game.Unlock()
+
+	if game.VoteCounting || !g.allVotesInLocked(game) {
+		return false
+	}
+	game.VoteCounting = true
+	return true
+}
+
+func (g *Undercover) allVotesInLocked(game *database.Undercover) bool {
+	voters := g.voterIDsLocked(game)
+	if len(voters) == 0 {
+		return false
+	}
+	for _, id := range voters {
+		if _, ok := game.Votes[id]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (g *Undercover) voteSignalsLocked(game *database.Undercover) []undercoverStateSignal {
+	voters := g.voterIDsLocked(game)
+	signals := make([]undercoverStateSignal, 0, len(voters))
+	for _, id := range voters {
+		if len(g.voteTargetsForPlayerLocked(game, id)) > 0 {
+			signals = append(signals, undercoverStateSignal{playerID: id, state: undercoverStateVote})
+		}
+	}
+	return signals
+}
+
+func (g *Undercover) voterIDsLocked(game *database.Undercover) []int64 {
+	voters := make([]int64, 0)
+	for _, id := range game.PlayerIDs {
+		if g.isEligibleVoterLocked(game, id) {
+			voters = append(voters, id)
+		}
+	}
+	return voters
+}
+
+func (g *Undercover) isEligibleVoterLocked(game *database.Undercover, playerID int64) bool {
+	if !game.Alive[playerID] {
+		return false
+	}
+	if len(game.VoteTargets) == 0 {
+		return true
+	}
+	if g.hasNonTargetVoterLocked(game) {
+		return !contains(game.VoteTargets, playerID)
+	}
+	return true
+}
+
+func (g *Undercover) hasNonTargetVoterLocked(game *database.Undercover) bool {
+	for _, id := range game.PlayerIDs {
+		if game.Alive[id] && !contains(game.VoteTargets, id) {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Undercover) voteTargetsForPlayerLocked(game *database.Undercover, playerID int64) []int64 {
+	source := game.PlayerIDs
+	if len(game.VoteTargets) > 0 {
+		source = game.VoteTargets
+	}
+
+	targets := make([]int64, 0, len(source))
+	for _, id := range source {
+		if game.Alive[id] && id != playerID {
+			targets = append(targets, id)
+		}
+	}
+	return targets
+}
+
+func (g *Undercover) firstAliveDescribeSignalLocked(game *database.Undercover) (undercoverStateSignal, bool) {
+	for i, id := range game.PlayerIDs {
+		if game.Alive[id] {
+			game.TurnIndex = i
+			return undercoverStateSignal{playerID: id, state: undercoverStateDescribe}, true
+		}
+	}
+	return undercoverStateSignal{}, false
+}
+
+func (g *Undercover) roleOfPlayerLocked(game *database.Undercover, playerID int64) string {
+	if game.IsBlankWord[playerID] {
+		return "空白词"
+	}
+	if game.IsUndercover[playerID] {
+		return "卧底"
+	}
+	return "平民"
+}
+
+// recordDescription 记录玩家的描述
+func (g *Undercover) recordDescription(game *database.Undercover, playerID int64, description string) {
+	game.Lock()
+	game.Descriptions[playerID] = description
+	game.Unlock()
+}
+
+// sendStateSignals 向多个玩家发送状态信号
+func (g *Undercover) sendStateSignals(game *database.Undercover, signals []undercoverStateSignal) {
+	for _, signal := range signals {
+		g.sendStateSignal(game, signal)
+	}
+}
+
+func (g *Undercover) sendStateSignal(game *database.Undercover, signal undercoverStateSignal) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Infof("[Undercover.sendStateSignal] Skip state %d for player %d because channel is closed: %v\n", signal.state, signal.playerID, r)
+		}
+	}()
+
+	if ch, ok := game.States[signal.playerID]; ok {
+		select {
+		case ch <- signal.state:
+		default:
+			select {
+			case <-ch:
+			default:
+			}
+			select {
+			case ch <- signal.state:
+			default:
+				log.Infof("[Undercover.sendStateSignal] Drop state %d for player %d because channel is still full\n", signal.state, signal.playerID)
+			}
+		}
+	}
 }
