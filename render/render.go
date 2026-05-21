@@ -70,6 +70,25 @@ func RoomList(player *database.Player) error {
 
 func RoomInfo(player *database.Player, room *database.Room) error {
 	buf := bytes.Buffer{}
+	
+	// 如果游戏正在进行中，显示玩家号码
+	if room.Game != nil {
+		if undercoverGame, ok := room.Game.(*database.Undercover); ok {
+			buf.WriteString(fmt.Sprintf("%-10s%-20s%-10s%-10s\n", "Number", "Name", "Amount", "Title"))
+			for playerId := range database.RoomPlayers(room.ID) {
+				title := "player"
+				if playerId == room.Creator {
+					title = "owner"
+				}
+				info := database.GetPlayer(playerId)
+				playerNum := undercoverGame.PlayerNumbers[playerId]
+				buf.WriteString(fmt.Sprintf("%-10d%-20s%-10d%-10s\n", playerNum, info.Name, info.Amount, title))
+			}
+			return player.WriteString(buf.String())
+		}
+	}
+	
+	// 默认显示（等待状态或其他游戏）
 	buf.WriteString(fmt.Sprintf("%-20s%-10s%-10s\n", "Name", "Amount", "Title"))
 	for playerId := range database.RoomPlayers(room.ID) {
 		title := "player"
