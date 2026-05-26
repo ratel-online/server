@@ -22,8 +22,9 @@ type undercoverStateSignal struct {
 
 var (
 	undercoverStateDescribe = 1 // 描述阶段
-	undercoverStateVote     = 2 // 投票阶段
-	undercoverStateGameEnd  = 3 // 游戏结束
+	undercoverStateReveal   = 2 // 爆词阶段
+	undercoverStateVote     = 3 // 投票阶段
+	undercoverStateGameEnd  = 4 // 游戏结束
 )
 
 func (g *Undercover) Next(player *database.Player) (consts.StateID, error) {
@@ -70,6 +71,12 @@ func (g *Undercover) Next(player *database.Player) (consts.StateID, error) {
 		switch state {
 		case undercoverStateDescribe:
 			err := g.handleDescribe(player, game)
+			if err != nil {
+				log.Error(err)
+				return 0, err
+			}
+		case undercoverStateReveal:
+			err := g.handleReveal(player, game)
 			if err != nil {
 				log.Error(err)
 				return 0, err
@@ -150,6 +157,163 @@ func (g *Undercover) handleDescribe(player *database.Player, game *database.Unde
 	}
 }
 
+// handleReveal 处理爆词阶段
+func (g *Undercover) handleReveal(player *database.Player, game *database.Undercover) error {
+	game.Lock()
+	playerNumber := game.PlayerNumbers[player.ID]
+	_, alreadyRevealed := game.RevealUsed[player.ID]
+	isUndercover := game.IsUndercover[player.ID]
+	isAlive := game.Alive[player.ID]
+	game.Unlock()
+
+	// 如果玩家已淘汰或不是卧底或已使用过爆词，跳过
+	if !isAlive || !isUndercover || alreadyRevealed {
+		g.nextRevealPlayerOrVote(game)
+		return nil
+	}
+
+	buf := bytes.Buffer{}
+	buf.WriteString("\n>>> 爆词环节！\n")
+	buf.WriteString("你是本轮的卧底！你可以选择：\n")
+	buf.WriteString("  1. 输入你猜测的平民词（如果猜对直接获胜）\n")
+	buf.WriteString("  2. 输入 's' 跳过爆词，进入投票环节\n")
+	buf.WriteString("（每个卧底只能爆词一次）\n")
+	buf.WriteString("\n请输入你的选择（60秒内）：")
+	_ = player.WriteString(buf.String())
+
+	ans, err := player.AskForString(60 * time.Second)
+	if err != nil {
+		if err == consts.ErrorsTimeout {
+			_ = player.WriteString("爆词超时，自动跳过。\n")
+			g.nextRevealPlayerOrVote(game)
+			return nil
+		}
+		_ = player.WriteString("连接断开，自动跳过爆词。\n")
+		g.nextRevealPlayerOrVote(game)
+		return nil
+	}
+
+	ans = strings.TrimSpace(ans)
+	if ans == "" {
+		_ = player.WriteString("输入不能为空，请重新输入或输入 's' 跳过：")
+		return g.handleReveal(player, game)
+	}
+
+	// 检查是否跳过爆词
+	if ans == "s" || ans == "S" {
+		_ = player.WriteString("你选择跳过爆词，进入投票环节。\n")
+		game.Lock()
+		game.RevealUsed[player.ID] = true
+		game.Unlock()
+		g.nextRevealPlayerOrVote(game)
+		return nil
+	}
+
+	// 记录爆词
+	game.Lock()
+	game.RevealUsed[player.ID] = true
+	normalWord := game.NormalWord
+	roomID := game.Room.ID
+	game.Unlock()
+
+	// 检查是否猜对（忽略空格和大小写）
+	normalizedAns := strings.ReplaceAll(strings.ToLower(ans), " ", "")
+	normalizedNormalWord := strings.ReplaceAll(strings.ToLower(normalWord), " ", "")
+
+	if normalizedAns == normalizedNormalWord {
+		// 猜对了，卧底获胜
+		_ = player.WriteString(fmt.Sprintf("🎉 恭喜你猜对了！平民词是：【%s】\n", normalWord))
+		database.Broadcast(roomID, fmt.Sprintf("\n>>> [%d号] %s 爆词成功！猜对了平民词：【%s】\n>>> 卧底获胜！\n",
+			playerNumber, player.Name, normalWord))
+
+		game.Lock()
+		game.GameOver = true
+		game.RevealWinner = true
+		// 通知所有玩家游戏结束
+		for _, id := range game.PlayerIDs {
+			g.sendStateSignal(game, undercoverStateSignal{playerID: id, state: undercoverStateGameEnd})
+		}
+		game.Unlock()
+
+		// 广播所有词
+		g.broadcastAllWords(game)
+	} else {
+		// 猜错了，卧底死亡
+		_ = player.WriteString(fmt.Sprintf("❌ 猜错了！平民词不是：【%s】\n", ans))
+		_ = player.WriteString("你猜错了，身份暴露，死亡！\n")
+		database.Broadcast(roomID, fmt.Sprintf("\n>>> [%d号] %s 爆词失败！猜的词是：【%s】（错误）\n>>> 卧底身份暴露，被淘汰！\n",
+			playerNumber, player.Name, ans))
+
+		game.Lock()
+		game.Alive[player.ID] = false
+		game.RevealWinner = false
+		game.Unlock()
+
+		// 检查游戏是否结束
+		if g.checkGameEnd(game) {
+			// 游戏结束，广播所有词
+		} else {
+			// 进入下一轮描述
+			game.Lock()
+			game.Round++
+			game.Descriptions = make(map[int64]string)
+			game.RevealUndercoverIDs = nil // 清空爆词列表
+			game.Votes = make(map[int64]int64)
+			game.VoteTargets = nil
+			game.TiebreakPlayers = nil
+			game.VoteCounting = false
+
+			// 找到第一个存活玩家开始描述
+			var firstSignal *undercoverStateSignal
+			for i, id := range game.PlayerIDs {
+				if game.Alive[id] {
+					game.TurnIndex = i
+					signal := undercoverStateSignal{playerID: id, state: undercoverStateDescribe}
+					firstSignal = &signal
+					break
+				}
+			}
+			game.Unlock()
+
+			if firstSignal != nil {
+				database.Broadcast(roomID, fmt.Sprintf("\n>>> 卧底已被淘汰，游戏继续！进入第%d轮描述\n", game.Round))
+				g.sendStateSignal(game, *firstSignal)
+			}
+		}
+	}
+
+	return nil
+}
+
+// nextRevealPlayerOrVote 通知下一个需要爆词的卧底，或进入投票阶段
+func (g *Undercover) nextRevealPlayerOrVote(game *database.Undercover) {
+	game.Lock()
+
+	// 检查是否所有卧底都已完成爆词
+	for _, id := range game.PlayerIDs {
+		if game.Alive[id] && game.IsUndercover[id] && game.IsBlankWord[id] {
+			if !game.RevealUsed[id] {
+				// 找到下一个需要爆词的卧底
+				signals := make([]undercoverStateSignal, 0)
+				signals = append(signals, undercoverStateSignal{playerID: id, state: undercoverStateReveal})
+				game.Unlock()
+				g.sendStateSignals(game, signals)
+				return
+			}
+		}
+	}
+
+	// 所有卧底都已完成爆词，进入投票阶段
+	game.VoteTargets = nil
+	game.VoteCounting = false
+	signals := g.voteSignalsLocked(game)
+	game.Unlock()
+
+	broadcastMsg := "\n>>> 所有卧底爆词结束，进入投票环节！\n"
+	database.Broadcast(game.Room.ID, broadcastMsg)
+	g.sendStateSignals(game, signals)
+}
+
 // nextPlayerOrPhase 切换到下一个玩家或进入投票阶段
 func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
 	broadcastMsg := ""
@@ -204,6 +368,36 @@ func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
 	}
 
 	if allDescribed {
+		// 检查是否需要进入爆词阶段（只在空白词模式下开启）
+		// 爆词规则：空白词卧底可以在描述结束后尝试猜测平民词
+		hasUndercoverToReveal := false
+		if game.Room.BlankWordMode {
+			for _, id := range game.PlayerIDs {
+				if game.Alive[id] && game.IsUndercover[id] && game.IsBlankWord[id] {
+					if !game.RevealUsed[id] {
+						hasUndercoverToReveal = true
+						break
+					}
+				}
+			}
+		}
+
+		if hasUndercoverToReveal {
+			// 找到第一个需要爆词的卧底
+			for _, id := range game.PlayerIDs {
+				if game.Alive[id] && game.IsUndercover[id] && game.IsBlankWord[id] {
+					if !game.RevealUsed[id] {
+						signals = append(signals, undercoverStateSignal{playerID: id, state: undercoverStateReveal})
+						broadcastMsg = "\n>>> 所有人描述完毕！卧底可以爆词了！\n"
+						game.Unlock()
+						database.Broadcast(game.Room.ID, broadcastMsg)
+						g.sendStateSignals(game, signals)
+						return
+					}
+				}
+			}
+		}
+
 		// 进入投票阶段 - 通知所有存活玩家同时投票
 		game.VoteTargets = nil
 		game.VoteCounting = false
@@ -743,6 +937,7 @@ func InitUndercoverGame(room *database.Room) (*database.Undercover, error) {
 		UndercoverWord: undercoverWord,
 		IsClockwise:    true,
 		GameOver:       false,
+		RevealUsed:     make(map[int64]bool),
 	}
 
 	// 广播游戏开始信息
@@ -756,6 +951,13 @@ func InitUndercoverGame(room *database.Room) (*database.Undercover, error) {
 	}
 	buf.WriteString("\n")
 	buf.WriteString("发言顺序：从1号开始顺序发言\n")
+	// 只在空白词模式下显示爆词规则
+	if blankWordMode {
+		buf.WriteString("🔓 爆词规则：每轮描述结束后，空白词卧底可以猜测平民词\n")
+		buf.WriteString("   - 爆词成功（猜对平民词）：卧底获胜\n")
+		buf.WriteString("   - 爆词失败（猜错）：卧底死亡，进入下一轮\n")
+		buf.WriteString("   - 输入 's' 跳过爆词，进入投票环节\n")
+	}
 	buf.WriteString("\n玩家列表：\n")
 	for _, id := range playerIDs {
 		player := database.GetPlayer(id)
