@@ -1,7 +1,11 @@
 package database
 
 import (
+	"fmt"
 	"sync"
+
+	"github.com/lipp12138/chatroom"
+	"github.com/ratel-online/core/util/rand"
 )
 
 // Undercover 谁是卧底游戏数据模型
@@ -75,4 +79,22 @@ var WordPairs = []UndercoverWordPair{
 	{NormalWord: "书包", UndercoverWord: "钱包"},
 	{NormalWord: "沙发", UndercoverWord: "椅子"},
 	{NormalWord: "窗户", UndercoverWord: "门"},
+}
+
+// PickUndercoverWordPair 优先使用 chatroom 词库取词，失败时回退到内置词库。
+func PickUndercoverWordPair() (UndercoverWordPair, error) {
+	pair, err := chatroom.Pick()
+	if err == nil {
+		return UndercoverWordPair{
+			NormalWord:     pair.Civilian,
+			UndercoverWord: pair.Undercover,
+		}, nil
+	}
+
+	if len(WordPairs) == 0 {
+		return UndercoverWordPair{}, fmt.Errorf("pick chatroom word pair: %w", err)
+	}
+
+	fallback := WordPairs[rand.Intn(len(WordPairs))]
+	return fallback, fmt.Errorf("pick chatroom word pair: %w", err)
 }

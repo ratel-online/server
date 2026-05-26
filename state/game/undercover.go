@@ -689,8 +689,11 @@ func InitUndercoverGame(room *database.Room) (*database.Undercover, error) {
 		}
 	}
 
-	// 随机选择词组
-	wordPair := database.WordPairs[rand.Intn(len(database.WordPairs))]
+	// 选择词组，优先使用 chatroom 词库，失败时回退到内置词库
+	wordPair, err := database.PickUndercoverWordPair()
+	if err != nil {
+		log.Errorf("pick undercover word pair fallback: %v", err)
+	}
 
 	// 随机决定是否互换平民词和卧底词（50%概率）
 	normalWord := wordPair.NormalWord
