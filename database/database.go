@@ -477,14 +477,16 @@ func broadcast(room *Room, msg string, exclude ...int64) {
 	for _, exc := range exclude {
 		excludeSet[exc] = true
 	}
+	// 使用 "[系统] " 前缀而不是 ">> "，避免与输入提示符冲突
+	formattedMsg := ">> " + msg
 	for playerId := range getRoomPlayers(room.ID) {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
-			_ = player.WriteString(">> " + msg)
+			_ = player.WriteString(formattedMsg)
 		}
 	}
 	for playerId := range getRoomSpectators(room.ID) {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
-			_ = player.WriteString(">> " + msg)
+			_ = player.WriteString(formattedMsg)
 		}
 	}
 }

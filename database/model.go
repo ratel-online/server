@@ -103,7 +103,6 @@ func (p *Player) Listening() error {
 
 // 向客户端发生消息
 func (p *Player) WriteString(data string) error {
-	time.Sleep(30 * time.Millisecond)
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(data),
 	})
