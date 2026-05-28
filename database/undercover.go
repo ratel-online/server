@@ -1,7 +1,11 @@
 package database
 
 import (
+	"fmt"
 	"sync"
+
+	"github.com/lipp12138/chatroom"
+	"github.com/ratel-online/core/util/rand"
 )
 
 // Undercover 谁是卧底游戏数据模型
@@ -26,6 +30,9 @@ type Undercover struct {
 	VoteCounting    bool               `json:"voteCounting"`    // 是否正在计票，防止重复结算
 	VoteTargets     []int64            `json:"voteTargets"`     // 当前投票阶段允许被投票的玩家列表；为空表示所有存活玩家
 	TiebreakPlayers []int64            `json:"tiebreakPlayers"` // 平票需要补充描述的玩家列表
+	RevealUndercoverIDs []int64        `json:"revealUndercoverIds"` // 本轮需要爆词的卧底玩家ID列表
+	RevealUsed      map[int64]bool     `json:"revealUsed"`     // 记录卧底是否已经使用过爆词
+	RevealWinner    bool               `json:"revealWinner"`   // 爆词环节是否已产生胜者
 }
 
 // Clean 清理游戏资源
@@ -75,4 +82,22 @@ var WordPairs = []UndercoverWordPair{
 	{NormalWord: "书包", UndercoverWord: "钱包"},
 	{NormalWord: "沙发", UndercoverWord: "椅子"},
 	{NormalWord: "窗户", UndercoverWord: "门"},
+}
+
+// PickUndercoverWordPair 优先使用 chatroom 词库取词，失败时回退到内置词库。
+func PickUndercoverWordPair() (UndercoverWordPair, error) {
+	pair, err := chatroom.Pick()
+	if err == nil {
+		return UndercoverWordPair{
+			NormalWord:     pair.Civilian,
+			UndercoverWord: pair.Undercover,
+		}, nil
+	}
+
+	if len(WordPairs) == 0 {
+		return UndercoverWordPair{}, fmt.Errorf("pick chatroom word pair: %w", err)
+	}
+
+	fallback := WordPairs[rand.Intn(len(WordPairs))]
+	return fallback, fmt.Errorf("pick chatroom word pair: %w", err)
 }
