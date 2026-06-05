@@ -306,12 +306,15 @@ func (g *Undercover) nextRevealPlayerOrVote(game *database.Undercover) {
 	// 所有卧底都已完成爆词，进入投票阶段
 	game.VoteTargets = nil
 	game.VoteCounting = false
-	signals := g.voteSignalsLocked(game)
+	signals, shouldCount := g.beginVoteLocked(game)
 	game.Unlock()
 
 	broadcastMsg := "\n>>> 所有卧底爆词结束，进入投票环节！\n"
 	database.Broadcast(game.Room.ID, broadcastMsg)
 	g.sendStateSignals(game, signals)
+	if shouldCount {
+		g.countVotes(game)
+	}
 }
 
 // nextPlayerOrPhase 切换到下一个玩家或进入投票阶段
@@ -339,10 +342,14 @@ func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
 			game.TiebreakPlayers = nil
 			game.VoteCounting = false
 			broadcastMsg = "\n>>> 平票玩家描述结束，其他玩家请对平票玩家投票！\n"
-			signals = g.voteSignalsLocked(game)
+			var shouldCount bool
+			signals, shouldCount = g.beginVoteLocked(game)
 			game.Unlock()
 			database.Broadcast(game.Room.ID, broadcastMsg)
 			g.sendStateSignals(game, signals)
+			if shouldCount {
+				g.countVotes(game)
+			}
 			return
 		}
 
@@ -402,10 +409,14 @@ func (g *Undercover) nextPlayerOrPhase(game *database.Undercover) {
 		game.VoteTargets = nil
 		game.VoteCounting = false
 		broadcastMsg = "\n>>> 所有人请同时投票！\n"
-		signals = g.voteSignalsLocked(game)
+		var shouldCount bool
+		signals, shouldCount = g.beginVoteLocked(game)
 		game.Unlock()
 		database.Broadcast(game.Room.ID, broadcastMsg)
 		g.sendStateSignals(game, signals)
+		if shouldCount {
+			g.countVotes(game)
+		}
 		return
 	} else {
 		// 通知下一个存活玩家
@@ -1077,6 +1088,12 @@ func (g *Undercover) voteSignalsLocked(game *database.Undercover) []undercoverSt
 	voters := g.voterIDsLocked(game)
 	signals := make([]undercoverStateSignal, 0, len(voters))
 	for _, id := range voters {
+		if _, ok := game.Votes[id]; ok {
+			continue
+		}
+		if !g.isPlayerOnline(id) {
+			continue
+		}
 		if len(g.voteTargetsForPlayerLocked(game, id)) > 0 {
 			signals = append(signals, undercoverStateSignal{playerID: id, state: undercoverStateVote})
 		}
@@ -1149,6 +1166,35 @@ func (g *Undercover) roleOfPlayerLocked(game *database.Undercover, playerID int6
 		return "卧底"
 	}
 	return "平民"
+}
+
+func (g *Undercover) beginVoteLocked(game *database.Undercover) ([]undercoverStateSignal, bool) {
+	g.recordOfflineVotesLocked(game)
+	signals := g.voteSignalsLocked(game)
+	if g.allVotesInLocked(game) && !game.VoteCounting {
+		game.VoteCounting = true
+		return signals, true
+	}
+	return signals, false
+}
+
+func (g *Undercover) recordOfflineVotesLocked(game *database.Undercover) {
+	for _, id := range game.PlayerIDs {
+		if !g.isEligibleVoterLocked(game, id) {
+			continue
+		}
+		if _, ok := game.Votes[id]; ok {
+			continue
+		}
+		if !g.isPlayerOnline(id) {
+			game.Votes[id] = 0
+		}
+	}
+}
+
+func (g *Undercover) isPlayerOnline(playerID int64) bool {
+	player := database.GetPlayer(playerID)
+	return player != nil && player.IsOnline()
 }
 
 // recordDescription 记录玩家的描述

@@ -50,14 +50,17 @@ type Player struct {
 	RoomID int64  `json:"roomId"`
 	Role   Role   `json:"role"`
 
-	conn   *network.Conn
-	data   chan *protocol.Packet
-	read   bool
-	state  consts.StateID
-	online bool
+	conn    *network.Conn
+	data    chan *protocol.Packet
+	read    bool
+	state   consts.StateID
+	online  bool
+	writeMu sync.Mutex
 }
 
 func (p *Player) Write(bytes []byte) error {
+	p.writeMu.Lock()
+	defer p.writeMu.Unlock()
 	return p.conn.Write(protocol.Packet{
 		Body: bytes,
 	})
@@ -103,12 +106,16 @@ func (p *Player) Listening() error {
 
 // 向客户端发生消息
 func (p *Player) WriteString(data string) error {
+	p.writeMu.Lock()
+	defer p.writeMu.Unlock()
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(data),
 	})
 }
 
 func (p *Player) WriteObject(data interface{}) error {
+	p.writeMu.Lock()
+	defer p.writeMu.Unlock()
 	return p.conn.Write(protocol.Packet{
 		Body: json.Marshal(data),
 	})
@@ -118,6 +125,8 @@ func (p *Player) WriteError(err error) error {
 	if err == consts.ErrorsExist {
 		return err
 	}
+	p.writeMu.Lock()
+	defer p.writeMu.Unlock()
 	return p.conn.Write(protocol.Packet{
 		Body: []byte(err.Error() + "\n"),
 	})
@@ -249,8 +258,8 @@ type Room struct {
 	EnableDontShuffle   bool      `json:"enableDontShuffle"`
 	EnableShowIP        bool      `json:"enableShowIP"`
 	EnableJokerAsTarget bool      `json:"enableJokerAsTarget"`
-	UndercoverNum       int       `json:"undercoverNum"`  // 卧底数量
-	BlankWordMode       bool      `json:"blankWordMode"`  // 空白词模式
+	UndercoverNum       int       `json:"undercoverNum"` // 卧底数量
+	BlankWordMode       bool      `json:"blankWordMode"` // 空白词模式
 }
 
 func (r *Room) Model() model.Room {
