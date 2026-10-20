@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/lipp12138/chatroom"
+	"github.com/ratel-online/server/internal/chatroom"
 	"github.com/ratel-online/core/util/rand"
 )
 

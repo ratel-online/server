@@ -1,12 +1,21 @@
 module github.com/ratel-online/server
 
-go 1.24
+go 1.17
+
+// 为了兼容 Go 1.17 部署环境，以下依赖以本地副本形式引入：
+// 上游 go.mod 声明的 go 版本高于 1.17（Milky=1.22、cast=1.19、uno=1.18），
+// Go 1.21+ 工具链会强制主模块版本 ≥ 依赖版本，因此 vendor 到 third_party 并统一降为 go 1.17。
+// 源码本身未使用 1.18+ 语法，功能与上游一致。
+replace (
+	github.com/Szzrain/Milky-go-sdk => ./third_party/milky-go-sdk
+	github.com/feel-easy/uno => ./third_party/uno
+	github.com/spf13/cast => ./third_party/cast
+)
 
 require (
 	github.com/Szzrain/Milky-go-sdk v1.0.1
 	github.com/feel-easy/uno v0.0.0-20220721061415-e6a3189cfd70
 	github.com/gorilla/websocket v1.5.3
-	github.com/lipp12138/chatroom v0.0.0-20260522015722-1f505441035d
 	github.com/ratel-online/core v0.0.0-20250225062905-81b6faff6d25
 	github.com/spf13/cast v1.6.0
 )
