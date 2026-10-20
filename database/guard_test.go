@@ -244,7 +244,7 @@ func TestReadyWindow(t *testing.T) {
 	defer deleteRoom(room)
 	room.MaxPlayers = 2
 	seated := getRoomPlayers(room.ID)
-	seated[1] = true
+	seated.Add(1)
 	room.Players = 1
 
 	SyncReady(room)
@@ -252,7 +252,7 @@ func TestReadyWindow(t *testing.T) {
 		t.Fatal("未满员就要求 ready")
 	}
 
-	seated[2] = true
+	seated.Add(2)
 	room.Players = 2
 	SyncReady(room)
 	info := ReadyStatus(room, 1)
@@ -273,7 +273,7 @@ func TestReadyWindow(t *testing.T) {
 
 	// 人数回落则清空 ready 窗口
 	room.Players = 1
-	delete(seated, 2)
+	seated.Del(2)
 	SyncReady(room)
 	if info := ReadyStatus(room, 1); info.Required || len(room.Ready) != 0 {
 		t.Fatalf("人数回落后 ready 状态未清空: %+v", info)
@@ -285,7 +285,7 @@ func TestResumeStateKeepsSeat(t *testing.T) {
 	room := CreateRoom(1, consts.GameTypeClassic)
 	defer deleteRoom(room)
 	p := &Player{ID: 7001, RoomID: room.ID, Role: RolePlayer}
-	getRoomPlayers(room.ID)[p.ID] = true
+	getRoomPlayers(room.ID).Add(p.ID)
 	room.Players = 1
 	room.State = consts.RoomStateRunning
 

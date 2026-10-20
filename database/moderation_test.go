@@ -113,7 +113,7 @@ func TestResumeState(t *testing.T) {
 	defer deleteRoom(room)
 	p.RoomID = room.ID
 	p.Role = RolePlayer
-	getRoomPlayers(room.ID)[p.ID] = true
+	getRoomPlayers(room.ID).Add(p.ID)
 	room.Players = 1
 	if got := ResumeState(p); got != consts.StateWaiting {
 		t.Fatalf("等待房间应恢复到房间, got %v", got)

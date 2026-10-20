@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/awesome-cap/hashmap"
 	"github.com/ratel-online/core/log"
 	modelx "github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
@@ -19,12 +18,12 @@ import (
 )
 
 var roomIds int64 = 0
-var players = hashmap.New() // 存储连接过服务器的全部用户
-var connPlayers = hashmap.New()
-var rooms = hashmap.New()
-var roomPlayers = hashmap.New()
-var roomSpectators = hashmap.New()
-var roomKickedPlayers = hashmap.New()
+var players = newStore[int64, *Player]() // 存储连接过服务器的全部用户
+var connPlayers = newStore[int64, *Player]()
+var rooms = newStore[int64, *Room]()
+var roomPlayers = newStore[int64, *memberSet]()
+var roomSpectators = newStore[int64, *memberSet]()
+var roomKickedPlayers = newStore[int64, map[int64]bool]()
 var roomPropsSetter = map[string]func(r *Room, v string){
 	consts.RoomPropsSkill: func(r *Room, v string) {
 		r.EnableSkill = v == "on"
@@ -90,9 +89,9 @@ func init() {
 				log.Infof("[database.init] Room cleanup loop count: %d (running for %d hours)\n", loopCount, loopCount/60)
 			}
 			time.Sleep(1 * time.Minute)
-			rooms.Foreach(func(e *hashmap.Entry) {
-				roomCancel(e.Value().(*Room))
-			})
+			for _, room := range rooms.Values() {
+				roomCancel(room)
+			}
 			Maintenance() // 清理过期的禁言/封禁/限流/名字占用
 		}
 	})
@@ -163,8 +162,8 @@ func CreateRoom(creator int64, t int) *Room {
 		room.UndercoverNum = 1
 		room.BlankWordMode = false
 	}
-	roomPlayers.Set(room.ID, map[int64]bool{})
-	roomSpectators.Set(room.ID, map[int64]int{})
+	roomPlayers.Set(room.ID, newMemberSet())
+	roomSpectators.Set(room.ID, newMemberSet())
 	room.Ready = map[int64]bool{}
 	rooms.Set(room.ID, room)
 	return room
@@ -182,10 +181,7 @@ func deleteRoom(room *Room) {
 }
 
 func GetRooms() []*Room {
-	list := make([]*Room, 0)
-	rooms.Foreach(func(e *hashmap.Entry) {
-		list = append(list, e.Value().(*Room))
-	})
+	list := rooms.Values()
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].ID < list[j].ID
 	})
@@ -198,21 +194,21 @@ func GetRoom(roomId int64) *Room {
 
 func getRoom(roomId int64) *Room {
 	if v, ok := rooms.Get(roomId); ok {
-		return v.(*Room)
+		return v
 	}
 	return nil
 }
 
 func getPlayer(playerId int64) *Player {
 	if v, ok := players.Get(playerId); ok {
-		return v.(*Player)
+		return v
 	}
 	return nil
 }
 
 func SetRoomProps(room *Room, k, v string) {
 	// 根据房间类型限制可设置的属性
-	allowedProps := getAllowedPropsByGameType(room.Type)
+	allowedProps := getAllowedPropsByGameType(room.Info().Type)
 
 	// 检查属性是否允许设置
 	if !allowedProps[k] {
@@ -220,7 +216,9 @@ func SetRoomProps(room *Room, k, v string) {
 	}
 
 	if setter, ok := roomPropsSetter[k]; ok {
+		room.Lock()
 		setter(room, v)
+		room.Unlock()
 	}
 }
 
@@ -271,16 +269,16 @@ func getAllowedPropsByGameType(gameType int) map[string]bool {
 	}
 }
 
-func getRoomPlayers(roomId int64) map[int64]bool {
+func getRoomPlayers(roomId int64) *memberSet {
 	if v, ok := roomPlayers.Get(roomId); ok {
-		return v.(map[int64]bool)
+		return v
 	}
 	return nil
 }
 
-func getRoomSpectators(roomId int64) map[int64]int {
+func getRoomSpectators(roomId int64) *memberSet {
 	if v, ok := roomSpectators.Get(roomId); ok {
-		return v.(map[int64]int)
+		return v
 	}
 	return nil
 }
@@ -290,19 +288,11 @@ func IsValidPlayer(roomId, playerId int64) bool {
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
-		playersIds := getRoomPlayers(roomId)
-		if playersIds != nil {
-			_, exists := playersIds[playerId]
-			if exists {
-				return true
-			}
+		if playersIds := getRoomPlayers(roomId); playersIds != nil && playersIds.Has(playerId) {
+			return true
 		}
-		spectatorsIds := getRoomSpectators(roomId)
-		if spectatorsIds != nil {
-			_, exists := spectatorsIds[playerId]
-			if exists {
-				return true
-			}
+		if spectatorsIds := getRoomSpectators(roomId); spectatorsIds != nil && spectatorsIds.Has(playerId) {
+			return true
 		}
 		return false
 	}
@@ -333,19 +323,16 @@ func JoinRoom(roomId, playerId int64) error {
 
 	//房间人数及状态检查
 	if room.Players >= room.MaxPlayers || room.State == consts.RoomStateRunning {
-		spectatorsIds := getRoomSpectators(roomId)
-		spectatorsIds[playerId] = len(spectatorsIds)
-		player.RoomID = roomId
-		player.Role = RoleSpectator
+		getRoomSpectators(roomId).Add(playerId)
+		player.SetRoom(roomId, RoleSpectator)
 	} else {
-		playersIds := getRoomPlayers(roomId)
-		playersIds[playerId] = true
+		getRoomPlayers(roomId).Add(playerId)
 		room.Players++
-		player.RoomID = roomId
-		player.Role = RolePlayer
+		role := Role(RolePlayer)
 		if room.Creator == playerId {
-			player.Role = RoleOwner
+			role = RoleOwner
 		}
+		player.SetRoom(roomId, role)
 	}
 	SyncReady(room)
 	return nil
@@ -375,7 +362,7 @@ func backfill(room *Room) *Player {
 		return nil
 	}
 	spectatorsIds := getRoomSpectators(room.ID)
-	if len(spectatorsIds) == 0 {
+	if spectatorsIds.Len() == 0 {
 		return nil
 	}
 	spectators := make([]struct {
@@ -383,7 +370,7 @@ func backfill(room *Room) *Player {
 		index int
 	}, 0)
 
-	for id, index := range spectatorsIds {
+	for id, index := range spectatorsIds.Copy() {
 		spectators = append(spectators, struct {
 			id    int64
 			index int
@@ -395,13 +382,12 @@ func backfill(room *Room) *Player {
 
 	playerId := spectators[0].id
 
-	delete(spectatorsIds, playerId)
-	playersIds := getRoomPlayers(room.ID)
-	playersIds[playerId] = true
+	spectatorsIds.Del(playerId)
+	getRoomPlayers(room.ID).Add(playerId)
 	room.Players++
 	player := getPlayer(playerId)
 	if player != nil {
-		player.Role = RolePlayer
+		player.SetRole(RolePlayer)
 	}
 	SyncReady(room)
 	return player
@@ -419,7 +405,7 @@ func Kicking(roomId, playerId int64) {
 			kickedPlayers = map[int64]bool{}
 			roomKickedPlayers.Set(roomId, kickedPlayers)
 		}
-		kickedPlayers.(map[int64]bool)[playerId] = true
+		kickedPlayers[playerId] = true
 	}
 }
 
@@ -428,7 +414,7 @@ func hasKicked(roomId, playerId int64) bool {
 	if !ok {
 		return false
 	}
-	_, exists := kickedPlayers.(map[int64]bool)[playerId]
+	_, exists := kickedPlayers[playerId]
 	return exists
 }
 
@@ -438,30 +424,28 @@ func leaveRoom(room *Room, player *Player) {
 	}
 	room.ActiveTime = time.Now()
 	playersIds := getRoomPlayers(room.ID)
-	if _, ok := playersIds[player.ID]; ok {
+	if playersIds.Has(player.ID) {
 		room.Players--
-		player.RoomID = 0
-		player.Role = ""
-		delete(playersIds, player.ID)
-		if len(playersIds) > 0 && room.Creator == player.ID {
-			for k := range playersIds {
+		player.SetRoom(0, "")
+		playersIds.Del(player.ID)
+		if playersIds.Len() > 0 && room.Creator == player.ID {
+			for _, k := range playersIds.IDs() {
 				room.Creator = k
 				if p := getPlayer(k); p != nil {
-					p.Role = RoleOwner
+					p.SetRole(RoleOwner)
 				}
 				break
 			}
 		}
 	}
 	spectatorsIds := getRoomSpectators(room.ID)
-	if _, ok := spectatorsIds[player.ID]; ok {
-		player.RoomID = 0
-		player.Role = ""
-		delete(spectatorsIds, player.ID)
+	if spectatorsIds.Has(player.ID) {
+		player.SetRoom(0, "")
+		spectatorsIds.Del(player.ID)
 	}
 	delete(room.Ready, player.ID)
 	SyncReady(room)
-	if len(playersIds) == 0 && len(spectatorsIds) == 0 {
+	if playersIds.Len() == 0 && spectatorsIds.Len() == 0 {
 		deleteRoom(room)
 	}
 }
@@ -473,15 +457,13 @@ func roomCancel(room *Room) {
 		return
 	}
 	living := false
-	playerIds := getRoomPlayers(room.ID)
-	for id := range playerIds {
+	for _, id := range getRoomPlayers(room.ID).IDs() {
 		if p := getPlayer(id); p != nil && p.IsOnline() {
 			living = true
 			break
 		}
 	}
-	spectatorIds := getRoomSpectators(room.ID)
-	for id := range spectatorIds {
+	for _, id := range getRoomSpectators(room.ID).IDs() {
 		if p := getPlayer(id); p != nil && p.IsOnline() {
 			living = true
 			break
@@ -493,12 +475,26 @@ func roomCancel(room *Room) {
 	}
 }
 
+// RoomPlayers 返回座位上玩家的快照，调用方随便 range，不会和进房/离房冲突。
 func RoomPlayers(roomId int64) map[int64]bool {
-	return getRoomPlayers(roomId)
+	set := getRoomPlayers(roomId)
+	if set == nil {
+		return nil
+	}
+	out := make(map[int64]bool, set.Len())
+	for _, id := range set.IDs() {
+		out[id] = true
+	}
+	return out
 }
 
+// RoomSpectators 返回旁观者的快照（值为加入顺序）。
 func RoomSpectators(roomId int64) map[int64]int {
-	return getRoomSpectators(roomId)
+	set := getRoomSpectators(roomId)
+	if set == nil {
+		return nil
+	}
+	return set.Copy()
 }
 
 func broadcast(room *Room, msg string, exclude ...int64) {
@@ -509,12 +505,12 @@ func broadcast(room *Room, msg string, exclude ...int64) {
 	}
 	// 使用 "[系统] " 前缀而不是 ">> "，避免与输入提示符冲突
 	formattedMsg := ">> " + msg
-	for playerId := range getRoomPlayers(room.ID) {
+	for _, playerId := range getRoomPlayers(room.ID).IDs() {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
 			_ = player.WriteString(formattedMsg)
 		}
 	}
-	for playerId := range getRoomSpectators(room.ID) {
+	for _, playerId := range getRoomSpectators(room.ID).IDs() {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
 			_ = player.WriteString(formattedMsg)
 		}
@@ -595,12 +591,12 @@ func readyStatusLocked(room *Room, playerID int64) ReadyInfo {
 	seated := getRoomPlayers(room.ID)
 	readyNum := 0
 	for id := range room.Ready {
-		if seated[id] {
+		if seated.Has(id) {
 			readyNum++
 		}
 	}
 	info := ReadyInfo{Total: room.Players, ReadyNum: readyNum}
-	if room.Ready[playerID] && seated[playerID] {
+	if room.Ready[playerID] && seated.Has(playerID) {
 		info.Ready = true
 	}
 	if room.State != consts.RoomStateWaiting || room.Players < room.MaxPlayers || room.ReadyUntil.IsZero() {
@@ -623,7 +619,7 @@ func SetReady(room *Room, playerID int64) ReadyInfo {
 	}
 	room.Lock()
 	defer room.Unlock()
-	if _, ok := getRoomPlayers(room.ID)[playerID]; !ok {
+	if !getRoomPlayers(room.ID).Has(playerID) {
 		return readyStatusLocked(room, playerID) // 旁观者不能 ready
 	}
 	if room.Ready == nil {
@@ -662,8 +658,7 @@ func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {
 		excludeSet[exc] = true
 	}
 	msg := json.Marshal(object)
-	playerIds := getRoomPlayers(roomId)
-	for playerId := range playerIds {
+	for _, playerId := range getRoomPlayers(roomId).IDs() {
 		if player := getPlayer(playerId); player != nil && !excludeSet[playerId] {
 			_ = player.WriteString(string(msg))
 		}

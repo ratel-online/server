@@ -78,8 +78,8 @@ func RunFrom(player *database.Player, initial consts.StateID) {
 			}
 			// 断线玩家不再托管（牌局结束/座位已不在）：顺手把残留在房间里的座位清掉，
 			// 避免房间一直挂着一个永远不在线的空位。
-			if !player.IsOnline() && player.RoomID != 0 {
-				database.LeaveRoom(player.RoomID, player.ID)
+			if roomID := player.RoomIDOf(); !player.IsOnline() && roomID != 0 {
+				database.LeaveRoom(roomID, player.ID)
 			}
 			if err1, ok := err.(consts.Error); ok {
 				if err1.Exit {

@@ -237,6 +237,7 @@ func (p *Player) OfflineConn(cs *ConnState) {
 
 	p.mu.Lock()
 	current := p.cs == cs
+	roomID := p.RoomID
 	if current {
 		p.online = false
 		p.cs = nil
@@ -251,11 +252,11 @@ func (p *Player) OfflineConn(cs *ConnState) {
 	}
 
 	_ = cs.conn.Close()
-	room := getRoom(p.RoomID)
+	room := getRoom(roomID)
 
 	// 牌局进行中掉线：保留座位与名字，重连窗口内回来还是同一个人，
 	// 超时后由托管接管（见 botInput），不把牌局打散。
-	if room != nil && room.State == consts.RoomStateRunning {
+	if roomRunning(room) {
 		room.Lock()
 		defer room.Unlock()
 		broadcast(room, fmt.Sprintf("%s lost connection! seat is kept for %d seconds.\n",
@@ -268,7 +269,7 @@ func (p *Player) OfflineConn(cs *ConnState) {
 		room.Lock()
 		defer room.Unlock()
 		broadcast(room, fmt.Sprintf("%s lost connection! \n", p.Name))
-		if room.State == consts.RoomStateWaiting {
+		if room.State == consts.RoomStateWaiting { // 已持有房间锁，可直接读
 			leaveRoom(room, p)
 		}
 		roomCancel(room)
@@ -325,19 +326,44 @@ func (p *Player) HandBackIfRetired(ch chan int, state int) (retired bool) {
 	return true
 }
 
+// SetRoom 在玩家锁内更新所在房间与角色。
+// 房间成员表变更（进房、离房、补位、换房主）都发生在别的协程里，
+// 而玩家自己的状态机协程同时在读这两个字段，统一加锁避免数据竞争。
+// 调用时若已持有房间锁，注意保持"先房间锁、后玩家锁"的顺序，不要反过来。
+func (p *Player) SetRoom(roomID int64, role Role) {
+	p.mu.Lock()
+	p.RoomID = roomID
+	p.Role = role
+	p.mu.Unlock()
+}
+
+// RoomIDOf 加锁读取玩家所在房间号。
+func (p *Player) RoomIDOf() int64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.RoomID
+}
+
+// SetRole 只更新角色（房主变更等场景）。
+func (p *Player) SetRole(role Role) {
+	p.mu.Lock()
+	p.Role = role
+	p.mu.Unlock()
+}
+
 // CanBotContinue 判断断线玩家是否应该留在牌局里由托管接手：
 // 同一代状态机、已断线、仍在牌座上、房间还在进行中。
 func (p *Player) CanBotContinue(gen int64) bool {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.runGen != gen || p.online || p.retired {
+	runGen, online, retired, offlineAt, roomID, role := p.runGen, p.online, p.retired, p.offlineAt, p.RoomID, p.Role
+	p.mu.Unlock()
+	if runGen != gen || online || retired {
 		return false
 	}
-	if p.offlineAt.IsZero() || p.RoomID == 0 || !p.Role.Seated() {
+	if offlineAt.IsZero() || roomID == 0 || !role.Seated() {
 		return false
 	}
-	room := getRoom(p.RoomID)
-	return room != nil && room.State == consts.RoomStateRunning
+	return roomRunning(getRoom(roomID))
 }
 
 // roomRunning 判断房间是否处于牌局进行中（加锁读取，避免与开局时的写入竞争）。
@@ -357,12 +383,12 @@ func roomRunning(room *Room) bool {
 // 返回 handled=true 表示本次输入已由托管处理，调用方不要再读 socket。
 func (p *Player) botInput(timeout time.Duration) (bool, error) {
 	p.mu.Lock()
-	online, retired, offlineAt, role := p.online, p.retired, p.offlineAt, p.Role
+	online, retired, offlineAt, role, roomID := p.online, p.retired, p.offlineAt, p.Role, p.RoomID
 	p.mu.Unlock()
 	if online || retired || offlineAt.IsZero() || !role.Seated() {
 		return false, nil
 	}
-	room := getRoom(p.RoomID)
+	room := getRoom(roomID)
 	if !roomRunning(room) {
 		return false, nil
 	}
@@ -636,6 +662,54 @@ type Room struct {
 	BlankWordMode       bool           `json:"blankWordMode"` // 空白词模式
 	Ready               map[int64]bool `json:"ready"`         // 满员后的 ready 状态
 	ReadyUntil          time.Time      `json:"readyUntil"`    // ready 倒计时截止
+}
+
+// RoomInfo 是房间可变字段的瞬时快照。多个协程（房间输入循环、牌局驱动、后台清理）
+// 会同时读写这些字段，直接读 room.State / room.Players 会被 race detector 抓到，
+// 所以统一走 Info() 拿一份加锁后的副本。
+type RoomInfo struct {
+	ID                  int64
+	Type                int
+	State               int
+	Players             int
+	Creator             int64
+	Banker              int
+	MaxPlayers          int
+	Password            string
+	EnableChat          bool
+	EnableLaiZi         bool
+	EnableSkill         bool
+	EnableLandlord      bool
+	EnableDontShuffle   bool
+	EnableShowIP        bool
+	EnableJokerAsTarget bool
+	UndercoverNum       int
+	BlankWordMode       bool
+}
+
+// Info 加锁读取房间的可变字段快照。
+func (r *Room) Info() RoomInfo {
+	r.Lock()
+	defer r.Unlock()
+	return RoomInfo{
+		ID:                  r.ID,
+		Type:                r.Type,
+		State:               r.State,
+		Players:             r.Players,
+		Creator:             r.Creator,
+		Banker:              r.Banker,
+		MaxPlayers:          r.MaxPlayers,
+		Password:            r.Password,
+		EnableChat:          r.EnableChat,
+		EnableLaiZi:         r.EnableLaiZi,
+		EnableSkill:         r.EnableSkill,
+		EnableLandlord:      r.EnableLandlord,
+		EnableDontShuffle:   r.EnableDontShuffle,
+		EnableShowIP:        r.EnableShowIP,
+		EnableJokerAsTarget: r.EnableJokerAsTarget,
+		UndercoverNum:       r.UndercoverNum,
+		BlankWordMode:       r.BlankWordMode,
+	}
 }
 
 func (r *Room) Model() model.Room {

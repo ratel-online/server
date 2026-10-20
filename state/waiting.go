@@ -30,7 +30,7 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		return 0, err
 	}
 	if access {
-		switch room.Type {
+		switch room.Info().Type {
 		default:
 			return consts.StateGame, nil
 		case consts.GameTypeRunFast:
@@ -53,12 +53,15 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 func (s *waiting) Exit(player *database.Player) consts.StateID {
 	room := database.GetRoom(player.RoomID)
 	if room != nil {
-		isOwner := room.Creator == player.ID
+		info := room.Info()
+		isOwner := info.Creator == player.ID
 		database.LeaveRoom(room.ID, player.ID)
-		database.Broadcast(room.ID, fmt.Sprintf("%s exited room! room current has %d players\n", player.Name, room.Players))
+		database.Broadcast(room.ID, fmt.Sprintf("%s exited room! room current has %d players\n", player.Name, room.Info().Players))
 		if isOwner {
-			newOwner := database.GetPlayer(room.Creator)
-			database.Broadcast(room.ID, fmt.Sprintf("%s become new owner\n", newOwner.Name))
+			newOwner := database.GetPlayer(room.Info().Creator)
+			if newOwner != nil {
+				database.Broadcast(room.ID, fmt.Sprintf("%s become new owner\n", newOwner.Name))
+			}
 		}
 		s.Backfill(room)
 	}
@@ -66,12 +69,12 @@ func (s *waiting) Exit(player *database.Player) consts.StateID {
 }
 
 func (*waiting) Backfill(room *database.Room) {
-	if room.State == consts.RoomStateRunning {
+	if room.Info().State == consts.RoomStateRunning {
 		return
 	}
 	newPlayer := database.Backfill(room.ID)
 	if newPlayer != nil {
-		database.Broadcast(room.ID, fmt.Sprintf("%s has joined room! room current has %d players\n", newPlayer.Name, room.Players))
+		database.Broadcast(room.ID, fmt.Sprintf("%s has joined room! room current has %d players\n", newPlayer.Name, room.Info().Players))
 	}
 }
 
@@ -80,7 +83,7 @@ func (*waiting) Kicking(player *database.Player) {
 	if room != nil {
 		database.Broadcast(room.ID, fmt.Sprintf("%s has been kicked!\n", player.Name))
 		database.Kicking(room.ID, player.ID)
-		database.Broadcast(room.ID, fmt.Sprintf("room current has %d players\n", room.Players))
+		database.Broadcast(room.ID, fmt.Sprintf("room current has %d players\n", room.Info().Players))
 	}
 }
 
@@ -92,12 +95,13 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 	loopCount := 0
 	for {
 		loopCount++
+		roomInfo := room.Info()
 		if loopCount%100 == 0 {
-			log.Infof("[waitingForStart] Player %d (Room %d) loop count: %d, room.State: %d, access: %v\n", player.ID, player.RoomID, loopCount, room.State, access)
+			log.Infof("[waitingForStart] Player %d (Room %d) loop count: %d, room.State: %d, access: %v\n", player.ID, player.RoomID, loopCount, roomInfo.State, access)
 		}
 
 		// 挂机检测：等待房间里太久没有输入，自动离房，别占着座位
-		if room.State == consts.RoomStateWaiting && player.IdleFor() > consts.WaitingIdleTimeout {
+		if roomInfo.State == consts.RoomStateWaiting && player.IdleFor() > consts.WaitingIdleTimeout {
 			database.Broadcast(room.ID, fmt.Sprintf("%s was idle for %d minutes and left the room.\n",
 				player.Name, int(consts.WaitingIdleTimeout.Minutes())))
 			database.LeaveRoom(room.ID, player.ID)
@@ -132,7 +136,7 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 			return false, consts.ErrorsPlayerNotInRoom
 		}
 
-		if room.State == consts.RoomStateRunning && player.Role == database.RolePlayer {
+		if room.Info().State == consts.RoomStateRunning && player.Role == database.RolePlayer {
 			access = true
 			break
 		}
@@ -186,24 +190,25 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 // ownerCommand 处理房主指令。handled=false 表示不是房主指令，调用方按聊天处理；
 // ok=true 表示已经可以进入牌局。
 func (s *waiting) ownerCommand(player *database.Player, room *database.Room, segments []string) (handled, ok bool, err error) {
-	if room.Creator != player.ID || len(segments) == 0 {
+	info := room.Info()
+	if info.Creator != player.ID || len(segments) == 0 {
 		return false, false, nil
 	}
 	switch segments[0] {
 	case "start", "s":
-		if room.Players <= 1 {
+		if info.Players <= 1 {
 			_ = player.WriteError(consts.ErrorsGamePlayersInsufficient)
 			return true, false, nil
 		}
-		if room.Type == consts.GameTypeRunFast && room.Players != 3 {
+		if info.Type == consts.GameTypeRunFast && info.Players != 3 {
 			_ = player.WriteError(consts.ErrorsGamePlayersInvalid)
 			return true, false, nil
 		}
-		if room.Type == consts.GameTypeMahjong && (room.Players < 3 || room.Players > 4) {
-			_ = player.WriteString(fmt.Sprintf("大众麻将需要 3 或 4 名玩家，当前 %d 人。\n", room.Players))
+		if info.Type == consts.GameTypeMahjong && (info.Players < 3 || info.Players > 4) {
+			_ = player.WriteString(fmt.Sprintf("大众麻将需要 3 或 4 名玩家，当前 %d 人。\n", info.Players))
 			return true, false, nil
 		}
-		if room.Type == consts.GameTypeUndercover && room.Players < 3 {
+		if info.Type == consts.GameTypeUndercover && info.Players < 3 {
 			_ = player.WriteString("谁是卧底游戏至少需要3名玩家！\n")
 			return true, false, nil
 		}
@@ -310,20 +315,21 @@ func startGame(player *database.Player, room *database.Room) (err error) {
 }
 
 func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
+	info := room.Info()
 	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("Room ID: %d\n", room.ID))
+	buf.WriteString(fmt.Sprintf("Room ID: %d\n", info.ID))
 	buf.WriteString("Players:\n")
-	for playerId := range database.RoomPlayers(room.ID) {
+	for playerId := range database.RoomPlayers(info.ID) {
 		player := database.GetPlayer(playerId)
 		readyFlag := ""
-		if info := database.ReadyStatus(room, playerId); info.Required {
-			if info.Ready {
+		if ready := database.ReadyStatus(room, playerId); ready.Required {
+			if ready.Ready {
 				readyFlag = " [ready]"
 			} else {
 				readyFlag = " [not ready]"
 			}
 		}
-		if room.EnableShowIP {
+		if info.EnableShowIP {
 			buf.WriteString(fmt.Sprintf("%s [%s], score: %d, id: %d, ip: %s%s\n", player.Name, player.Role, player.Amount, player.ID, maskIP(player.IP), readyFlag))
 		} else {
 			buf.WriteString(fmt.Sprintf("%s [%s], score: %d, id: %d%s\n", player.Name, player.Role, player.Amount, player.ID, readyFlag))
@@ -331,9 +337,9 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	}
 
 	buf.WriteString("\nSpectators:\n")
-	for spectatorId := range database.RoomSpectators(room.ID) {
+	for spectatorId := range database.RoomSpectators(info.ID) {
 		spectator := database.GetPlayer(spectatorId)
-		if room.EnableShowIP {
+		if info.EnableShowIP {
 			buf.WriteString(fmt.Sprintf("%s [spectator], score: %d, id: %d, ip: %s\n", spectator.Name, spectator.Amount, spectator.ID, maskIP(spectator.IP)))
 		} else {
 			buf.WriteString(fmt.Sprintf("%s [spectator], score: %d, id: %d\n", spectator.Name, spectator.Amount, spectator.ID))
@@ -341,31 +347,31 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 	}
 
 	buf.WriteString("\nSettings:\n")
-	switch room.Type {
+	switch info.Type {
 	case consts.GameTypeUno:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
 	case consts.GameTypeMahjong:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", info.MaxPlayers))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
 	case consts.GameTypeTexas:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", info.MaxPlayers))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
 	case consts.GameTypeLiar:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "jt:", sprintPropsState(room.EnableJokerAsTarget)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "jt:", sprintPropsState(info.EnableJokerAsTarget)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
 	case consts.GameTypeUndercover:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ucn:", room.UndercoverNum))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "bwm:", sprintPropsState(room.BlankWordMode)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", info.MaxPlayers))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ucn:", info.UndercoverNum))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "bwm:", sprintPropsState(info.BlankWordMode)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
 	default:
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "lz:", sprintPropsState(room.EnableLaiZi)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v, %-5s%-5v\n", "ds:", sprintPropsState(room.EnableDontShuffle), "sk:", sprintPropsState(room.EnableSkill)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v, %-5s%-5v\n", "pn:", room.MaxPlayers, "ct:", sprintPropsState(room.EnableChat)))
-		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
-		pwd := room.Password
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "lz:", sprintPropsState(info.EnableLaiZi)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v, %-5s%-5v\n", "ds:", sprintPropsState(info.EnableDontShuffle), "sk:", sprintPropsState(info.EnableSkill)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v, %-5s%-5v\n", "pn:", info.MaxPlayers, "ct:", sprintPropsState(info.EnableChat)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
+		pwd := info.Password
 		if pwd != "" {
-			if room.Creator != currPlayer.ID {
+			if info.Creator != currPlayer.ID {
 				pwd = "********"
 			}
 		} else {
