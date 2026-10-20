@@ -45,6 +45,8 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 			return consts.StateLiarGame, nil
 		case consts.GameTypeUndercover:
 			return consts.StateUndercoverGame, nil
+		case consts.GameTypeGouji:
+			return consts.StateGoujiGame, nil
 		}
 	}
 	return s.Exit(player), nil
@@ -213,6 +215,10 @@ func (s *waiting) ownerCommand(player *database.Player, room *database.Room, seg
 			_ = player.WriteString("谁是卧底游戏至少需要3名玩家！\n")
 			return true, false, nil
 		}
+		if info.Type == consts.GameTypeGouji && info.Players != 6 {
+			_ = player.WriteString(fmt.Sprintf("够级需要 6 名玩家，当前 %d 人。\n", info.Players))
+			return true, false, nil
+		}
 		if err = startGame(player, room); err != nil {
 			return true, false, err
 		}
@@ -305,6 +311,8 @@ func startGame(player *database.Player, room *database.Room) (err error) {
 		room.Game, err = game.InitLiarGame(room)
 	case consts.GameTypeUndercover:
 		room.Game, err = game.InitUndercoverGame(room)
+	case consts.GameTypeGouji:
+		room.Game, err = game.InitGoujiGame(room)
 	}
 	if err != nil {
 		_ = player.WriteError(err)
@@ -364,6 +372,9 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", info.MaxPlayers))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ucn:", info.UndercoverNum))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "bwm:", sprintPropsState(info.BlankWordMode)))
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
+	case consts.GameTypeGouji:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", info.MaxPlayers))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(info.EnableShowIP)))
 	default:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "lz:", sprintPropsState(info.EnableLaiZi)))

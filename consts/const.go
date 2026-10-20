@@ -22,6 +22,7 @@ const (
 	StateTexasGame
 	StateLiarGame
 	StateUndercoverGame
+	StateGoujiGame
 )
 
 type SkillID int
@@ -60,6 +61,7 @@ const (
 	GameTypeLiar       = 7
 	GameTypeUno        = 8
 	GameTypeUndercover = 9
+	GameTypeGouji      = 10
 
 	RobTimeout         = 20 * time.Second
 	PlayTimeout        = 40 * time.Second
@@ -149,6 +151,7 @@ var (
 		GameTypeMahjong:    "大众麻将",
 		GameTypeLiar:       "liar's bar",
 		GameTypeUndercover: "谁是卧底",
+		GameTypeGouji:      "够级",
 	}
 	GameTypesIds = []int{
 		GameTypeClassic,
@@ -159,6 +162,7 @@ var (
 		GameTypeMahjong,
 		GameTypeLiar,
 		GameTypeUndercover,
+		GameTypeGouji,
 	}
 	RoomStates = map[int]string{
 		RoomStateWaiting: "Waiting",
@@ -181,6 +185,8 @@ func GameState(roomType int) StateID {
 		return StateLiarGame
 	case GameTypeUndercover:
 		return StateUndercoverGame
+	case GameTypeGouji:
+		return StateGoujiGame
 	}
 	return StateGame
 }

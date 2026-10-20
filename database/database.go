@@ -160,6 +160,9 @@ func CreateRoom(creator int64, t int) *Room {
 		room.MaxPlayers = 6
 		room.UndercoverNum = 1
 		room.BlankWordMode = false
+	case consts.GameTypeGouji:
+		// 够级固定 6 人
+		room.MaxPlayers = 6
 	}
 	roomPlayers.Set(room.ID, newMemberSet())
 	roomSpectators.Set(room.ID, newMemberSet())
@@ -253,6 +256,12 @@ func getAllowedPropsByGameType(gameType int) map[string]bool {
 			consts.RoomPropsPlayerNum: true,
 			consts.RoomPropsShowIP:    true,
 			consts.RoomPropsPassword:  true,
+		}
+	case consts.GameTypeGouji:
+		// 够级人数固定为 6 人，只允许设置密码与显示 IP
+		return map[string]bool{
+			consts.RoomPropsPassword: true,
+			consts.RoomPropsShowIP:   true,
 		}
 	default:
 		// 其他游戏类型允许所有常规属性
