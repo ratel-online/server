@@ -101,9 +101,11 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 	buf.WriteString(fmt.Sprintf("你的手牌: %s\n", game.Hands[player.ID].String()))
 	_ = player.WriteString(buf.String())
 
+	// 整回合共用一个绝对截止时间：聊天/刷屏不再能重置或拖延回合
+	timer := database.NewTurnTimer(consts.PlayTimeout)
 	for {
-		ans, err := player.AskForString(consts.PlayTimeout)
-		if err != nil || ans == "" {
+		ans, ok := timer.Ask(player)
+		if !ok || ans == "" {
 			// 超时或无输入自动出第一张牌
 			ans = poker.GetAlias(game.Hands[player.ID][0].Key)
 		}

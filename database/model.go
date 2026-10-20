@@ -40,6 +40,29 @@ const (
 	RoleSpectator Role = "spectator"
 )
 
+// ConnState 代表玩家的一次连接（"一代"）。
+// 顶号时 Player 会绑定新的 ConnState，旧一代通过 done 收到通知后安静退出，
+// 既不会关掉新连接，也不会把玩家从房间/牌局里带走。
+type ConnState struct {
+	conn *network.Conn
+	data chan *protocol.Packet
+	done chan struct{}
+	once sync.Once
+}
+
+func NewConnState(conn *network.Conn) *ConnState {
+	return &ConnState{
+		conn: conn,
+		data: make(chan *protocol.Packet, 8),
+		done: make(chan struct{}),
+	}
+}
+
+// close 通知这一代连接失效，可重复调用。
+func (cs *ConnState) close() {
+	cs.once.Do(func() { close(cs.done) })
+}
+
 type Player struct {
 	ID     int64  `json:"id"`
 	IP     string `json:"ip"`
@@ -50,27 +73,139 @@ type Player struct {
 	RoomID int64  `json:"roomId"`
 	Role   Role   `json:"role"`
 
-	conn   *network.Conn
-	data   chan *protocol.Packet
-	read   bool
-	state  consts.StateID
-	online bool
+	mu       sync.Mutex
+	cs       *ConnState // 当前这一代连接；顶号会整体替换
+	read     bool
+	state    consts.StateID
+	online   bool
+	runGen   int64  // 状态机代际：顶号后旧状态机据此退出，避免两个协程抢同一个输入
+	baseName string // 不含 "#短ID" 后缀的基础名
+	nameKey  string // 同 IP 同名的排他键
+}
+
+// playerSnapshot 顶号时从旧玩家对象继承的字段（不含锁与连接）。
+type playerSnapshot struct {
+	ID       int64
+	IP       string
+	Name     string
+	Mode     int
+	Type     int
+	Amount   uint
+	RoomID   int64
+	Role     Role
+	baseName string
+	nameKey  string
+}
+
+// snapshot 取一份继承用的字段快照。
+func (p *Player) snapshot() playerSnapshot {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return playerSnapshot{
+		ID:       p.ID,
+		IP:       p.IP,
+		Name:     p.Name,
+		Mode:     p.Mode,
+		Type:     p.Type,
+		Amount:   p.Amount,
+		RoomID:   p.RoomID,
+		Role:     p.Role,
+		baseName: p.baseName,
+		nameKey:  p.nameKey,
+	}
+}
+
+// invalidate 彻底作废旧对象（顶号时使用）：状态机失效、连接关闭。
+// 旧协程随后会自行退出，且它的任何写入都落在已关闭的旧 socket 上，不会打扰新会话。
+func (p *Player) invalidate() {
+	old := p.currentState()
+	p.mu.Lock()
+	p.runGen++ // 让仍在这一代跑的状态机退出
+	p.online = false
+	p.cs = nil
+	p.read = false
+	p.mu.Unlock()
+
+	if old != nil {
+		old.close()
+		_ = old.conn.Close()
+	}
+}
+
+// BeginStateRun 开启一代状态机，返回代际号。上一次的协程检测到代际变化后会退出。
+func (p *Player) BeginStateRun() int64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.runGen++
+	return p.runGen
+}
+
+// IsCurrentRun 判断某代状态机是否仍是当前有效的那一个。
+func (p *Player) IsCurrentRun(gen int64) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.runGen == gen
+}
+
+// currentState 取当前这一代连接。
+func (p *Player) currentState() *ConnState {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.cs
+}
+
+func (p *Player) writePacket(packet protocol.Packet) error {
+	p.mu.Lock()
+	cs := p.cs
+	p.mu.Unlock()
+	if cs == nil {
+		return consts.ErrorsChanClosed
+	}
+	return cs.conn.Write(packet)
 }
 
 func (p *Player) Write(bytes []byte) error {
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: bytes,
 	})
 }
 
 func (p *Player) IsOnline() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.online
 }
 
+// Offline 关闭当前连接。被顶号后旧协程应调用 OfflineConn(旧 cs)。
 func (p *Player) Offline() {
-	p.online = false
-	_ = p.conn.Close()
-	close(p.data)
+	p.OfflineConn(p.currentState())
+}
+
+// OfflineConn 关闭指定的一代连接。
+// 如果这一代已经被顶掉（p.cs 已换成新连接），只通知本代协程退出，
+// 房间、名字、余额都留给新连接，不做任何清理。
+func (p *Player) OfflineConn(cs *ConnState) {
+	if cs == nil {
+		return
+	}
+	cs.close()
+
+	p.mu.Lock()
+	current := p.cs == cs
+	if current {
+		p.online = false
+		p.cs = nil
+		p.read = false
+	}
+	p.mu.Unlock()
+
+	if !current {
+		log.Infof("%s[%d] old session closed, newer connection is serving.\n", p.BaseName(), p.ID)
+		return
+	}
+
+	_ = cs.conn.Close()
+	releaseName(p) // 释放名字占用，避免名字被离线玩家永久锁死
 	room := getRoom(p.RoomID)
 	if room != nil {
 		room.Lock()
@@ -83,33 +218,45 @@ func (p *Player) Offline() {
 	}
 }
 
-func (p *Player) Listening() error {
+// Listening 读取指定一代连接上的数据包。连接被顶掉后返回。
+func (p *Player) Listening(cs *ConnState) error {
+	if cs == nil {
+		return consts.ErrorsChanClosed
+	}
 	loopCount := 0
 	for {
 		loopCount++
 		if loopCount%1000 == 0 {
-			log.Infof("[Player.Listening] Player %d loop count: %d, online: %v\n", p.ID, loopCount, p.online)
+			log.Infof("[Player.Listening] Player %d loop count: %d\n", p.ID, loopCount)
 		}
-		pack, err := p.conn.Read()
+		pack, err := cs.conn.Read()
 		if err != nil {
 			log.Error(err)
 			return err
 		}
-		if p.read {
-			p.data <- pack
+		p.mu.Lock()
+		deliver := p.cs == cs && p.read
+		p.mu.Unlock()
+		if !deliver {
+			continue
+		}
+		select {
+		case cs.data <- pack:
+		case <-cs.done:
+			return consts.ErrorsChanClosed
 		}
 	}
 }
 
 // 向客户端发生消息
 func (p *Player) WriteString(data string) error {
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: []byte(data),
 	})
 }
 
 func (p *Player) WriteObject(data interface{}) error {
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: json.Marshal(data),
 	})
 }
@@ -118,7 +265,7 @@ func (p *Player) WriteError(err error) error {
 	if err == consts.ErrorsExist {
 		return err
 	}
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: []byte(err.Error() + "\n"),
 	})
 }
@@ -130,15 +277,27 @@ func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error
 }
 
 func (p *Player) askForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
+	cs := p.currentState()
+	if cs == nil {
+		return nil, consts.ErrorsChanClosed
+	}
 	var packet *protocol.Packet
 	if len(timeout) > 0 {
+		timer := time.NewTimer(timeout[0])
+		defer timer.Stop()
 		select {
-		case packet = <-p.data:
-		case <-time.After(timeout[0]):
+		case packet = <-cs.data:
+		case <-cs.done: // 顶号/断线：让这一代的回合逻辑立即退出
+			return nil, consts.ErrorsChanClosed
+		case <-timer.C:
 			return nil, consts.ErrorsTimeout
 		}
 	} else {
-		packet = <-p.data
+		select {
+		case packet = <-cs.data:
+		case <-cs.done:
+			return nil, consts.ErrorsChanClosed
+		}
 	}
 	if packet == nil {
 		return nil, consts.ErrorsChanClosed
@@ -183,30 +342,55 @@ func (p *Player) AskForStringWithoutTransaction(timeout ...time.Duration) (strin
 }
 
 func (p *Player) StartTransaction() {
+	p.mu.Lock()
 	p.read = true
+	p.mu.Unlock()
 	_ = p.WriteString(consts.IsStart)
 }
 
 func (p *Player) StopTransaction() {
+	p.mu.Lock()
 	p.read = false
+	p.mu.Unlock()
 	_ = p.WriteString(consts.IsStop)
 }
 
 func (p *Player) State(s consts.StateID) {
+	p.mu.Lock()
 	p.state = s
+	p.mu.Unlock()
 }
 
 func (p *Player) GetState() consts.StateID {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.state
 }
 
-func (p *Player) Conn(conn *network.Conn) {
-	p.conn = conn
-	p.data = make(chan *protocol.Packet, 8)
+// BindConn 绑定一代新连接。若该玩家此前有连接（顶号），旧连接会被通知失效并关闭，
+// 但玩家 ID、名字、房间、牌局进度全部保留。
+func (p *Player) BindConn(conn *network.Conn) *ConnState {
+	p.mu.Lock()
+	old := p.cs
+	cs := NewConnState(conn)
+	p.cs = cs
+	p.read = false
 	p.online = true
+	p.mu.Unlock()
+
+	if old != nil {
+		old.close()
+		_ = old.conn.Close()
+	}
+	return cs
 }
 
-func (p Player) Model() model.Player {
+// Conn 兼容旧调用，等价于 BindConn。
+func (p *Player) Conn(conn *network.Conn) {
+	p.BindConn(conn)
+}
+
+func (p *Player) Model() model.Player {
 	modelPlayer := model.Player{
 		ID:   p.ID,
 		Name: p.Name,
@@ -220,8 +404,8 @@ func (p Player) Model() model.Player {
 	return modelPlayer
 }
 
-func (p Player) String() string {
-	return fmt.Sprintf("%s[%d]", p.Name, p.ID)
+func (p *Player) String() string {
+	return fmt.Sprintf("%s[%d]", p.BaseName(), p.ID)
 }
 
 type RoomGame interface {
@@ -249,8 +433,8 @@ type Room struct {
 	EnableDontShuffle   bool      `json:"enableDontShuffle"`
 	EnableShowIP        bool      `json:"enableShowIP"`
 	EnableJokerAsTarget bool      `json:"enableJokerAsTarget"`
-	UndercoverNum       int       `json:"undercoverNum"`  // 卧底数量
-	BlankWordMode       bool      `json:"blankWordMode"`  // 空白词模式
+	UndercoverNum       int       `json:"undercoverNum"` // 卧底数量
+	BlankWordMode       bool      `json:"blankWordMode"` // 空白词模式
 }
 
 func (r *Room) Model() model.Room {

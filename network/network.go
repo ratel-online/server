@@ -1,6 +1,8 @@
 package network
 
 import (
+	"time"
+
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/model"
 	"github.com/ratel-online/core/network"
@@ -9,7 +11,6 @@ import (
 	"github.com/ratel-online/server/consts"
 	"github.com/ratel-online/server/database"
 	"github.com/ratel-online/server/state"
-	"time"
 )
 
 // Network is interface of all kinds of network.
@@ -32,11 +33,20 @@ func handle(rwc protocol.ReadWriteCloser) error {
 		_ = c.Write(protocol.ErrorPacket(err))
 		return err
 	}
-	player := database.Connected(c, authInfo)
-	log.Infof("player auth accessed, ip %s, %d:%s\n", player.IP, player.ID, authInfo.Name)
-	go state.Run(player)
-	defer player.Offline()
-	return player.Listening()
+	player, cs, tookOver, err := database.Connected(c, authInfo)
+	if err != nil {
+		_ = c.Write(protocol.ErrorPacket(err))
+		return err
+	}
+	log.Infof("player auth accessed, ip %s, %d:%s, takeover: %v\n", player.IP, player.ID, player.Name, tookOver)
+	initial := consts.StateWelcome
+	if tookOver {
+		initial = database.ResumeState(player)
+	}
+	go state.RunFrom(player, initial)
+	// 用本次连接的那一代去关闭：被顶号时旧协程不会误关新连接，也不会清掉房间
+	defer player.OfflineConn(cs)
+	return player.Listening(cs)
 }
 
 // 登陆验签

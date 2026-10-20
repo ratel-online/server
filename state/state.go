@@ -38,7 +38,13 @@ type State interface {
 }
 
 func Run(player *database.Player) {
-	player.State(consts.StateWelcome)
+	RunFrom(player, consts.StateWelcome)
+}
+
+// RunFrom 从指定状态启动状态机，顶号时用于回到玩家原本所在的状态。
+func RunFrom(player *database.Player, initial consts.StateID) {
+	gen := player.BeginStateRun()
+	player.State(initial)
 	defer func() {
 		if err := recover(); err != nil {
 			async.PrintStackTrace(err)
@@ -47,6 +53,11 @@ func Run(player *database.Player) {
 	}()
 	loopCount := 0
 	for {
+		// 被顶号后，上一代状态机必须退出，否则两个协程会抢同一个输入通道
+		if !player.IsCurrentRun(gen) {
+			log.Infof("player %s state machine superseded by a newer session, exit.\n", player)
+			return
+		}
 		loopCount++
 		if loopCount%100 == 0 {
 			log.Infof("[State.Run] Player %d loop count: %d, current state: %d\n", player.ID, loopCount, player.GetState())
@@ -54,6 +65,9 @@ func Run(player *database.Player) {
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)
 		if err != nil {
+			if !player.IsCurrentRun(gen) {
+				return
+			}
 			if err1, ok := err.(consts.Error); ok {
 				if err1.Exit {
 					stateId = state.Exit(player)
@@ -63,6 +77,9 @@ func Run(player *database.Player) {
 				state.Exit(player)
 				break
 			}
+		}
+		if !player.IsCurrentRun(gen) {
+			return
 		}
 		if stateId > 0 {
 			player.State(stateId)

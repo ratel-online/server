@@ -22,7 +22,7 @@ type UnoGame struct {
 
 func (ug *UnoGame) HavePlay(player *Player) bool {
 	for _, id := range ug.Players {
-		if id == int(player.ID) && player.online {
+		if id == int(player.ID) && player.IsOnline() {
 			return true
 		}
 	}

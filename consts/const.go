@@ -107,6 +107,7 @@ var (
 	ErrorsChatUnopened            = NewErr(1, false, "Chat disabled. ")
 	ErrorsChatUnopenedDuringGame  = NewErr(1, false, "Chat disabled during game. ")
 	ErrorsAuthFail                = NewErr(1, true, "Auth fail. ")
+	ErrorsNameInUse               = NewErr(1, true, "This name is already online from your IP, please wait or choose another name. ")
 	ErrorsRoomInvalid             = NewErr(1, true, "Room invalid. ")
 	ErrorsGameTypeInvalid         = NewErr(1, false, "Game type invalid. ")
 	ErrorsRoomPlayersIsFull       = NewErr(1, false, "Room players is fill. ")

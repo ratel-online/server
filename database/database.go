@@ -89,17 +89,28 @@ func init() {
 	})
 }
 
-func Connected(conn *network.Conn, info *modelx.AuthInfo) *Player {
-	player := &Player{
-		ID:     conn.ID(),
-		IP:     conn.IP(),
-		Name:   strings.Desensitize(info.Name),
-		Amount: 2000,
+// Connected 建立玩家对象。名字会被净化并追加 "#短ID"。
+// 同一 IP 下同名且对方仍在线时执行"顶号"：踢掉旧连接，新连接沿用旧玩家的 ID 与全部状态。
+// 返回的 ConnState 是本次连接的那一代，供读取/关闭时精确对应，避免顶号时误伤新连接。
+func Connected(conn *network.Conn, info *modelx.AuthInfo) (*Player, *ConnState, bool, error) {
+	player, cs, tookOver, err := claimIdentity(conn, info.Name)
+	if err != nil {
+		return nil, nil, false, err
 	}
-	player.Conn(conn)                  // 初始化play对象
-	players.Set(conn.ID(), player)     // 写入用户池
+	players.Set(player.ID, player)     // 写入用户池（顶号时 ID 不变，覆盖的是同一个玩家）
 	connPlayers.Set(conn.ID(), player) // 写入连接用户池
-	return player
+	return player, cs, tookOver, nil
+}
+
+// ResumeState 顶号后新连接应该从哪个状态继续：
+// 等待房间是无状态的输入循环，可以原地恢复；牌局进行中则回大厅，
+// 避免新连接重跑 game.Next 把进行中的牌局重置掉。
+func ResumeState(p *Player) consts.StateID {
+	room := getRoom(p.RoomID)
+	if room != nil && room.State == consts.RoomStateWaiting {
+		return consts.StateWaiting
+	}
+	return consts.StateWelcome
 }
 
 func CreateRoom(creator int64, t int) *Room {
@@ -445,14 +456,14 @@ func roomCancel(room *Room) {
 	living := false
 	playerIds := getRoomPlayers(room.ID)
 	for id := range playerIds {
-		if getPlayer(id).online {
+		if p := getPlayer(id); p != nil && p.IsOnline() {
 			living = true
 			break
 		}
 	}
 	spectatorIds := getRoomSpectators(room.ID)
 	for id := range spectatorIds {
-		if getPlayer(id).online {
+		if p := getPlayer(id); p != nil && p.IsOnline() {
 			living = true
 			break
 		}
@@ -499,9 +510,18 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 	broadcast(room, msg, exclude...)
 }
 
-func BroadcastChat(player *Player, msg string, exclude ...int64) {
+// BroadcastChat 统一聊天出口：所有聊天消息都必须经过这里，
+// 以便限流、去重、禁言等防护对等待房间和所有玩法同时生效。
+// 返回 false 表示本条消息被拦截（刷屏/重复/禁言）。
+func BroadcastChat(player *Player, msg string, exclude ...int64) bool {
+	msg = strings.Desensitize(msg)
+	if !allowChat(player.ID, stringx.TrimSpace(msg)) {
+		_ = player.WriteString("Chat throttled, please slow down. \n")
+		return false
+	}
 	log.Infof("chat msg, player %s[%d] %s say: %s\n", player.Name, player.ID, player.IP, stringx.TrimSpace(msg))
-	Broadcast(player.RoomID, strings.Desensitize(msg), exclude...)
+	Broadcast(player.RoomID, msg, exclude...)
+	return true
 }
 
 func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {

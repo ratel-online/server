@@ -119,8 +119,10 @@ func (g *Undercover) handleDescribe(player *database.Player, game *database.Unde
 	buf.WriteString("请输入你对这个词的描述（输入 's' 或 '结束' 结束发言）：\n")
 	_ = player.WriteString(buf.String())
 
+	// 发言阶段共用一个绝对截止时间，避免靠反复发言无限拖延
+	timer := database.NewTurnTimer(180 * time.Second)
 	for {
-		ans, err := player.AskForString(60 * time.Second)
+		ans, err := timer.AskErr(player)
 		if err != nil {
 			if err == consts.ErrorsTimeout {
 				_ = player.WriteString("发言超时，自动结束发言。\n")
@@ -181,22 +183,28 @@ func (g *Undercover) handleReveal(player *database.Player, game *database.Underc
 	buf.WriteString("\n请输入你的选择（60秒内）：")
 	_ = player.WriteString(buf.String())
 
-	ans, err := player.AskForString(60 * time.Second)
-	if err != nil {
-		if err == consts.ErrorsTimeout {
-			_ = player.WriteString("爆词超时，自动跳过。\n")
+	// 爆词只给一次机会：空输入不再重置计时，反复空输入会直接超时跳过
+	timer := database.NewTurnTimer(60 * time.Second)
+	var ans string
+	for {
+		a, err := timer.AskErr(player)
+		if err != nil {
+			if err == consts.ErrorsTimeout {
+				_ = player.WriteString("爆词超时，自动跳过。\n")
+				g.nextRevealPlayerOrVote(game)
+				return nil
+			}
+			_ = player.WriteString("连接断开，自动跳过爆词。\n")
 			g.nextRevealPlayerOrVote(game)
 			return nil
 		}
-		_ = player.WriteString("连接断开，自动跳过爆词。\n")
-		g.nextRevealPlayerOrVote(game)
-		return nil
-	}
-
-	ans = strings.TrimSpace(ans)
-	if ans == "" {
-		_ = player.WriteString("输入不能为空，请重新输入或输入 's' 跳过：")
-		return g.handleReveal(player, game)
+		a = strings.TrimSpace(a)
+		if a == "" {
+			_ = player.WriteString("输入不能为空，请重新输入或输入 's' 跳过：")
+			continue
+		}
+		ans = a
+		break
 	}
 
 	// 检查是否跳过爆词
@@ -461,8 +469,10 @@ func (g *Undercover) handleVote(player *database.Player, game *database.Undercov
 	buf.WriteString("\n直接输入数字投票（30秒内未投票将自动跳过）：")
 	_ = player.WriteString(buf.String())
 
+	// 投票阶段共用 30 秒预算，空输入不再重置计时
+	voteTimer := database.NewTurnTimer(30 * time.Second)
 	for {
-		ans, err := player.AskForString(30 * time.Second)
+		ans, err := voteTimer.AskErr(player)
 		if err != nil {
 			if err == consts.ErrorsTimeout {
 				// 超时跳过投票（不投票）
