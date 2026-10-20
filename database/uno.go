@@ -22,7 +22,7 @@ type UnoGame struct {
 
 func (ug *UnoGame) HavePlay(player *Player) bool {
 	for _, id := range ug.Players {
-		if id == int(player.ID) && player.online {
+		if id == int(player.ID) && player.IsOnline() {
 			return true
 		}
 	}
@@ -172,7 +172,7 @@ func (up *UnoPlayer) Play(playableCards []card.Card, gameState game.State) (card
 		}
 		selectedCard, found := cardOptions[strings.ToUpper(selectedLabel)]
 		if !found {
-			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
+			BroadcastChat(p, fmt.Sprintf("%s say: ", p.Name), selectedLabel)
 			continue
 		}
 		if !contains(playableCards, selectedCard) {

@@ -41,6 +41,9 @@ func (g *Texas) Next(player *database.Player) (consts.StateID, error) {
 			if !ok {
 				return 0, consts.ErrorsChanClosed
 			}
+			if player.HandBackIfRetired(texasPlayer.State, state) {
+				return 0, consts.ErrorsChanClosed
+			}
 			switch state {
 			case stateBet:
 				err := bet(player, game)

@@ -49,7 +49,18 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 	}
 	for {
 		state, open := <-gd.States[player.ID]
-		if !open || state == database.MahjongStateWaiting || gd.Finished() {
+		if !open {
+			if gd.HasQuit(player.ID) {
+				// 中途退出，直接回到大厅
+				return 0, player.WriteError(consts.ErrorsExist)
+			}
+			return consts.StateWaiting, nil
+		}
+		// 被顶号换代的旧协程：把这一手交还新会话，自己退出
+		if player.HandBackIfRetired(gd.States[player.ID], state) {
+			return 0, consts.ErrorsChanClosed
+		}
+		if state == database.MahjongStateWaiting || gd.Finished() {
 			if gd.HasQuit(player.ID) {
 				// 中途退出，直接回到大厅
 				return 0, player.WriteError(consts.ErrorsExist)
@@ -384,7 +395,7 @@ func (g *Mahjong) sayChat(gd *database.Mahjong, seat int, text string) {
 		_ = p.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
 		return
 	}
-	database.BroadcastChat(p, fmt.Sprintf("%s 说: %s\n", p.Name, strings.TrimSpace(text)))
+	database.BroadcastChat(p, fmt.Sprintf("%s 说: ", p.Name), text)
 }
 
 type mjClaim struct {

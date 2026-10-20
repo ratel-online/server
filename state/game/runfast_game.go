@@ -42,6 +42,9 @@ func (g *RunFastGame) Next(player *database.Player) (consts.StateID, error) {
 		}
 		log.Infof("[RunFastGame.Next] Player %d waiting for state, loop count: %d\n", player.ID, loopCount)
 		state := <-game.States[player.ID]
+		if player.HandBackIfRetired(game.States[player.ID], state) {
+			return 0, consts.ErrorsChanClosed
+		}
 		switch state {
 		case stateRob:
 			for i, id := range game.Players {
@@ -72,21 +75,43 @@ func (g *RunFastGame) Exit(player *database.Player) consts.StateID {
 }
 
 func runFastPlaying(player *database.Player, game *database.Game, master bool, playTimes int) error {
-	timeout := game.PlayTimeOut[player.ID]
+	// 绝对截止时间：输入再多也消耗真实剩余时间，防止刷屏拖时间
+	timer := database.NewTurnTimer(game.PlayTimeOut[player.ID])
+	// 超时 / 熔断时的兜底出牌
+	autoAnswer := func() string {
+		if master {
+			if p := game.Pokers[player.ID]; len(p) > 0 {
+				return poker.GetAlias(p[0].Key)
+			}
+			return "p"
+		}
+		if game.LastFaces != nil {
+			list := poker.RunFastComparativeFaces(*game.LastFaces, game.Pokers[player.ID], rule.RunFastRules)
+			if len(list) > 0 {
+				s := ""
+				for i := range list[0].Keys {
+					s += poker.GetAlias(list[0].Keys[i])
+				}
+				if s != "" {
+					return s
+				}
+			}
+		}
+		return "p"
+	}
 	loopCount := 0
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[runFastPlaying] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, timeout: %v\n", player.ID, player.RoomID, loopCount, master, playTimes, timeout)
+			log.Infof("[runFastPlaying] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, remain: %v\n", player.ID, player.RoomID, loopCount, master, playTimes, timer.Remaining())
 		}
 		buf := bytes.Buffer{}
 		buf.WriteString("\n")
 		if !master && len(game.LastPokers) > 0 {
 			buf.WriteString(fmt.Sprintf("Last player: %s (%s), played: %s\n", database.GetPlayer(game.LastPlayer).Name, game.Team(game.LastPlayer), game.LastPokers.String()))
 		}
-		buf.WriteString(fmt.Sprintf("Timeout: %ds, pokers: %s\n", int(timeout.Seconds()), game.Pokers[player.ID].String()))
+		buf.WriteString(fmt.Sprintf("Timeout: %ds, pokers: %s\n", int(timer.Remaining().Seconds()), game.Pokers[player.ID].String()))
 		_ = player.WriteString(buf.String())
-		before := time.Now().Unix()
 		pokers := game.Pokers[player.ID]
 		//auto pass
 		if !master {
@@ -98,29 +123,14 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 				return nil
 			}
 		}
-		ans, err := player.AskForString(timeout)
-		if err != nil {
-			if master {
-				ans = poker.GetAlias(pokers[0].Key)
-			} else {
-				ans = "p"
-				if game.LastFaces != nil {
-					ans = ""
-					list := poker.RunFastComparativeFaces(*game.LastFaces, game.Pokers[player.ID], rule.RunFastRules)
-					if len(list) > 0 {
-						for i := range list[0].Keys {
-							ans += poker.GetAlias(list[0].Keys[i])
-						}
-					} else {
-						ans = "p"
-					}
-				}
-			}
-		} else {
-			timeout -= time.Second * time.Duration(time.Now().Unix()-before)
+		ans, ok := timer.Ask(player)
+		if !ok {
+			ans = autoAnswer()
 		}
 
+		rawAns := strings.TrimSpace(ans)
 		ans = strings.ToLower(ans)
+	retry:
 		if ans == "" {
 			log.Infof("[runFastPlaying] Player %d empty input, loop count: %d\n", player.ID, loopCount)
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
@@ -135,6 +145,11 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 			} else {
 				list := poker.RunFastComparativeFaces(*game.LastFaces, game.Pokers[player.ID], rule.RunFastRules)
 				if len(list) > 0 {
+					if timer.Invalid() {
+						// 反复用"过牌"回避必出，按超时兜底出最小可出牌
+						ans = autoAnswer()
+						goto retry
+					}
 					_ = player.WriteError(consts.ErrorsMustHaveToPlay)
 					continue
 				} else {
@@ -180,15 +195,20 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 		if len(facesArr) == 0 {
 			invalid = true
 		}
-		//聊天開啓才能說話
+		// 非法输入：允许当聊天（限流），但连续多次直接按超时处理
 		if invalid {
+			if timer.Invalid() {
+				ans = autoAnswer()
+				rawAns = ans
+				log.Infof("[runFastPlaying] player %d invalid input reached limit, force play %q\n", player.ID, ans)
+				goto retry
+			}
 			if game.Room.EnableChat {
-				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
-				continue
+				database.BroadcastChat(player, fmt.Sprintf("%s say: ", player.Name), rawAns)
 			} else {
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
-				continue
 			}
+			continue
 		}
 		lastFaces := game.LastFaces
 		if !master && lastFaces != nil {

@@ -40,6 +40,42 @@ const (
 	RoleSpectator Role = "spectator"
 )
 
+// Seated 表示玩家是否占着一个牌座（房主与普通玩家都算，旁观不算）。
+func (r Role) Seated() bool {
+	return r == RolePlayer || r == RoleOwner
+}
+
+// ConnState 代表玩家的一次连接（"一代"）。
+// 顶号时 Player 会绑定新的 ConnState，旧一代通过 done 收到通知后安静退出，
+// 既不会关掉新连接，也不会把玩家从房间/牌局里带走。
+type ConnState struct {
+	conn   *network.Conn
+	data   chan *protocol.Packet
+	done   chan struct{}
+	once   sync.Once
+	ip     string
+	ipOnce sync.Once
+}
+
+func NewConnState(conn *network.Conn) *ConnState {
+	return &ConnState{
+		conn: conn,
+		data: make(chan *protocol.Packet, 8),
+		done: make(chan struct{}),
+		ip:   normalizeIP(conn.IP()),
+	}
+}
+
+// close 通知这一代连接失效，可重复调用。
+func (cs *ConnState) close() {
+	cs.once.Do(func() { close(cs.done) })
+}
+
+// releaseIP 归还该 IP 的连接名额，一代连接只归还一次。
+func (cs *ConnState) releaseIP() {
+	cs.ipOnce.Do(func() { ReleaseConnection(cs.ip) })
+}
+
 type Player struct {
 	ID     int64  `json:"id"`
 	IP     string `json:"ip"`
@@ -50,11 +86,100 @@ type Player struct {
 	RoomID int64  `json:"roomId"`
 	Role   Role   `json:"role"`
 
-	conn   *network.Conn
-	data   chan *protocol.Packet
-	read   bool
-	state  consts.StateID
-	online bool
+	mu         sync.Mutex
+	cs         *ConnState // 当前这一代连接；顶号会整体替换
+	read       bool
+	state      consts.StateID
+	online     bool
+	runGen     int64     // 状态机代际：顶号后旧状态机据此退出，避免两个协程抢同一个输入
+	baseName   string    // 不含 "#短ID" 后缀的基础名
+	nameKey    string    // 同 IP 同名的排他键
+	lastActive time.Time // 最近一次有输入的时间，用于挂机检测
+	offlineAt  time.Time // 断线时间，用于重连窗口与托管
+	retired    bool      // 已被顶号作废，旧协程见到后立刻退出
+}
+
+// playerSnapshot 顶号时从旧玩家对象继承的字段（不含锁与连接）。
+type playerSnapshot struct {
+	ID       int64
+	IP       string
+	Name     string
+	Mode     int
+	Type     int
+	Amount   uint
+	RoomID   int64
+	Role     Role
+	baseName string
+	nameKey  string
+}
+
+// snapshot 取一份继承用的字段快照。
+func (p *Player) snapshot() playerSnapshot {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return playerSnapshot{
+		ID:       p.ID,
+		IP:       p.IP,
+		Name:     p.Name,
+		Mode:     p.Mode,
+		Type:     p.Type,
+		Amount:   p.Amount,
+		RoomID:   p.RoomID,
+		Role:     p.Role,
+		baseName: p.baseName,
+		nameKey:  p.nameKey,
+	}
+}
+
+// invalidate 彻底作废旧对象（顶号时使用）：状态机失效、连接关闭。
+// 旧协程随后会自行退出，且它的任何写入都落在已关闭的旧 socket 上，不会打扰新会话。
+func (p *Player) invalidate() {
+	old := p.currentState()
+	p.mu.Lock()
+	p.retired = true // 让仍在这一代跑的状态机在下次输入时立刻退出
+	p.runGen++       // 让仍在这一代跑的状态机退出
+	p.online = false
+	p.cs = nil
+	p.read = false
+	p.mu.Unlock()
+
+	if old != nil {
+		old.close()
+		old.releaseIP()
+		_ = old.conn.Close()
+	}
+}
+
+// BeginStateRun 开启一代状态机，返回代际号。上一次的协程检测到代际变化后会退出。
+func (p *Player) BeginStateRun() int64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.runGen++
+	return p.runGen
+}
+
+// IsCurrentRun 判断某代状态机是否仍是当前有效的那一个。
+func (p *Player) IsCurrentRun(gen int64) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.runGen == gen
+}
+
+// currentState 取当前这一代连接。
+func (p *Player) currentState() *ConnState {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.cs
+}
+
+func (p *Player) writePacket(packet protocol.Packet) error {
+	p.mu.Lock()
+	cs := p.cs
+	p.mu.Unlock()
+	if cs == nil {
+		return consts.ErrorsChanClosed
+	}
+	return cs.conn.Write(packet)
 }
 
 // amountMu 保护积分读写（Player 会被按值复制，所以用包级锁）
@@ -84,58 +209,261 @@ func (p *Player) AddPoints(delta int) int {
 }
 
 func (p *Player) Write(bytes []byte) error {
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: bytes,
 	})
 }
 
 func (p *Player) IsOnline() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.online
 }
 
+// Offline 关闭当前连接。被顶号后旧协程应调用 OfflineConn(旧 cs)。
 func (p *Player) Offline() {
-	p.online = false
-	_ = p.conn.Close()
-	close(p.data)
-	room := getRoom(p.RoomID)
+	p.OfflineConn(p.currentState())
+}
+
+// OfflineConn 关闭指定的一代连接。
+// 如果这一代已经被顶掉（p.cs 已换成新连接），只通知本代协程退出，
+// 房间、名字、余额都留给新连接，不做任何清理。
+func (p *Player) OfflineConn(cs *ConnState) {
+	if cs == nil {
+		return
+	}
+	cs.close()
+	cs.releaseIP()
+
+	p.mu.Lock()
+	current := p.cs == cs
+	roomID := p.RoomID
+	if current {
+		p.online = false
+		p.cs = nil
+		p.read = false
+		p.offlineAt = time.Now()
+	}
+	p.mu.Unlock()
+
+	if !current {
+		log.Infof("%s[%d] old session closed, newer connection is serving.\n", p.BaseName(), p.ID)
+		return
+	}
+
+	_ = cs.conn.Close()
+	room := getRoom(roomID)
+
+	// 牌局进行中掉线：保留座位与名字，重连窗口内回来还是同一个人，
+	// 超时后由托管接管（见 botInput），不把牌局打散。
+	if roomRunning(room) {
+		room.Lock()
+		defer room.Unlock()
+		broadcast(room, fmt.Sprintf("%s lost connection! seat is kept for %d seconds.\n",
+			p.Name, int(consts.ReconnectWindow.Seconds())))
+		return
+	}
+
+	releaseName(p) // 释放名字占用，避免名字被离线玩家永久锁死
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
 		broadcast(room, fmt.Sprintf("%s lost connection! \n", p.Name))
-		if room.State == consts.RoomStateWaiting {
+		if room.State == consts.RoomStateWaiting { // 已持有房间锁，可直接读
 			leaveRoom(room, p)
 		}
 		roomCancel(room)
 	}
 }
 
-func (p *Player) Listening() error {
+// Touch 记录一次玩家活动（收到输入），用于挂机检测。
+func (p *Player) Touch() {
+	p.mu.Lock()
+	p.lastActive = time.Now()
+	p.mu.Unlock()
+}
+
+// IdleFor 返回距离最近一次活动过了多久。
+func (p *Player) IdleFor() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.lastActive.IsZero() {
+		return 0
+	}
+	return time.Since(p.lastActive)
+}
+
+// OfflineFor 返回断线了多久，在线返回 0。
+func (p *Player) OfflineFor() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.online || p.offlineAt.IsZero() {
+		return 0
+	}
+	return time.Since(p.offlineAt)
+}
+
+// IsRetired 判断该对象是否已被顶号作废。
+func (p *Player) IsRetired() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.retired
+}
+
+// HandBackIfRetired 在被顶号时把"刚收到的一手"交还给同一个通道，
+// 让接管座位的新会话接着走，避免旧协程替新玩家出牌。
+// 返回 true 表示本代已作废，调用方应直接退出。
+func (p *Player) HandBackIfRetired(ch chan int, state int) (retired bool) {
+	if !p.IsRetired() {
+		return false
+	}
+	// 房间可能已经被清理、通道已经关闭，这时交还失败也不影响什么
+	defer func() { _ = recover() }()
+	select {
+	case ch <- state:
+	default:
+	}
+	return true
+}
+
+// SetRoom 在玩家锁内更新所在房间与角色。
+// 房间成员表变更（进房、离房、补位、换房主）都发生在别的协程里，
+// 而玩家自己的状态机协程同时在读这两个字段，统一加锁避免数据竞争。
+// 调用时若已持有房间锁，注意保持"先房间锁、后玩家锁"的顺序，不要反过来。
+func (p *Player) SetRoom(roomID int64, role Role) {
+	p.mu.Lock()
+	p.RoomID = roomID
+	p.Role = role
+	p.mu.Unlock()
+}
+
+// RoomIDOf 加锁读取玩家所在房间号。
+func (p *Player) RoomIDOf() int64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.RoomID
+}
+
+// SetRole 只更新角色（房主变更等场景）。
+func (p *Player) SetRole(role Role) {
+	p.mu.Lock()
+	p.Role = role
+	p.mu.Unlock()
+}
+
+// CanBotContinue 判断断线玩家是否应该留在牌局里由托管接手：
+// 同一代状态机、已断线、仍在牌座上、房间还在进行中。
+func (p *Player) CanBotContinue(gen int64) bool {
+	p.mu.Lock()
+	runGen, online, retired, offlineAt, roomID, role := p.runGen, p.online, p.retired, p.offlineAt, p.RoomID, p.Role
+	p.mu.Unlock()
+	if runGen != gen || online || retired {
+		return false
+	}
+	if offlineAt.IsZero() || roomID == 0 || !role.Seated() {
+		return false
+	}
+	return roomRunning(getRoom(roomID))
+}
+
+// roomRunning 判断房间是否处于牌局进行中（加锁读取，避免与开局时的写入竞争）。
+func roomRunning(room *Room) bool {
+	if room == nil {
+		return false
+	}
+	room.Lock()
+	defer room.Unlock()
+	return room.State == consts.RoomStateRunning
+}
+
+// botInput 处理"已断线但牌局还在进行"的输入：
+//   - 重连窗口内：最多等到本轮超时，期间对方回来就交还控制权；
+//   - 窗口结束后：按托管节奏停顿一下，返回超时，交给上层自动出牌。
+//
+// 返回 handled=true 表示本次输入已由托管处理，调用方不要再读 socket。
+func (p *Player) botInput(timeout time.Duration) (bool, error) {
+	p.mu.Lock()
+	online, retired, offlineAt, role, roomID := p.online, p.retired, p.offlineAt, p.Role, p.RoomID
+	p.mu.Unlock()
+	if online || retired || offlineAt.IsZero() || !role.Seated() {
+		return false, nil
+	}
+	room := getRoom(roomID)
+	if !roomRunning(room) {
+		return false, nil
+	}
+
+	if wait := consts.ReconnectWindow - time.Since(offlineAt); wait > 0 {
+		capped := wait
+		if timeout > 0 && timeout < capped {
+			capped = timeout
+		}
+		// 边等边看：本人重连（新会话）或被顶号时立刻交还控制权
+		deadline := time.Now().Add(capped)
+		for {
+			remain := time.Until(deadline)
+			if remain <= 0 {
+				break
+			}
+			if remain > 200*time.Millisecond {
+				remain = 200 * time.Millisecond
+			}
+			time.Sleep(remain)
+			if p.IsOnline() || p.IsRetired() {
+				return false, nil
+			}
+		}
+		if capped < wait {
+			// 本轮超时了，但重连窗口还在：按普通超时处理，不额外停顿
+			return true, consts.ErrorsTimeout
+		}
+	}
+	time.Sleep(consts.BotPace)
+	if p.IsRetired() {
+		return true, consts.ErrorsChanClosed
+	}
+	return true, consts.ErrorsTimeout
+}
+
+// Listening 读取指定一代连接上的数据包。连接被顶掉后返回。
+func (p *Player) Listening(cs *ConnState) error {
+	if cs == nil {
+		return consts.ErrorsChanClosed
+	}
 	loopCount := 0
 	for {
 		loopCount++
 		if loopCount%1000 == 0 {
-			log.Infof("[Player.Listening] Player %d loop count: %d, online: %v\n", p.ID, loopCount, p.online)
+			log.Infof("[Player.Listening] Player %d loop count: %d\n", p.ID, loopCount)
 		}
-		pack, err := p.conn.Read()
+		pack, err := cs.conn.Read()
 		if err != nil {
 			log.Error(err)
 			return err
 		}
-		if p.read {
-			p.data <- pack
+		p.mu.Lock()
+		deliver := p.cs == cs && p.read
+		p.mu.Unlock()
+		if !deliver {
+			continue
+		}
+		select {
+		case cs.data <- pack:
+		case <-cs.done:
+			return consts.ErrorsChanClosed
 		}
 	}
 }
 
 // 向客户端发生消息
 func (p *Player) WriteString(data string) error {
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: []byte(data),
 	})
 }
 
 func (p *Player) WriteObject(data interface{}) error {
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: json.Marshal(data),
 	})
 }
@@ -144,7 +472,7 @@ func (p *Player) WriteError(err error) error {
 	if err == consts.ErrorsExist {
 		return err
 	}
-	return p.conn.Write(protocol.Packet{
+	return p.writePacket(protocol.Packet{
 		Body: []byte(err.Error() + "\n"),
 	})
 }
@@ -152,23 +480,48 @@ func (p *Player) WriteError(err error) error {
 func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
 	p.StartTransaction()
 	defer p.StopTransaction()
+	return p.readInput(timeout...)
+}
+
+// readInput 是所有输入的统一入口：先判断是否该由托管接手，再正常读连接。
+func (p *Player) readInput(timeout ...time.Duration) (*protocol.Packet, error) {
+	var limit time.Duration
+	if len(timeout) > 0 {
+		limit = timeout[0]
+	}
+	if handled, err := p.botInput(limit); handled {
+		return nil, err
+	}
 	return p.askForPacket(timeout...)
 }
 
 func (p *Player) askForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
+	cs := p.currentState()
+	if cs == nil {
+		return nil, consts.ErrorsChanClosed
+	}
 	var packet *protocol.Packet
 	if len(timeout) > 0 {
+		timer := time.NewTimer(timeout[0])
+		defer timer.Stop()
 		select {
-		case packet = <-p.data:
-		case <-time.After(timeout[0]):
+		case packet = <-cs.data:
+		case <-cs.done: // 顶号/断线：让这一代的回合逻辑立即退出
+			return nil, consts.ErrorsChanClosed
+		case <-timer.C:
 			return nil, consts.ErrorsTimeout
 		}
 	} else {
-		packet = <-p.data
+		select {
+		case packet = <-cs.data:
+		case <-cs.done:
+			return nil, consts.ErrorsChanClosed
+		}
 	}
 	if packet == nil {
 		return nil, consts.ErrorsChanClosed
 	}
+	p.Touch() // 有输入就刷新活跃时间，等待房间据此判断挂机
 	single := strings.ToLower(packet.String())
 	if single == "exit" || single == "e" {
 		return nil, consts.ErrorsExist
@@ -201,7 +554,7 @@ func (p *Player) AskForString(timeout ...time.Duration) (string, error) {
 }
 
 func (p *Player) AskForStringWithoutTransaction(timeout ...time.Duration) (string, error) {
-	packet, err := p.askForPacket(timeout...)
+	packet, err := p.readInput(timeout...)
 	if err != nil {
 		return "", err
 	}
@@ -209,30 +562,58 @@ func (p *Player) AskForStringWithoutTransaction(timeout ...time.Duration) (strin
 }
 
 func (p *Player) StartTransaction() {
+	p.mu.Lock()
 	p.read = true
+	p.mu.Unlock()
 	_ = p.WriteString(consts.IsStart)
 }
 
 func (p *Player) StopTransaction() {
+	p.mu.Lock()
 	p.read = false
+	p.mu.Unlock()
 	_ = p.WriteString(consts.IsStop)
 }
 
 func (p *Player) State(s consts.StateID) {
+	p.mu.Lock()
 	p.state = s
+	p.mu.Unlock()
 }
 
 func (p *Player) GetState() consts.StateID {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.state
 }
 
-func (p *Player) Conn(conn *network.Conn) {
-	p.conn = conn
-	p.data = make(chan *protocol.Packet, 8)
+// BindConn 绑定一代新连接。若该玩家此前有连接（顶号），旧连接会被通知失效并关闭，
+// 但玩家 ID、名字、房间、牌局进度全部保留。
+func (p *Player) BindConn(conn *network.Conn) *ConnState {
+	p.mu.Lock()
+	old := p.cs
+	cs := NewConnState(conn)
+	p.cs = cs
+	p.read = false
 	p.online = true
+	p.retired = false
+	p.offlineAt = time.Time{}
+	p.lastActive = time.Now()
+	p.mu.Unlock()
+
+	if old != nil {
+		old.close()
+		_ = old.conn.Close()
+	}
+	return cs
 }
 
-func (p Player) Model() model.Player {
+// Conn 兼容旧调用，等价于 BindConn。
+func (p *Player) Conn(conn *network.Conn) {
+	p.BindConn(conn)
+}
+
+func (p *Player) Model() model.Player {
 	modelPlayer := model.Player{
 		ID:   p.ID,
 		Name: p.Name,
@@ -248,8 +629,8 @@ func (p Player) Model() model.Player {
 	return modelPlayer
 }
 
-func (p Player) String() string {
-	return fmt.Sprintf("%s[%d]", p.Name, p.ID)
+func (p *Player) String() string {
+	return fmt.Sprintf("%s[%d]", p.BaseName(), p.ID)
 }
 
 type RoomGame interface {
@@ -259,26 +640,76 @@ type RoomGame interface {
 type Room struct {
 	sync.Mutex
 
-	ID                  int64     `json:"id"`
-	Type                int       `json:"type"`
-	Game                RoomGame  `json:"gameId"`
-	State               int       `json:"state"`
-	Players             int       `json:"players"`
-	Banker              int       `json:"banker"`
-	Robots              int       `json:"robots"`
-	Creator             int64     `json:"creator"`
-	ActiveTime          time.Time `json:"activeTime"`
-	MaxPlayers          int       `json:"maxPlayers"`
-	Password            string    `json:"password"`
-	EnableChat          bool      `json:"enableChat"`
-	EnableLaiZi         bool      `json:"enableLaiZi"`
-	EnableSkill         bool      `json:"enableSkill"`
-	EnableLandlord      bool      `json:"enableLandlord"`
-	EnableDontShuffle   bool      `json:"enableDontShuffle"`
-	EnableShowIP        bool      `json:"enableShowIP"`
-	EnableJokerAsTarget bool      `json:"enableJokerAsTarget"`
-	UndercoverNum       int       `json:"undercoverNum"` // 卧底数量
-	BlankWordMode       bool      `json:"blankWordMode"` // 空白词模式
+	ID                  int64          `json:"id"`
+	Type                int            `json:"type"`
+	Game                RoomGame       `json:"gameId"`
+	State               int            `json:"state"`
+	Players             int            `json:"players"`
+	Banker              int            `json:"banker"`
+	Robots              int            `json:"robots"`
+	Creator             int64          `json:"creator"`
+	ActiveTime          time.Time      `json:"activeTime"`
+	MaxPlayers          int            `json:"maxPlayers"`
+	Password            string         `json:"password"`
+	EnableChat          bool           `json:"enableChat"`
+	EnableLaiZi         bool           `json:"enableLaiZi"`
+	EnableSkill         bool           `json:"enableSkill"`
+	EnableLandlord      bool           `json:"enableLandlord"`
+	EnableDontShuffle   bool           `json:"enableDontShuffle"`
+	EnableShowIP        bool           `json:"enableShowIP"`
+	EnableJokerAsTarget bool           `json:"enableJokerAsTarget"`
+	UndercoverNum       int            `json:"undercoverNum"` // 卧底数量
+	BlankWordMode       bool           `json:"blankWordMode"` // 空白词模式
+	Ready               map[int64]bool `json:"ready"`         // 满员后的 ready 状态
+	ReadyUntil          time.Time      `json:"readyUntil"`    // ready 倒计时截止
+}
+
+// RoomInfo 是房间可变字段的瞬时快照。多个协程（房间输入循环、牌局驱动、后台清理）
+// 会同时读写这些字段，直接读 room.State / room.Players 会被 race detector 抓到，
+// 所以统一走 Info() 拿一份加锁后的副本。
+type RoomInfo struct {
+	ID                  int64
+	Type                int
+	State               int
+	Players             int
+	Creator             int64
+	Banker              int
+	MaxPlayers          int
+	Password            string
+	EnableChat          bool
+	EnableLaiZi         bool
+	EnableSkill         bool
+	EnableLandlord      bool
+	EnableDontShuffle   bool
+	EnableShowIP        bool
+	EnableJokerAsTarget bool
+	UndercoverNum       int
+	BlankWordMode       bool
+}
+
+// Info 加锁读取房间的可变字段快照。
+func (r *Room) Info() RoomInfo {
+	r.Lock()
+	defer r.Unlock()
+	return RoomInfo{
+		ID:                  r.ID,
+		Type:                r.Type,
+		State:               r.State,
+		Players:             r.Players,
+		Creator:             r.Creator,
+		Banker:              r.Banker,
+		MaxPlayers:          r.MaxPlayers,
+		Password:            r.Password,
+		EnableChat:          r.EnableChat,
+		EnableLaiZi:         r.EnableLaiZi,
+		EnableSkill:         r.EnableSkill,
+		EnableLandlord:      r.EnableLandlord,
+		EnableDontShuffle:   r.EnableDontShuffle,
+		EnableShowIP:        r.EnableShowIP,
+		EnableJokerAsTarget: r.EnableJokerAsTarget,
+		UndercoverNum:       r.UndercoverNum,
+		BlankWordMode:       r.BlankWordMode,
+	}
 }
 
 func (r *Room) Model() model.Room {

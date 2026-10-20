@@ -15,11 +15,12 @@ func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	rooms := database.GetRooms()
 	buf.WriteString(fmt.Sprintf("%-10s%-10s%-10s%-10s\n", "ID", "Type", "Players", "State"))
 	for _, room := range rooms {
+		info := room.Info()
 		pwdFlag := ""
-		if room.Password != "" {
+		if info.Password != "" {
 			pwdFlag = "*"
 		}
-		buf.WriteString(fmt.Sprintf("%-10d%-10s%-10d%-10s\n", room.ID, pwdFlag+consts.GameTypes[room.Type], room.Players, consts.RoomStates[room.State]))
+		buf.WriteString(fmt.Sprintf("%-10d%-10s%-10d%-10s\n", info.ID, pwdFlag+consts.GameTypes[info.Type], info.Players, consts.RoomStates[info.State]))
 	}
 	err := player.WriteString(buf.String())
 	if err != nil {
@@ -45,7 +46,7 @@ func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	}
 
 	//房间存在密码，要求输入密码
-	pwd := room.Password
+	pwd := room.Info().Password
 	if pwd != "" {
 		err = verifyPassword(player, pwd)
 		if err != nil {
@@ -56,8 +57,9 @@ func (s *join) Next(player *database.Player) (consts.StateID, error) {
 	if err != nil {
 		return 0, player.WriteError(err)
 	}
-	if room.State != consts.RoomStateRunning {
-		database.Broadcast(roomId, fmt.Sprintf("%s [%s] joined room! room current has %d players\n", player.Name, player.Role, room.Players))
+	info := room.Info()
+	if info.State != consts.RoomStateRunning {
+		database.Broadcast(roomId, fmt.Sprintf("%s [%s] joined room! room current has %d players\n", player.Name, player.Role, info.Players))
 	} else {
 		_ = player.WriteString("You have joined a running game, please wait for the game to finish.\n")
 	}

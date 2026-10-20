@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/server/consts"
@@ -24,14 +23,14 @@ func bet(player *database.Player, game *database.Texas) error {
 
 	database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn to bet\n", player.Name), player.ID)
 
-	timeout := consts.BetTimeout
+	// 绝对截止时间 + 连续非法输入熔断，避免靠刷屏卡住下注环节
+	timer := database.NewTurnTimer(consts.BetTimeout)
 	loopCount := 0
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[bet] Player %d (Room %d) loop count: %d, timeout: %v\n", player.ID, player.RoomID, loopCount, timeout)
+			log.Infof("[bet] Player %d (Room %d) loop count: %d, remain: %v\n", player.ID, player.RoomID, loopCount, timer.Remaining())
 		}
-		before := time.Now().Unix()
 
 		buf := bytes.Buffer{}
 		buf.WriteString(fmt.Sprintf("Your hand: %s\n", texasPlayer.Hand.TexasString()))
@@ -51,11 +50,10 @@ func bet(player *database.Player, game *database.Texas) error {
 		}
 		buf.WriteString("What do you want to do? (call/raise/fold/check/allin)\n")
 		_ = player.WriteString(buf.String())
-		ans, err := player.AskForString(timeout)
-		if err != nil {
-			ans = "fold"
+		ans, ok := timer.Ask(player)
+		if !ok {
+			ans = "fold" // 超时/断线默认弃牌
 		}
-		timeout -= time.Second * time.Duration(time.Now().Unix()-before)
 		minCall := game.MaxBetAmount - texasPlayer.Bets
 
 		instructions := strings.Split(ans, " ")
@@ -110,7 +108,17 @@ func bet(player *database.Player, game *database.Texas) error {
 			game.Bet(texasPlayer, betAmount)
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s all in, bet %d\n", player.Name, betAmount))
 		default:
-			database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: %s\n", player.Name, player.Role, ans))
+			if timer.Invalid() {
+				log.Infof("[bet] player %d invalid input reached limit, force fold\n", player.ID)
+				texasPlayer.Folded = true
+				game.Folded++
+				database.Broadcast(player.RoomID, fmt.Sprintf("%s fold (invalid input limit)\n", player.Name))
+				if game.Folded == len(game.Players)-1 {
+					return settlementRound(game)
+				}
+				break
+			}
+			database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: ", player.Name, player.Role), ans)
 			continue
 		}
 		break

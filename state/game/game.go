@@ -65,6 +65,9 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 		}
 		log.Infof("[Game.Next] Player %d waiting for state, loop count: %d\n", player.ID, loopCount)
 		state := <-game.States[player.ID]
+		if player.HandBackIfRetired(game.States[player.ID], state) {
+			return 0, consts.ErrorsChanClosed
+		}
 		switch state {
 		case stateRob:
 			if !game.Room.EnableLandlord {
@@ -150,21 +153,19 @@ func handleRob(player *database.Player, game *database.Game) error {
 		database.Broadcast(player.RoomID, fmt.Sprintf("%s's turn to rob\n", player.Name), player.ID)
 	}
 
-	timeout := consts.RobTimeout
+	timer := database.NewTurnTimer(consts.RobTimeout)
 	loopCount := 0
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[handleRob] Player %d (Room %d) loop count: %d, timeout: %v, FirstRob: %d, LastRob: %d\n", player.ID, player.RoomID, loopCount, timeout, game.FirstRob, game.LastRob)
+			log.Infof("[handleRob] Player %d (Room %d) loop count: %d, remain: %v, FirstRob: %d, LastRob: %d\n", player.ID, player.RoomID, loopCount, timer.Remaining(), game.FirstRob, game.LastRob)
 		}
-		before := time.Now().Unix()
 		_ = player.WriteString("Are you want to become landlord? (y or n)\n")
-		ans, err := player.AskForString(timeout)
-		if err != nil && err != consts.ErrorsExist {
-			ans = "n"
+		ans, ok := timer.Ask(player)
+		if !ok {
+			ans = "n" // 超时/断线默认不抢
 		}
-		timeout -= time.Second * time.Duration(time.Now().Unix()-before)
-		ans = strings.ToLower(ans)
+		ans = strings.ToLower(strings.TrimSpace(ans))
 		if ans == "y" {
 			if game.FirstRob == 0 {
 				game.FirstRob = player.ID
@@ -173,13 +174,17 @@ func handleRob(player *database.Player, game *database.Game) error {
 			game.Multiple *= 2
 			database.Broadcast(player.RoomID, fmt.Sprintf("%s rob\n", player.Name))
 			break
-		} else if ans == "n" {
-			database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob\n", player.Name))
-			break
-		} else {
-			_ = player.WriteError(consts.ErrorsInputInvalid)
-			continue
 		}
+		if ans != "n" {
+			if !timer.Invalid() {
+				_ = player.WriteError(consts.ErrorsInputInvalid)
+				continue
+			}
+			// 连续非法输入熔断，按不抢处理
+			log.Infof("[handleRob] player %d invalid input reached limit, force no-rob\n", player.ID)
+		}
+		database.Broadcast(player.RoomID, fmt.Sprintf("%s don't rob\n", player.Name))
+		break
 	}
 	if game.FinalRob {
 		game.FinalRob = false
@@ -192,33 +197,37 @@ func handleRob(player *database.Player, game *database.Game) error {
 }
 
 func playing(player *database.Player, game *database.Game, master bool, playTimes int) error {
-	timeout := game.PlayTimeOut[player.ID]
+	// 绝对截止时间：任何输入都会消耗真实剩余时间，
+	// 避免"快速发垃圾输入把秒级差值卡成 0"从而无限拖时间。
+	timer := database.NewTurnTimer(game.PlayTimeOut[player.ID])
+	// 超时 / 连续非法输入熔断时的兜底出牌：庄家出最小单张，闲家过牌
+	autoAnswer := func(pokers modelx.Pokers) string {
+		if master && len(pokers) > 0 {
+			return poker.GetAlias(pokers[0].Key)
+		}
+		return "p"
+	}
 	loopCount := 0
 	for {
 		loopCount++
 		if loopCount%100 == 0 {
-			log.Infof("[playing] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, timeout: %v\n", player.ID, player.RoomID, loopCount, master, playTimes, timeout)
+			log.Infof("[playing] Player %d (Room %d) loop count: %d, master: %v, playTimes: %d, remain: %v\n", player.ID, player.RoomID, loopCount, master, playTimes, timer.Remaining())
 		}
 		buf := bytes.Buffer{}
 		buf.WriteString("\n")
 		if !master && len(game.LastPokers) > 0 {
 			buf.WriteString(fmt.Sprintf("Last player: %s (%s), played: %s\n", database.GetPlayer(game.LastPlayer).Name, game.Team(game.LastPlayer), game.LastPokers.String()))
 		}
-		buf.WriteString(fmt.Sprintf("Timeout: %ds, pokers: %s\n", int(timeout.Seconds()), game.Pokers[player.ID].String()))
+		buf.WriteString(fmt.Sprintf("Timeout: %ds, pokers: %s\n", int(timer.Remaining().Seconds()), game.Pokers[player.ID].String()))
 		_ = player.WriteString(buf.String())
-		before := time.Now().Unix()
 		pokers := game.Pokers[player.ID]
-		ans, err := player.AskForString(timeout)
-		if err != nil {
-			if master {
-				ans = poker.GetAlias(pokers[0].Key)
-			} else {
-				ans = "p"
-			}
-		} else {
-			timeout -= time.Second * time.Duration(time.Now().Unix()-before)
+		ans, ok := timer.Ask(player)
+		if !ok {
+			ans = autoAnswer(pokers)
 		}
+		rawAns := strings.TrimSpace(ans)
 		ans = strings.ToLower(ans)
+	retry:
 		if ans == "" {
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsPokersFacesInvalid.Error()))
 			continue
@@ -275,15 +284,21 @@ func playing(player *database.Player, game *database.Game, master bool, playTime
 		if len(facesArr) == 0 {
 			invalid = true
 		}
-		//聊天開啓才能說話
+		// 非法输入：既能当聊天，也可能是熊在刷屏拖时间。
+		// 聊天照样允许（有限流），但连续多次非法输入会直接按超时处理。
 		if invalid {
+			if timer.Invalid() {
+				ans = autoAnswer(pokers)
+				rawAns = ans
+				log.Infof("[playing] player %d invalid input reached limit, force play %q\n", player.ID, ans)
+				goto retry
+			}
 			if game.Room.EnableChat {
-				database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: %s\n", player.Name, player.Role, ans))
-				continue
+				database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: ", player.Name, player.Role), rawAns)
 			} else {
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
-				continue
 			}
+			continue
 		}
 		lastFaces := game.LastFaces
 		if !master && lastFaces != nil {
