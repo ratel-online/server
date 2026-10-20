@@ -1,5 +1,5 @@
-# 构建阶段
-FROM golang:1.17-alpine AS builder
+# 构建阶段（与 go.mod 声明的 go 版本保持一致）
+FROM golang:1.24-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
