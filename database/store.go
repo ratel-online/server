@@ -2,138 +2,70 @@ package database
 
 import "sync"
 
-// store 是一个带读写锁的 int64 → interface{} map，用来替代第三方 hashmap 包，
-// 并保持 Go 1.17 兼容（不使用泛型）。
+// store 是一个带读写锁的泛型 map，用来替代第三方 hashmap 包。
 //
-// 换掉 awesome-cap/hashmap 的原因：它在 Set 里先调 resize()，而 resize 判断
+// 换掉它的原因：awesome-cap/hashmap 在 Set 里先调 resize()，而 resize 判断
 // dilate() 时读的 size / table.len() 并没有加锁，和别的 goroutine 的原子写
-// 构成数据竞争（go test -race 能稳定复现）。这里用最直白的 RWMutex + 内置 map，
-// 行为可预期。
-//
-// 为了让调用侧保持类型安全，按值类型提供四个薄封装：
-// playerStore / roomStore / memberStore / kickedStore。
+// 构成数据竞争（go test -race 能稳定复现）。并发建连时不仅有 race，扩容瞬间
+// 还可能读到正在被替换的旧表。这里用最直白的 RWMutex + 内置 map，行为可预期。
 //
 // 注意：所有遍历都先取快照再执行回调，回调里可以安全地继续读写 store，
 // 不会死锁，也不会边遍历边修改同一个 map。
-type store struct {
+type store[K comparable, V any] struct {
 	mu sync.RWMutex
-	m  map[int64]interface{}
+	m  map[K]V
 }
 
-func newStore() *store {
-	return &store{m: make(map[int64]interface{})}
+func newStore[K comparable, V any]() *store[K, V] {
+	return &store[K, V]{m: make(map[K]V)}
 }
 
-func (s *store) getRaw(k int64) (interface{}, bool) {
+func (s *store[K, V]) Get(k K) (V, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	v, ok := s.m[k]
 	return v, ok
 }
 
-func (s *store) setRaw(k int64, v interface{}) {
+func (s *store[K, V]) Set(k K, v V) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.m[k] = v
 }
 
-func (s *store) delRaw(k int64) {
+func (s *store[K, V]) Del(k K) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.m, k)
 }
 
-func (s *store) snapshotRaw() map[int64]interface{} {
+func (s *store[K, V]) Len() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := make(map[int64]interface{}, len(s.m))
+	return len(s.m)
+}
+
+// Snapshot 返回一份浅拷贝，用于需要遍历的场景。
+func (s *store[K, V]) Snapshot() map[K]V {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[K]V, len(s.m))
 	for k, v := range s.m {
 		out[k] = v
 	}
 	return out
 }
 
-// playerStore 存 *Player。
-type playerStore struct{ store }
-
-func newPlayerStore() *playerStore { return &playerStore{store: store{m: make(map[int64]interface{})}} }
-
-func (s *playerStore) Get(k int64) (*Player, bool) {
-	v, ok := s.getRaw(k)
-	if !ok {
-		return nil, false
-	}
-	return v.(*Player), true
-}
-
-func (s *playerStore) Set(k int64, v *Player) { s.setRaw(k, v) }
-
-func (s *playerStore) Values() []*Player {
-	raw := s.snapshotRaw()
-	out := make([]*Player, 0, len(raw))
-	for _, v := range raw {
-		out = append(out, v.(*Player))
+// Values 返回所有值（顺序不确定）。
+func (s *store[K, V]) Values() []V {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]V, 0, len(s.m))
+	for _, v := range s.m {
+		out = append(out, v)
 	}
 	return out
 }
-
-// roomStore 存 *Room。
-type roomStore struct{ store }
-
-func newRoomStore() *roomStore { return &roomStore{store: store{m: make(map[int64]interface{})}} }
-
-func (s *roomStore) Get(k int64) (*Room, bool) {
-	v, ok := s.getRaw(k)
-	if !ok {
-		return nil, false
-	}
-	return v.(*Room), true
-}
-
-func (s *roomStore) Set(k int64, v *Room) { s.setRaw(k, v) }
-
-func (s *roomStore) Del(k int64) { s.delRaw(k) }
-
-func (s *roomStore) Values() []*Room {
-	raw := s.snapshotRaw()
-	out := make([]*Room, 0, len(raw))
-	for _, v := range raw {
-		out = append(out, v.(*Room))
-	}
-	return out
-}
-
-// memberStore 存 *memberSet。
-type memberStore struct{ store }
-
-func newMemberStore() *memberStore { return &memberStore{store: store{m: make(map[int64]interface{})}} }
-
-func (s *memberStore) Get(k int64) (*memberSet, bool) {
-	v, ok := s.getRaw(k)
-	if !ok {
-		return nil, false
-	}
-	return v.(*memberSet), true
-}
-
-func (s *memberStore) Set(k int64, v *memberSet) { s.setRaw(k, v) }
-
-func (s *memberStore) Del(k int64) { s.delRaw(k) }
-
-// kickedStore 存 map[int64]bool（房间踢人名单）。
-type kickedStore struct{ store }
-
-func newKickedStore() *kickedStore { return &kickedStore{store: store{m: make(map[int64]interface{})}} }
-
-func (s *kickedStore) Get(k int64) (map[int64]bool, bool) {
-	v, ok := s.getRaw(k)
-	if !ok {
-		return nil, false
-	}
-	return v.(map[int64]bool), true
-}
-
-func (s *kickedStore) Set(k int64, v map[int64]bool) { s.setRaw(k, v) }
 
 // memberSet 是房间成员集合（座位上的人 / 旁观的人），自带读写锁。
 //

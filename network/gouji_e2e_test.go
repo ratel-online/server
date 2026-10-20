@@ -103,8 +103,7 @@ func goujiBeatSingle(hand, last []string) string {
 // 上家出单张且手里有更大的单张就压，否则过牌，直到有人出完触发结算。
 func (c *testClient) goujiBot(done chan<- string) {
 	for {
-		// 读超时给足余量：整包测试并发跑时机器负载高，30s 曾出现偶发超时
-		text, err := c.read(120 * time.Second)
+		text, err := c.read(30 * time.Second)
 		if err != nil {
 			done <- "read error: " + err.Error()
 			return

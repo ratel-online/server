@@ -17,12 +17,12 @@ import (
 )
 
 var roomIds int64 = 0
-var players = newPlayerStore() // 存储连接过服务器的全部用户
-var connPlayers = newPlayerStore()
-var rooms = newRoomStore()
-var roomPlayers = newMemberStore()
-var roomSpectators = newMemberStore()
-var roomKickedPlayers = newKickedStore()
+var players = newStore[int64, *Player]() // 存储连接过服务器的全部用户
+var connPlayers = newStore[int64, *Player]()
+var rooms = newStore[int64, *Room]()
+var roomPlayers = newStore[int64, *memberSet]()
+var roomSpectators = newStore[int64, *memberSet]()
+var roomKickedPlayers = newStore[int64, map[int64]bool]()
 var roomPropsSetter = map[string]func(r *Room, v string){
 	consts.RoomPropsSkill: func(r *Room, v string) {
 		r.EnableSkill = v == "on"
