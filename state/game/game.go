@@ -65,6 +65,9 @@ func (g *Game) Next(player *database.Player) (consts.StateID, error) {
 		}
 		log.Infof("[Game.Next] Player %d waiting for state, loop count: %d\n", player.ID, loopCount)
 		state := <-game.States[player.ID]
+		if player.HandBackIfRetired(game.States[player.ID], state) {
+			return 0, consts.ErrorsChanClosed
+		}
 		switch state {
 		case stateRob:
 			if !game.Room.EnableLandlord {

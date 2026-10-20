@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"hash/fnv"
 	"net"
 	"strings"
@@ -78,6 +79,11 @@ func sanitizeName(raw string) string {
 	if name == "" {
 		name = defaultName
 	}
+	// 名字里也不许夹带脏话，整段替换成 '*'；全是掩码时退回默认名
+	name, _ = maskProfanity(name)
+	if strings.Trim(name, "*") == "" {
+		name = defaultName
+	}
 	runes := []rune(name)
 	if len(runes) > maxNameRunes {
 		name = string(runes[:maxNameRunes])
@@ -122,15 +128,22 @@ func registerName(p *Player, base, key string) error {
 	return nil
 }
 
-// lookupSameIPName 查找同 IP 同名的在线玩家（即顶号目标）。
+// lookupSameIPName 查找同 IP 同名的玩家（即顶号/重连目标）：
+// 在线的直接命中；已断线但座位还在牌局里的也命中，保证掉线重连能接管自己的座位。
 func lookupSameIPName(ip, base string) *Player {
 	nameMu.Lock()
-	defer nameMu.Unlock()
 	owner := ipNameIndex[nameKey(ip, base)]
-	if owner == nil || !owner.IsOnline() {
+	nameMu.Unlock()
+	if owner == nil {
 		return nil
 	}
-	return owner
+	if owner.IsOnline() {
+		return owner
+	}
+	if room := getRoom(owner.RoomID); room != nil && room.State == consts.RoomStateRunning {
+		return owner
+	}
+	return nil
 }
 
 // claimIdentity 为本次连接确定身份：
@@ -143,7 +156,21 @@ func claimIdentity(conn *network.Conn, raw string) (p *Player, cs *ConnState, to
 	ip := normalizeIP(conn.IP())
 	key := nameKey(ip, base)
 
-	if owner := lookupSameIPName(ip, base); owner != nil && owner.ID != conn.ID() {
+	// 违规被封禁的 IP 直接拒绝，换名字也进不来
+	if banned, remain := IsIPBanned(ip); banned {
+		mins := int(remain.Minutes()) + 1
+		return nil, nil, false, consts.NewErr(1, true,
+			fmt.Sprintf("You are banned for another %d minute(s) because of abusive behavior. ", mins))
+	}
+
+	// 连接准入：同 IP 连接数上限 + 连接速率限制（顶号不占新名额）
+	owner := lookupSameIPName(ip, base)
+	takeover := owner != nil && owner.ID != conn.ID()
+	if err = AllowConnection(ip, takeover); err != nil {
+		return nil, nil, false, err
+	}
+
+	if takeover {
 		snap := owner.snapshot()
 		owner.invalidate() // 旧连接、旧状态机一并作废，槽位 ID 留给新连接用
 
@@ -175,6 +202,7 @@ func claimIdentity(conn *network.Conn, raw string) (p *Player, cs *ConnState, to
 	cs = p.BindConn(conn)
 	if err = registerName(p, base, key); err != nil {
 		cs.close()
+		cs.releaseIP()
 		return nil, nil, false, err
 	}
 	return p, cs, false, nil
@@ -206,20 +234,26 @@ func (p *Player) BaseName() string {
 // ============================================================================
 
 const (
-	chatBurst     = 3.0             // 允许的突发条数
-	chatInterval  = 2 * time.Second // 每 2 秒回 1 条
-	chatStrikes   = 5               // 连续被拦截多少次后禁言
-	chatMuteTime  = 60 * time.Second
-	chatDupWindow = 2 // 同一条消息连续出现超过该次数就丢弃
+	chatBurst    = 3.0             // 允许的突发条数
+	chatInterval = 2 * time.Second // 每 2 秒回 1 条
+	chatHistory  = 5               // 最近 5 条做哈希去重
+)
+
+// chatVerdict 是聊天准入的结果。
+type chatVerdict int
+
+const (
+	chatOK chatVerdict = iota
+	chatThrottled
+	chatDuplicate
 )
 
 type chatLimit struct {
-	tokens    float64
-	last      time.Time
-	strikes   int
-	repeat    int
-	lastHash  uint64
-	muteUntil time.Time
+	tokens float64
+	last   time.Time
+	hashes [chatHistory]uint64
+	idx    int
+	filled int
 }
 
 var (
@@ -233,8 +267,26 @@ func hashMessage(msg string) uint64 {
 	return h.Sum64()
 }
 
-// allowChat 判断该玩家当前是否可以发言（内存态，无需数据库）。
-func allowChat(id int64, msg string) bool {
+// seen 判断该消息是否在最近 chatHistory 条里出现过。
+func (c *chatLimit) seen(h uint64) bool {
+	for i := 0; i < c.filled; i++ {
+		if c.hashes[i] == h {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *chatLimit) push(h uint64) {
+	c.hashes[c.idx] = h
+	c.idx = (c.idx + 1) % chatHistory
+	if c.filled < chatHistory {
+		c.filled++
+	}
+}
+
+// chatCheck 判断该玩家当前是否可以发言（内存态，无需数据库）。
+func chatCheck(id int64, msg string) chatVerdict {
 	now := time.Now()
 	chatMu.Lock()
 	defer chatMu.Unlock()
@@ -244,9 +296,6 @@ func allowChat(id int64, msg string) bool {
 		lim = &chatLimit{tokens: chatBurst, last: now}
 		chatTable[id] = lim
 	}
-	if now.Before(lim.muteUntil) {
-		return false
-	}
 	lim.tokens += now.Sub(lim.last).Seconds() / chatInterval.Seconds()
 	if lim.tokens > chatBurst {
 		lim.tokens = chatBurst
@@ -254,27 +303,16 @@ func allowChat(id int64, msg string) bool {
 	lim.last = now
 
 	h := hashMessage(msg)
-	if h == lim.lastHash {
-		lim.repeat++
-	} else {
-		lim.lastHash = h
-		lim.repeat = 0
+	if lim.seen(h) {
+		return chatDuplicate
 	}
-	if lim.repeat > chatDupWindow {
-		return false
-	}
+	lim.push(h)
 
 	if lim.tokens < 1 {
-		lim.strikes++
-		if lim.strikes >= chatStrikes {
-			lim.muteUntil = now.Add(chatMuteTime)
-			lim.strikes = 0
-			log.Infof("[chat] player %d muted for %v (flood)\n", id, chatMuteTime)
-		}
-		return false
+		return chatThrottled
 	}
 	lim.tokens--
-	return true
+	return chatOK
 }
 
 // ============================================================================

@@ -65,6 +65,19 @@ const (
 	PlayTimeout        = 40 * time.Second
 	PlayMahjongTimeout = 30 * time.Second
 	BetTimeout         = 60 * time.Second
+
+	// 防挂机/防刷房的时间参数
+	WaitingIdleTimeout = 5 * time.Minute  // 等待房间内无输入多久自动离房
+	ReadyTimeout       = 30 * time.Second // 满员后必须 ready 的时限，超时踢人
+	ReconnectWindow    = 60 * time.Second // 局内断线保留座位的时长，之后转托管
+	BotPace            = 2 * time.Second  // 托管出牌的节奏
+)
+
+// 同 IP 连接限制（挡小号刷房）
+const (
+	MaxConnsPerIP  = 3
+	ConnRateLimit  = 10
+	ConnRateWindow = time.Minute
 )
 
 // Room properties.
@@ -123,6 +136,8 @@ var (
 	ErrorsGamePlayersInsufficient = NewErr(1, false, "Game players insufficient. ")
 	ErrorsCannotKickYourself      = NewErr(1, false, "Cannot kick yourself. ")
 	ErrorsPlayerNotInRoom         = NewErr(1, true, "Player not in room. ")
+	ErrorsTooManyConns            = NewErr(1, true, "Too many connections from your IP, please close one and retry. ")
+	ErrorsConnectTooFast          = NewErr(1, true, "Too many connection attempts from your IP, please wait a minute. ")
 	GameTypes = map[int]string{
 		GameTypeClassic:    "斗地主",
 		GameTypeLaiZi:      "斗地主-癞子版",
@@ -148,3 +163,22 @@ var (
 		RoomStateRunning: "Running",
 	}
 )
+
+// GameState 返回房间类型对应的牌局状态，用于断线重连后回到牌桌。
+func GameState(roomType int) StateID {
+	switch roomType {
+	case GameTypeRunFast:
+		return StateRunFastGame
+	case GameTypeUno:
+		return StateUnoGame
+	case GameTypeMahjong:
+		return StateMahjongGame
+	case GameTypeTexas:
+		return StateTexasGame
+	case GameTypeLiar:
+		return StateLiarGame
+	case GameTypeUndercover:
+		return StateUndercoverGame
+	}
+	return StateGame
+}

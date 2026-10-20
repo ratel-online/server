@@ -68,6 +68,9 @@ func (g *Undercover) Next(player *database.Player) (consts.StateID, error) {
 			log.Infof("[Undercover.Next] Player %d state channel closed, returning to waiting\n", player.ID)
 			return consts.StateWaiting, nil
 		}
+		if player.HandBackIfRetired(game.States[player.ID], state) {
+			return 0, consts.ErrorsChanClosed
+		}
 		switch state {
 		case undercoverStateDescribe:
 			err := g.handleDescribe(player, game)

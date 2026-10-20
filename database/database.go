@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	stringx "strings"
@@ -85,6 +86,7 @@ func init() {
 			rooms.Foreach(func(e *hashmap.Entry) {
 				roomCancel(e.Value().(*Room))
 			})
+			Maintenance() // 清理过期的禁言/封禁/限流/名字占用
 		}
 	})
 }
@@ -102,15 +104,18 @@ func Connected(conn *network.Conn, info *modelx.AuthInfo) (*Player, *ConnState, 
 	return player, cs, tookOver, nil
 }
 
-// ResumeState 顶号后新连接应该从哪个状态继续：
-// 等待房间是无状态的输入循环，可以原地恢复；牌局进行中则回大厅，
-// 避免新连接重跑 game.Next 把进行中的牌局重置掉。
+// ResumeState 顶号/重连后新连接应该从哪个状态继续：
+// 等待房间是无状态的输入循环，可以原地恢复；牌局进行中且座位还在，
+// 直接回到牌桌；已经不在房间里的，回大厅。
 func ResumeState(p *Player) consts.StateID {
 	room := getRoom(p.RoomID)
-	if room != nil && room.State == consts.RoomStateWaiting {
+	if room == nil || p.Role == RoleSpectator || !IsValidPlayer(room.ID, p.ID) {
+		return consts.StateWelcome
+	}
+	if room.State == consts.RoomStateWaiting {
 		return consts.StateWaiting
 	}
-	return consts.StateWelcome
+	return consts.GameState(room.Type)
 }
 
 func CreateRoom(creator int64, t int) *Room {
@@ -150,6 +155,7 @@ func CreateRoom(creator int64, t int) *Room {
 	}
 	roomPlayers.Set(room.ID, map[int64]bool{})
 	roomSpectators.Set(room.ID, map[int64]int{})
+	room.Ready = map[int64]bool{}
 	rooms.Set(room.ID, room)
 	return room
 }
@@ -331,7 +337,7 @@ func JoinRoom(roomId, playerId int64) error {
 			player.Role = RoleOwner
 		}
 	}
-
+	SyncReady(room)
 	return nil
 }
 
@@ -387,6 +393,7 @@ func backfill(room *Room) *Player {
 	if player != nil {
 		player.Role = RolePlayer
 	}
+	SyncReady(room)
 	return player
 }
 
@@ -442,6 +449,8 @@ func leaveRoom(room *Room, player *Player) {
 		player.Role = ""
 		delete(spectatorsIds, player.ID)
 	}
+	delete(room.Ready, player.ID)
+	SyncReady(room)
 	if len(playersIds) == 0 && len(spectatorsIds) == 0 {
 		deleteRoom(room)
 	}
@@ -511,17 +520,124 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 }
 
 // BroadcastChat 统一聊天出口：所有聊天消息都必须经过这里，
-// 以便限流、去重、禁言等防护对等待房间和所有玩法同时生效。
-// 返回 false 表示本条消息被拦截（刷屏/重复/禁言）。
+// 以便屏蔽脏词、限流、去重、禁言等防护对等待房间和所有玩法同时生效。
+// 返回 false 表示本条消息被拦截（脏话被掩码但已计入违规、刷屏、重复、禁言）。
 func BroadcastChat(player *Player, msg string, exclude ...int64) bool {
+	if player == nil {
+		return false
+	}
+	if remain := MutedFor(player); remain > 0 {
+		_ = player.WriteString(fmt.Sprintf("You are muted, %d second(s) left. \n", int(remain.Seconds())+1))
+		return false
+	}
+
+	// 归一化后匹配脏词，命中就把这段替换成 '*'，并记一次违规
+	msg, hits := sanitizeChat(msg)
 	msg = strings.Desensitize(msg)
-	if !allowChat(player.ID, stringx.TrimSpace(msg)) {
+	if stringx.TrimSpace(msg) == "" {
+		return false
+	}
+	if hits > 0 {
+		Strike(player, "abusive language")
+	}
+
+	switch chatCheck(player.ID, msg) {
+	case chatDuplicate:
+		// 最近 5 条内的重复消息直接丢弃，不记违规（正常聊天也会复读）
+		return false
+	case chatThrottled:
 		_ = player.WriteString("Chat throttled, please slow down. \n")
 		return false
 	}
-	log.Infof("chat msg, player %s[%d] %s say: %s\n", player.Name, player.ID, player.IP, stringx.TrimSpace(msg))
+
+	log.Infof("chat msg, player %s[%d] %s say: %s\n", player.Name, player.ID, player.IP, msg)
 	Broadcast(player.RoomID, msg, exclude...)
 	return true
+}
+
+// ============================================================================
+// 满员 ready 机制：房间满员后 30 秒内必须 ready，否则踢出，避免占座挂机。
+// ============================================================================
+
+// ReadyInfo 是一次 ready 状态查询的结果。
+type ReadyInfo struct {
+	Required bool // 房间满员且正在倒计时
+	Ready    bool // 本人是否已 ready
+	Expired  bool // 倒计时是否已结束
+	AllReady bool // 全员 ready
+	ReadyNum int
+	Total    int
+	Remain   int // 剩余秒数
+}
+
+// ReadyStatus 查询某个玩家视角的 ready 状态（内部加房间锁）。
+func ReadyStatus(room *Room, playerID int64) ReadyInfo {
+	if room == nil {
+		return ReadyInfo{}
+	}
+	room.Lock()
+	defer room.Unlock()
+	return readyStatusLocked(room, playerID)
+}
+
+func readyStatusLocked(room *Room, playerID int64) ReadyInfo {
+	// 只统计牌座上的玩家，旁观者 ready 不算数
+	seated := getRoomPlayers(room.ID)
+	readyNum := 0
+	for id := range room.Ready {
+		if seated[id] {
+			readyNum++
+		}
+	}
+	info := ReadyInfo{Total: room.Players, ReadyNum: readyNum}
+	if room.Ready[playerID] && seated[playerID] {
+		info.Ready = true
+	}
+	if room.State != consts.RoomStateWaiting || room.Players < room.MaxPlayers || room.ReadyUntil.IsZero() {
+		return info
+	}
+	info.Required = true
+	info.AllReady = readyNum >= room.Players
+	if remain := time.Until(room.ReadyUntil); remain > 0 {
+		info.Remain = int(remain.Seconds()) + 1
+	} else {
+		info.Expired = true
+	}
+	return info
+}
+
+// SetReady 记录玩家 ready，返回最新状态（内部加房间锁）。
+func SetReady(room *Room, playerID int64) ReadyInfo {
+	if room == nil {
+		return ReadyInfo{}
+	}
+	room.Lock()
+	defer room.Unlock()
+	if _, ok := getRoomPlayers(room.ID)[playerID]; !ok {
+		return readyStatusLocked(room, playerID) // 旁观者不能 ready
+	}
+	if room.Ready == nil {
+		room.Ready = map[int64]bool{}
+	}
+	room.Ready[playerID] = true
+	return readyStatusLocked(room, playerID)
+}
+
+// SyncReady 在人数/状态变化后维护 ready 窗口。调用方需持有房间锁。
+func SyncReady(room *Room) {
+	if room == nil {
+		return
+	}
+	if room.State == consts.RoomStateWaiting && room.Players > 0 && room.Players >= room.MaxPlayers {
+		if room.ReadyUntil.IsZero() {
+			room.ReadyUntil = time.Now().Add(consts.ReadyTimeout)
+		}
+		return
+	}
+	room.ReadyUntil = time.Time{}
+	for id := range room.Ready {
+		delete(room.Ready, id)
+	}
 }
 
 func BroadcastObject(roomId int64, object interface{}, exclude ...int64) {

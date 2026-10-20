@@ -112,13 +112,16 @@ func TestResumeState(t *testing.T) {
 	room := CreateRoom(1, consts.GameTypeLaiZi)
 	defer deleteRoom(room)
 	p.RoomID = room.ID
+	p.Role = RolePlayer
+	getRoomPlayers(room.ID)[p.ID] = true
+	room.Players = 1
 	if got := ResumeState(p); got != consts.StateWaiting {
 		t.Fatalf("等待房间应恢复到房间, got %v", got)
 	}
 
 	room.State = consts.RoomStateRunning
-	if got := ResumeState(p); got != consts.StateWelcome {
-		t.Fatalf("牌局中应退回大厅, got %v", got)
+	if got := ResumeState(p); got != consts.StateGame {
+		t.Fatalf("牌局中应回到牌桌, got %v", got)
 	}
 }
 
@@ -126,35 +129,45 @@ func TestChatRateLimit(t *testing.T) {
 	id := int64(1001)
 	// 初始令牌桶允许 3 条突发
 	for i := 0; i < 3; i++ {
-		if !allowChat(id, "msg-"+string(rune('a'+i))) {
-			t.Fatalf("第 %d 条正常消息被拦截", i+1)
+		if v := chatCheck(id, "msg-"+string(rune('a'+i))); v != chatOK {
+			t.Fatalf("第 %d 条正常消息被拦截: %v", i+1, v)
 		}
 	}
-	if allowChat(id, "msg-d") {
-		t.Fatal("超出突发上限的消息未被拦截")
+	if v := chatCheck(id, "msg-d"); v != chatThrottled {
+		t.Fatalf("超出突发上限的消息未被限流: %v", v)
 	}
 	// 等待回填后可以继续发言
 	time.Sleep(chatInterval + 100*time.Millisecond)
-	if !allowChat(id, "msg-e") {
-		t.Fatal("回填后仍然被拦截")
+	if v := chatCheck(id, "msg-e"); v != chatOK {
+		t.Fatalf("回填后仍然被拦截: %v", v)
 	}
 }
 
 func TestChatDuplicate(t *testing.T) {
 	id := int64(1002)
 	msg := "重复刷屏"
-	if !allowChat(id, msg) || !allowChat(id, msg) {
-		t.Fatal("前两条相同消息不应被拦截")
+	if v := chatCheck(id, msg); v != chatOK {
+		t.Fatalf("首条消息被拦截: %v", v)
 	}
-	// 第三条开始按重复丢弃
-	blocked := false
-	for i := 0; i < 2; i++ {
-		if !allowChat(id, msg) {
-			blocked = true
-		}
+	if v := chatCheck(id, msg); v != chatDuplicate {
+		t.Fatalf("重复消息未被去重: %v", v)
 	}
-	if !blocked {
-		t.Fatal("重复消息未被去重")
+}
+
+// TestChatRingWindow 最近 5 条内的消息视为重复，超出窗口后可以再说
+func TestChatRingWindow(t *testing.T) {
+	lim := &chatLimit{tokens: chatBurst, last: time.Now()}
+	first := hashMessage("第一句")
+	lim.push(first)
+	for i := 0; i < chatHistory-1; i++ {
+		lim.push(hashMessage(string(rune('a' + i))))
+	}
+	if !lim.seen(first) {
+		t.Fatal("还在最近 5 条内却被判为不重复")
+	}
+	lim.push(hashMessage("newest"))
+	if lim.seen(first) {
+		t.Fatal("超出 5 条窗口后仍被判为重复")
 	}
 }
 

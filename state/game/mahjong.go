@@ -42,6 +42,9 @@ func (g *Mahjong) Next(player *database.Player) (consts.StateID, error) {
 		}
 		log.Infof("[Mahjong.Next] Player %d waiting for state, loop count: %d\n", player.ID, loopCount)
 		state := <-game.States[int(player.ID)]
+		if player.HandBackIfRetired(game.States[int(player.ID)], state) {
+			return 0, consts.ErrorsChanClosed
+		}
 		switch state {
 		case statePlay:
 			err := handlePlayMahjong(room, player, game)

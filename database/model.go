@@ -40,14 +40,21 @@ const (
 	RoleSpectator Role = "spectator"
 )
 
+// Seated 表示玩家是否占着一个牌座（房主与普通玩家都算，旁观不算）。
+func (r Role) Seated() bool {
+	return r == RolePlayer || r == RoleOwner
+}
+
 // ConnState 代表玩家的一次连接（"一代"）。
 // 顶号时 Player 会绑定新的 ConnState，旧一代通过 done 收到通知后安静退出，
 // 既不会关掉新连接，也不会把玩家从房间/牌局里带走。
 type ConnState struct {
-	conn *network.Conn
-	data chan *protocol.Packet
-	done chan struct{}
-	once sync.Once
+	conn   *network.Conn
+	data   chan *protocol.Packet
+	done   chan struct{}
+	once   sync.Once
+	ip     string
+	ipOnce sync.Once
 }
 
 func NewConnState(conn *network.Conn) *ConnState {
@@ -55,12 +62,18 @@ func NewConnState(conn *network.Conn) *ConnState {
 		conn: conn,
 		data: make(chan *protocol.Packet, 8),
 		done: make(chan struct{}),
+		ip:   normalizeIP(conn.IP()),
 	}
 }
 
 // close 通知这一代连接失效，可重复调用。
 func (cs *ConnState) close() {
 	cs.once.Do(func() { close(cs.done) })
+}
+
+// releaseIP 归还该 IP 的连接名额，一代连接只归还一次。
+func (cs *ConnState) releaseIP() {
+	cs.ipOnce.Do(func() { ReleaseConnection(cs.ip) })
 }
 
 type Player struct {
@@ -73,14 +86,17 @@ type Player struct {
 	RoomID int64  `json:"roomId"`
 	Role   Role   `json:"role"`
 
-	mu       sync.Mutex
-	cs       *ConnState // 当前这一代连接；顶号会整体替换
-	read     bool
-	state    consts.StateID
-	online   bool
-	runGen   int64  // 状态机代际：顶号后旧状态机据此退出，避免两个协程抢同一个输入
-	baseName string // 不含 "#短ID" 后缀的基础名
-	nameKey  string // 同 IP 同名的排他键
+	mu         sync.Mutex
+	cs         *ConnState // 当前这一代连接；顶号会整体替换
+	read       bool
+	state      consts.StateID
+	online     bool
+	runGen     int64     // 状态机代际：顶号后旧状态机据此退出，避免两个协程抢同一个输入
+	baseName   string    // 不含 "#短ID" 后缀的基础名
+	nameKey    string    // 同 IP 同名的排他键
+	lastActive time.Time // 最近一次有输入的时间，用于挂机检测
+	offlineAt  time.Time // 断线时间，用于重连窗口与托管
+	retired    bool      // 已被顶号作废，旧协程见到后立刻退出
 }
 
 // playerSnapshot 顶号时从旧玩家对象继承的字段（不含锁与连接）。
@@ -120,7 +136,8 @@ func (p *Player) snapshot() playerSnapshot {
 func (p *Player) invalidate() {
 	old := p.currentState()
 	p.mu.Lock()
-	p.runGen++ // 让仍在这一代跑的状态机退出
+	p.retired = true // 让仍在这一代跑的状态机在下次输入时立刻退出
+	p.runGen++       // 让仍在这一代跑的状态机退出
 	p.online = false
 	p.cs = nil
 	p.read = false
@@ -128,6 +145,7 @@ func (p *Player) invalidate() {
 
 	if old != nil {
 		old.close()
+		old.releaseIP()
 		_ = old.conn.Close()
 	}
 }
@@ -189,6 +207,7 @@ func (p *Player) OfflineConn(cs *ConnState) {
 		return
 	}
 	cs.close()
+	cs.releaseIP()
 
 	p.mu.Lock()
 	current := p.cs == cs
@@ -196,6 +215,7 @@ func (p *Player) OfflineConn(cs *ConnState) {
 		p.online = false
 		p.cs = nil
 		p.read = false
+		p.offlineAt = time.Now()
 	}
 	p.mu.Unlock()
 
@@ -205,8 +225,19 @@ func (p *Player) OfflineConn(cs *ConnState) {
 	}
 
 	_ = cs.conn.Close()
-	releaseName(p) // 释放名字占用，避免名字被离线玩家永久锁死
 	room := getRoom(p.RoomID)
+
+	// 牌局进行中掉线：保留座位与名字，重连窗口内回来还是同一个人，
+	// 超时后由托管接管（见 botInput），不把牌局打散。
+	if room != nil && room.State == consts.RoomStateRunning {
+		room.Lock()
+		defer room.Unlock()
+		broadcast(room, fmt.Sprintf("%s lost connection! seat is kept for %d seconds.\n",
+			p.Name, int(consts.ReconnectWindow.Seconds())))
+		return
+	}
+
+	releaseName(p) // 释放名字占用，避免名字被离线玩家永久锁死
 	if room != nil {
 		room.Lock()
 		defer room.Unlock()
@@ -216,6 +247,130 @@ func (p *Player) OfflineConn(cs *ConnState) {
 		}
 		roomCancel(room)
 	}
+}
+
+// Touch 记录一次玩家活动（收到输入），用于挂机检测。
+func (p *Player) Touch() {
+	p.mu.Lock()
+	p.lastActive = time.Now()
+	p.mu.Unlock()
+}
+
+// IdleFor 返回距离最近一次活动过了多久。
+func (p *Player) IdleFor() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.lastActive.IsZero() {
+		return 0
+	}
+	return time.Since(p.lastActive)
+}
+
+// OfflineFor 返回断线了多久，在线返回 0。
+func (p *Player) OfflineFor() time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.online || p.offlineAt.IsZero() {
+		return 0
+	}
+	return time.Since(p.offlineAt)
+}
+
+// IsRetired 判断该对象是否已被顶号作废。
+func (p *Player) IsRetired() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.retired
+}
+
+// HandBackIfRetired 在被顶号时把"刚收到的一手"交还给同一个通道，
+// 让接管座位的新会话接着走，避免旧协程替新玩家出牌。
+// 返回 true 表示本代已作废，调用方应直接退出。
+func (p *Player) HandBackIfRetired(ch chan int, state int) (retired bool) {
+	if !p.IsRetired() {
+		return false
+	}
+	// 房间可能已经被清理、通道已经关闭，这时交还失败也不影响什么
+	defer func() { _ = recover() }()
+	select {
+	case ch <- state:
+	default:
+	}
+	return true
+}
+
+// CanBotContinue 判断断线玩家是否应该留在牌局里由托管接手：
+// 同一代状态机、已断线、仍在牌座上、房间还在进行中。
+func (p *Player) CanBotContinue(gen int64) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.runGen != gen || p.online || p.retired {
+		return false
+	}
+	if p.offlineAt.IsZero() || p.RoomID == 0 || !p.Role.Seated() {
+		return false
+	}
+	room := getRoom(p.RoomID)
+	return room != nil && room.State == consts.RoomStateRunning
+}
+
+// roomRunning 判断房间是否处于牌局进行中（加锁读取，避免与开局时的写入竞争）。
+func roomRunning(room *Room) bool {
+	if room == nil {
+		return false
+	}
+	room.Lock()
+	defer room.Unlock()
+	return room.State == consts.RoomStateRunning
+}
+
+// botInput 处理"已断线但牌局还在进行"的输入：
+//   - 重连窗口内：最多等到本轮超时，期间对方回来就交还控制权；
+//   - 窗口结束后：按托管节奏停顿一下，返回超时，交给上层自动出牌。
+//
+// 返回 handled=true 表示本次输入已由托管处理，调用方不要再读 socket。
+func (p *Player) botInput(timeout time.Duration) (bool, error) {
+	p.mu.Lock()
+	online, retired, offlineAt, role := p.online, p.retired, p.offlineAt, p.Role
+	p.mu.Unlock()
+	if online || retired || offlineAt.IsZero() || !role.Seated() {
+		return false, nil
+	}
+	room := getRoom(p.RoomID)
+	if !roomRunning(room) {
+		return false, nil
+	}
+
+	if wait := consts.ReconnectWindow - time.Since(offlineAt); wait > 0 {
+		capped := wait
+		if timeout > 0 && timeout < capped {
+			capped = timeout
+		}
+		// 边等边看：本人重连（新会话）或被顶号时立刻交还控制权
+		deadline := time.Now().Add(capped)
+		for {
+			remain := time.Until(deadline)
+			if remain <= 0 {
+				break
+			}
+			if remain > 200*time.Millisecond {
+				remain = 200 * time.Millisecond
+			}
+			time.Sleep(remain)
+			if p.IsOnline() || p.IsRetired() {
+				return false, nil
+			}
+		}
+		if capped < wait {
+			// 本轮超时了，但重连窗口还在：按普通超时处理，不额外停顿
+			return true, consts.ErrorsTimeout
+		}
+	}
+	time.Sleep(consts.BotPace)
+	if p.IsRetired() {
+		return true, consts.ErrorsChanClosed
+	}
+	return true, consts.ErrorsTimeout
 }
 
 // Listening 读取指定一代连接上的数据包。连接被顶掉后返回。
@@ -273,6 +428,18 @@ func (p *Player) WriteError(err error) error {
 func (p *Player) AskForPacket(timeout ...time.Duration) (*protocol.Packet, error) {
 	p.StartTransaction()
 	defer p.StopTransaction()
+	return p.readInput(timeout...)
+}
+
+// readInput 是所有输入的统一入口：先判断是否该由托管接手，再正常读连接。
+func (p *Player) readInput(timeout ...time.Duration) (*protocol.Packet, error) {
+	var limit time.Duration
+	if len(timeout) > 0 {
+		limit = timeout[0]
+	}
+	if handled, err := p.botInput(limit); handled {
+		return nil, err
+	}
 	return p.askForPacket(timeout...)
 }
 
@@ -302,6 +469,7 @@ func (p *Player) askForPacket(timeout ...time.Duration) (*protocol.Packet, error
 	if packet == nil {
 		return nil, consts.ErrorsChanClosed
 	}
+	p.Touch() // 有输入就刷新活跃时间，等待房间据此判断挂机
 	single := strings.ToLower(packet.String())
 	if single == "exit" || single == "e" {
 		return nil, consts.ErrorsExist
@@ -334,7 +502,7 @@ func (p *Player) AskForString(timeout ...time.Duration) (string, error) {
 }
 
 func (p *Player) AskForStringWithoutTransaction(timeout ...time.Duration) (string, error) {
-	packet, err := p.askForPacket(timeout...)
+	packet, err := p.readInput(timeout...)
 	if err != nil {
 		return "", err
 	}
@@ -376,6 +544,9 @@ func (p *Player) BindConn(conn *network.Conn) *ConnState {
 	p.cs = cs
 	p.read = false
 	p.online = true
+	p.retired = false
+	p.offlineAt = time.Time{}
+	p.lastActive = time.Now()
 	p.mu.Unlock()
 
 	if old != nil {
@@ -415,26 +586,28 @@ type RoomGame interface {
 type Room struct {
 	sync.Mutex
 
-	ID                  int64     `json:"id"`
-	Type                int       `json:"type"`
-	Game                RoomGame  `json:"gameId"`
-	State               int       `json:"state"`
-	Players             int       `json:"players"`
-	Banker              int       `json:"banker"`
-	Robots              int       `json:"robots"`
-	Creator             int64     `json:"creator"`
-	ActiveTime          time.Time `json:"activeTime"`
-	MaxPlayers          int       `json:"maxPlayers"`
-	Password            string    `json:"password"`
-	EnableChat          bool      `json:"enableChat"`
-	EnableLaiZi         bool      `json:"enableLaiZi"`
-	EnableSkill         bool      `json:"enableSkill"`
-	EnableLandlord      bool      `json:"enableLandlord"`
-	EnableDontShuffle   bool      `json:"enableDontShuffle"`
-	EnableShowIP        bool      `json:"enableShowIP"`
-	EnableJokerAsTarget bool      `json:"enableJokerAsTarget"`
-	UndercoverNum       int       `json:"undercoverNum"` // 卧底数量
-	BlankWordMode       bool      `json:"blankWordMode"` // 空白词模式
+	ID                  int64          `json:"id"`
+	Type                int            `json:"type"`
+	Game                RoomGame       `json:"gameId"`
+	State               int            `json:"state"`
+	Players             int            `json:"players"`
+	Banker              int            `json:"banker"`
+	Robots              int            `json:"robots"`
+	Creator             int64          `json:"creator"`
+	ActiveTime          time.Time      `json:"activeTime"`
+	MaxPlayers          int            `json:"maxPlayers"`
+	Password            string         `json:"password"`
+	EnableChat          bool           `json:"enableChat"`
+	EnableLaiZi         bool           `json:"enableLaiZi"`
+	EnableSkill         bool           `json:"enableSkill"`
+	EnableLandlord      bool           `json:"enableLandlord"`
+	EnableDontShuffle   bool           `json:"enableDontShuffle"`
+	EnableShowIP        bool           `json:"enableShowIP"`
+	EnableJokerAsTarget bool           `json:"enableJokerAsTarget"`
+	UndercoverNum       int            `json:"undercoverNum"` // 卧底数量
+	BlankWordMode       bool           `json:"blankWordMode"` // 空白词模式
+	Ready               map[int64]bool `json:"ready"`         // 满员后的 ready 状态
+	ReadyUntil          time.Time      `json:"readyUntil"`
 }
 
 func (r *Room) Model() model.Room {

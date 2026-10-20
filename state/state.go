@@ -1,8 +1,10 @@
 package state
 
 import (
-	"github.com/ratel-online/server/state/game/texas"
 	"strings"
+	"time"
+
+	"github.com/ratel-online/server/state/game/texas"
 
 	"github.com/ratel-online/core/log"
 	"github.com/ratel-online/core/util/async"
@@ -67,6 +69,17 @@ func RunFrom(player *database.Player, initial consts.StateID) {
 		if err != nil {
 			if !player.IsCurrentRun(gen) {
 				return
+			}
+			// 牌局进行中掉线：座位保留，重连窗口内等本人回来，
+			// 超时后由托管继续把这局打完（输入侧见 database.Player.botInput）。
+			if player.CanBotContinue(gen) {
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
+			// 断线玩家不再托管（牌局结束/座位已不在）：顺手把残留在房间里的座位清掉，
+			// 避免房间一直挂着一个永远不在线的空位。
+			if !player.IsOnline() && player.RoomID != 0 {
+				database.LeaveRoom(player.RoomID, player.ID)
 			}
 			if err1, ok := err.(consts.Error); ok {
 				if err1.Exit {
