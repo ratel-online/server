@@ -5,7 +5,6 @@ go 1.24
 require (
 	github.com/Szzrain/Milky-go-sdk v1.0.1
 	github.com/awesome-cap/hashmap v0.0.0-20211211100532-e3300ac4ae14
-	github.com/feel-easy/mahjong v0.0.0-20220721030133-7a0f4032c008
 	github.com/feel-easy/uno v0.0.0-20220721061415-e6a3189cfd70
 	github.com/gorilla/websocket v1.5.3
 	github.com/lipp12138/chatroom v0.0.0-20260522015722-1f505441035d

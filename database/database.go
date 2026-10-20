@@ -47,6 +47,13 @@ var roomPropsSetter = map[string]func(r *Room, v string){
 	},
 	consts.RoomPropsPlayerNum: func(r *Room, v string) {
 		n, _ := strconv.Atoi(v)
+		if r.Type == consts.GameTypeMahjong {
+			if n < 3 || n > 4 {
+				n = 4
+			}
+			r.MaxPlayers = n
+			return
+		}
 		if n < 2 || n > 50 {
 			n = consts.MaxPlayers
 		}
@@ -129,6 +136,9 @@ func CreateRoom(creator int64, t int) *Room {
 		room.EnableDontShuffle = true
 	case consts.GameTypeTexas:
 		room.MaxPlayers = 10
+	case consts.GameTypeMahjong:
+		// 大众麻将支持 3 人或 4 人，默认 4 人
+		room.MaxPlayers = 4
 	case consts.GameTypeLiar:
 		room.MaxPlayers = 4
 		room.EnableJokerAsTarget = true

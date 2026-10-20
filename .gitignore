@@ -16,3 +16,7 @@
 /.idea
 
 .vscode
+
+# 本地工作区元数据
+.workbuddy/
+ratel-server

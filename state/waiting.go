@@ -42,10 +42,10 @@ func (s *waiting) Next(player *database.Player) (consts.StateID, error) {
 		case consts.GameTypeTexas:
 			return consts.StateTexasGame, nil
 		case consts.GameTypeLiar:
-		return consts.StateLiarGame, nil
-	case consts.GameTypeUndercover:
-		return consts.StateUndercoverGame, nil
-	}
+			return consts.StateLiarGame, nil
+		case consts.GameTypeUndercover:
+			return consts.StateUndercoverGame, nil
+		}
 	}
 	return s.Exit(player), nil
 }
@@ -125,13 +125,17 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 						continue
 					}
 					if room.Type == consts.GameTypeRunFast && room.Players != 3 {
-				_ = player.WriteError(consts.ErrorsGamePlayersInvalid)
-				continue
-			}
-			if room.Type == consts.GameTypeUndercover && room.Players < 3 {
-				_ = player.WriteString("谁是卧底游戏至少需要3名玩家！\n")
-				continue
-			}
+						_ = player.WriteError(consts.ErrorsGamePlayersInvalid)
+						continue
+					}
+					if room.Type == consts.GameTypeMahjong && (room.Players < 3 || room.Players > 4) {
+						_ = player.WriteString(fmt.Sprintf("大众麻将需要 3 或 4 名玩家，当前 %d 人。\n", room.Players))
+						continue
+					}
+					if room.Type == consts.GameTypeUndercover && room.Players < 3 {
+						_ = player.WriteString("谁是卧底游戏至少需要3名玩家！\n")
+						continue
+					}
 					err = startGame(player, room)
 					if err != nil {
 						return access, err
@@ -229,7 +233,10 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 
 	buf.WriteString("\nSettings:\n")
 	switch room.Type {
-	case consts.GameTypeUno, consts.GameTypeMahjong:
+	case consts.GameTypeUno:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+	case consts.GameTypeMahjong:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 	case consts.GameTypeTexas:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))

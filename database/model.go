@@ -57,6 +57,32 @@ type Player struct {
 	online bool
 }
 
+// amountMu 保护积分读写（Player 会被按值复制，所以用包级锁）
+var amountMu sync.Mutex
+
+// Points 当前积分
+func (p *Player) Points() int {
+	amountMu.Lock()
+	defer amountMu.Unlock()
+	return int(p.Amount)
+}
+
+// AddPoints 增减积分，返回实际变动量；扣分不会把积分扣成负数
+func (p *Player) AddPoints(delta int) int {
+	amountMu.Lock()
+	defer amountMu.Unlock()
+	if delta >= 0 {
+		p.Amount += uint(delta)
+		return delta
+	}
+	pay := -delta
+	if pay > int(p.Amount) {
+		pay = int(p.Amount)
+	}
+	p.Amount -= uint(pay)
+	return -pay
+}
+
 func (p *Player) Write(bytes []byte) error {
 	return p.conn.Write(protocol.Packet{
 		Body: bytes,
@@ -212,10 +238,12 @@ func (p Player) Model() model.Player {
 		Name: p.Name,
 	}
 	room := getRoom(p.RoomID)
-	if room != nil && room.Game != nil {
-		game := room.Game.(*Game)
-		modelPlayer.Pokers = len(game.Pokers[p.ID])
-		modelPlayer.Group = game.Groups[p.ID]
+	if room != nil {
+		// 只有斗地主类牌局才有 Pokers / Groups 信息，其它模式安全跳过
+		if game, ok := room.Game.(*Game); ok && game != nil {
+			modelPlayer.Pokers = len(game.Pokers[p.ID])
+			modelPlayer.Group = game.Groups[p.ID]
+		}
 	}
 	return modelPlayer
 }
@@ -249,8 +277,8 @@ type Room struct {
 	EnableDontShuffle   bool      `json:"enableDontShuffle"`
 	EnableShowIP        bool      `json:"enableShowIP"`
 	EnableJokerAsTarget bool      `json:"enableJokerAsTarget"`
-	UndercoverNum       int       `json:"undercoverNum"`  // 卧底数量
-	BlankWordMode       bool      `json:"blankWordMode"`  // 空白词模式
+	UndercoverNum       int       `json:"undercoverNum"` // 卧底数量
+	BlankWordMode       bool      `json:"blankWordMode"` // 空白词模式
 }
 
 func (r *Room) Model() model.Room {

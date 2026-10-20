@@ -1,209 +1,144 @@
 package database
 
 import (
-	"bytes"
-	"fmt"
-	"sort"
-	"strconv"
-	"strings"
+	"sync"
+	"time"
 
-	"github.com/feel-easy/mahjong/card"
-	"github.com/feel-easy/mahjong/consts"
-	"github.com/feel-easy/mahjong/event"
-	"github.com/feel-easy/mahjong/game"
-	"github.com/feel-easy/mahjong/tile"
-	"github.com/ratel-online/core/log"
-	rconsts "github.com/ratel-online/server/consts"
+	"github.com/ratel-online/server/mahjong"
 )
 
+// 牌桌内部状态信号
+const (
+	MahjongStateWaiting = 1
+)
+
+// Mahjong 一局大众麻将的运行时数据。
+//
+// 与斗地主等模式不同，麻将每个回合需要依次询问多名玩家（吃碰杠胡），
+// 因此整局由一个“桌长”协程串行驱动：其余玩家只在状态通道上等待，
+// 收到 MahjongStateWaiting 即表示本局结束。
 type Mahjong struct {
-	Room      *Room            `json:"room"`
-	PlayerIDs []int            `json:"playerIds"`
-	States    map[int]chan int `json:"states"`
-	Game      *game.Game       `json:"game"`
+	Room   *Room              `json:"room"`
+	Seats  []int64            `json:"seats"`
+	States map[int64]chan int `json:"states"`
+	Game   *mahjong.Game      `json:"game"`
+
+	mu      sync.Mutex
+	driver  int64
+	started bool
+	arrived map[int64]bool
+	quits   map[int64]bool
+	done    bool
+	ended   bool
+	finish  sync.Once
 }
 
-func (game *Mahjong) Clean() {
-	if game != nil {
-		for _, state := range game.States {
-			close(state)
+// MarkQuit 记录中途退出牌局的玩家
+func (m *Mahjong) MarkQuit(id int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.quits == nil {
+		m.quits = map[int64]bool{}
+	}
+	m.quits[id] = true
+}
+
+// HasQuit 玩家是否中途退出
+func (m *Mahjong) HasQuit(id int64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.quits[id]
+}
+
+// MarkEnded 结算只执行一次
+func (m *Mahjong) MarkEnded() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.ended {
+		return false
+	}
+	m.ended = true
+	return true
+}
+
+// Clean 房间被回收时确保所有玩家都能退出牌局
+func (m *Mahjong) Clean() {
+	m.Finish()
+}
+
+// Finish 通知所有玩家本局结束（幂等）
+func (m *Mahjong) Finish() {
+	if m == nil {
+		return
+	}
+	m.finish.Do(func() {
+		m.mu.Lock()
+		m.done = true
+		chans := make([]chan int, 0, len(m.States))
+		for _, ch := range m.States {
+			chans = append(chans, ch)
 		}
-	}
-}
-
-type OP struct {
-	operation int
-	tiles     []int
-}
-
-func circled(n int) string {
-	if n >= 1 && n <= 20 {
-		return string(rune(0x2460 + n - 1))
-	}
-	return strconv.Itoa(n)
-}
-
-type MahjongPlayer struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-}
-
-func NewPlayer(user *Player) *MahjongPlayer {
-	return &MahjongPlayer{
-		ID:   user.ID,
-		Name: user.Name,
-	}
-}
-
-func (p *MahjongPlayer) PlayerID() int {
-	return int(p.ID)
-}
-
-func (p *MahjongPlayer) NickName() string {
-	return p.Name
-}
-
-func (mp *MahjongPlayer) OnPlayTile(payload event.PlayTilePayload) {
-	p := GetPlayer(mp.ID)
-	p.WriteString(fmt.Sprintf("You play %s ! \n", tile.Tile(payload.Tile)))
-	Broadcast(p.RoomID, fmt.Sprintf("%s PlayTile %s !\n", payload.PlayerName, tile.Tile(payload.Tile)), p.ID)
-}
-
-func (mp *MahjongPlayer) Take(tiles []int, gameState game.State) (int, []int, error) {
-	p := GetPlayer(mp.ID)
-	Broadcast(p.RoomID, fmt.Sprintf("It's %s take mahjong! \n", p.Name), p.ID)
-	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("It's your take mahjong, %s! \n", p.Name))
-	buf.WriteString(gameState.String())
-	p.WriteString(buf.String())
-	askBuf := bytes.Buffer{}
-	tileOptions := make(map[string]*OP)
-	labelCounter := 1
-	if pvs, ok := gameState.SpecialPrivileges[int(p.ID)]; ok {
-		for _, pv := range pvs {
-			switch pv {
-			case consts.GANG:
-				askBuf.WriteString("You can 杠!!!\n")
-				label := strconv.Itoa(labelCounter)
-				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile, gameState.LastPlayedTile}
-				tileOptions[label] = &OP{
-					operation: consts.GANG,
-					tiles:     append(ts, gameState.LastPlayedTile),
-				}
-				askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), tile.ToTileString(ts)))
-				labelCounter++
-			case consts.PENG:
-				askBuf.WriteString("You can 碰!!!\n")
-				label := strconv.Itoa(labelCounter)
-				ts := []int{gameState.LastPlayedTile, gameState.LastPlayedTile}
-				tileOptions[label] = &OP{
-					operation: consts.PENG,
-					tiles:     append(ts, gameState.LastPlayedTile),
-				}
-				askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), tile.ToTileString(ts)))
-				labelCounter++
-			case consts.CHI:
-				askBuf.WriteString("You can 吃!!!\n")
-				for _, ts := range card.CanChiTiles(tiles, gameState.LastPlayedTile) {
-					label := strconv.Itoa(labelCounter)
-					tileOptions[label] = &OP{
-						operation: consts.CHI,
-						tiles:     append(ts, gameState.LastPlayedTile),
-					}
-					askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), tile.ToTileString(ts)))
-					labelCounter++
-				}
-			}
-		}
-	}
-	label := strconv.Itoa(labelCounter)
-	askBuf.WriteString(fmt.Sprintf("%s. %s \n", circled(labelCounter), "no"))
-	tileOptions[label] = &OP{
-		operation: 0,
-		tiles:     []int{},
-	}
-	loopCount := 0
-	for {
-		loopCount++
-		if loopCount%100 == 0 {
-			log.Infof("[MahjongPlayer.Take] Player %d loop count: %d\n", mp.ID, loopCount)
-		}
-		p = getPlayer(p.ID)
-		p.WriteString(askBuf.String())
-		selectedLabel, err := p.AskForString(consts.PlayMahjongTimeout)
-		if err != nil {
-			switch err {
-			case rconsts.ErrorsExist:
-				p.WriteString("Don't quit a good game！\n")
-				selectedLabel = "E"
-			case rconsts.ErrorsTimeout:
-				// Default to "no" action (skip peng/chi/gang) on timeout
-				selectedLabel = label
+		m.mu.Unlock()
+		for _, ch := range chans {
+			select {
+			case ch <- MahjongStateWaiting:
 			default:
-				return 0, nil, err
 			}
 		}
-		selected, found := tileOptions[strings.ToUpper(selectedLabel)]
-		if !found {
-			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
-			continue
+	})
+}
+
+// Finished 本局是否已经结束
+func (m *Mahjong) Finished() bool {
+	if m == nil {
+		return true
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.done
+}
+
+// Arrive 玩家进入牌桌。第一个进入的玩家成为桌长并负责驱动整局。
+func (m *Mahjong) Arrive(id int64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.States[id]; !ok {
+		return false
+	}
+	if m.arrived == nil {
+		m.arrived = make(map[int64]bool, len(m.States))
+	}
+	if m.driver == 0 {
+		m.driver = id
+	}
+	m.arrived[id] = true
+	if m.driver != id || m.started {
+		return false
+	}
+	// 整局只启动一次
+	m.started = true
+	return true
+}
+
+// WaitArrive 等待所有座位就绪
+func (m *Mahjong) WaitArrive(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		m.mu.Lock()
+		n := len(m.arrived)
+		m.mu.Unlock()
+		if n >= len(m.Seats) {
+			return true
 		}
-		return selected.operation, selected.tiles, nil
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
-func (mp *MahjongPlayer) Play(tiles []int, gameState game.State) (int, error) {
-	p := GetPlayer(mp.ID)
-	Broadcast(p.RoomID, fmt.Sprintf("It's %s turn! \n", p.Name), p.ID)
-	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("It's your turn, %s! \n", p.Name))
-	buf.WriteString(gameState.String())
-	p.WriteString(buf.String())
-	askBuf := bytes.Buffer{}
-	askBuf.WriteString("Select a tile to play:\n")
-	tileOptions := make(map[string]int)
-	sort.Ints(tiles)
-	for idx, i := range tiles {
-		label := strconv.Itoa(idx + 1)
-		tileOptions[label] = i
-		askBuf.WriteString(fmt.Sprintf("%s. %-6s", circled(idx+1), tile.Tile(i).String()))
-		if (idx+1)%6 == 0 {
-			askBuf.WriteString("\n")
-		} else {
-			askBuf.WriteString("  ")
-		}
-	}
-	askBuf.WriteString("\n")
-	loopCount := 0
-	for {
-		loopCount++
-		if loopCount%100 == 0 {
-			log.Infof("[MahjongPlayer.Play] Player %d loop count: %d\n", mp.ID, loopCount)
-		}
-		p = GetPlayer(p.ID)
-		p.WriteString(askBuf.String())
-		selectedLabel, err := p.AskForString(rconsts.PlayMahjongTimeout)
-		if err != nil {
-			switch err {
-			case rconsts.ErrorsExist:
-				p.WriteString("Don't quit a good game！\n")
-				selectedLabel = "E"
-			case rconsts.ErrorsTimeout:
-				// Default to the last tile (least likely to be useful) on timeout
-				selectedLabel = strconv.Itoa(len(tiles))
-			default:
-				return 0, err
-			}
-		}
-		selectedCard, found := tileOptions[strings.ToUpper(selectedLabel)]
-		if !found {
-			BroadcastChat(p, fmt.Sprintf("%s say: %s\n", p.Name, selectedLabel))
-			continue
-		}
-		mp.OnPlayTile(event.PlayTilePayload{
-			PlayerName: p.Name,
-			Tile:       selectedCard,
-		})
-		return selectedCard, nil
-	}
+// Seated 指定玩家是否在本局座位中
+func (m *Mahjong) Seated(id int64) bool {
+	_, ok := m.States[id]
+	return ok
 }

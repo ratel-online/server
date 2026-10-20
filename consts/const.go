@@ -51,12 +51,12 @@ const (
 	RoomStateWaiting = 1
 	RoomStateRunning = 2
 
-	GameTypeClassic = 1
-	GameTypeLaiZi   = 2
-	GameTypeSkill   = 3
-	GameTypeRunFast = 4
-	GameTypeTexas   = 5
-	GameTypeMahjong = 6
+	GameTypeClassic    = 1
+	GameTypeLaiZi      = 2
+	GameTypeSkill      = 3
+	GameTypeRunFast    = 4
+	GameTypeTexas      = 5
+	GameTypeMahjong    = 6
 	GameTypeLiar       = 7
 	GameTypeUno        = 8
 	GameTypeUndercover = 9
@@ -69,16 +69,16 @@ const (
 
 // Room properties.
 const (
-	RoomPropsDotShuffle     = "ds"
-	RoomPropsLaiZi          = "lz"
-	RoomPropsSkill          = "sk"
-	RoomPropsPassword       = "pwd"
-	RoomPropsPlayerNum      = "pn"
-	RoomPropsChat           = "ct"
-	RoomPropsShowIP         = "ip"
-	RoomPropsJokerAsTarget  = "jt"
-	RoomPropsUndercoverNum  = "ucn" // 卧底数量
-	RoomPropsBlankWordMode  = "bwm" // 空白词模式
+	RoomPropsDotShuffle    = "ds"
+	RoomPropsLaiZi         = "lz"
+	RoomPropsSkill         = "sk"
+	RoomPropsPassword      = "pwd"
+	RoomPropsPlayerNum     = "pn"
+	RoomPropsChat          = "ct"
+	RoomPropsShowIP        = "ip"
+	RoomPropsJokerAsTarget = "jt"
+	RoomPropsUndercoverNum = "ucn" // 卧底数量
+	RoomPropsBlankWordMode = "bwm" // 空白词模式
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
@@ -122,13 +122,13 @@ var (
 	ErrorsGamePlayersInsufficient = NewErr(1, false, "Game players insufficient. ")
 	ErrorsCannotKickYourself      = NewErr(1, false, "Cannot kick yourself. ")
 	ErrorsPlayerNotInRoom         = NewErr(1, true, "Player not in room. ")
-	GameTypes = map[int]string{
+	GameTypes                     = map[int]string{
 		GameTypeClassic:    "斗地主",
 		GameTypeLaiZi:      "斗地主-癞子版",
 		GameTypeSkill:      "斗地主-大招版",
 		GameTypeRunFast:    "跑得快",
 		GameTypeTexas:      "德州扑克",
-		GameTypeMahjong:    "Mahjong",
+		GameTypeMahjong:    "大众麻将",
 		GameTypeLiar:       "liar's bar",
 		GameTypeUndercover: "谁是卧底",
 	}
