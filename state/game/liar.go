@@ -112,6 +112,7 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 			// 超时或无输入自动出第一张牌
 			ans = poker.GetAlias(game.Hands[player.ID][0].Key)
 		}
+		rawAns := strings.TrimSpace(ans)
 		ans = strings.TrimSpace(strings.ToLower(ans))
 
 		// 处理质疑逻辑
@@ -139,7 +140,7 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 
 		if !isValidPokerInput {
 			// 如果输入包含非牌面字符，则作为聊天消息
-			database.BroadcastChat(player, fmt.Sprintf("%s 说: %s\n", player.Name, ans))
+			database.BroadcastChat(player, fmt.Sprintf("%s 说: ", player.Name), rawAns)
 			continue
 		}
 
@@ -187,7 +188,7 @@ func (g *Liar) handlePlay(player *database.Player, game *database.Liar) error {
 
 		if !valid {
 			// 如果不是有效的质疑或出牌操作，则视为聊天
-			database.BroadcastChat(player, fmt.Sprintf("%s 说: %s\n", player.Name, ans))
+			database.BroadcastChat(player, fmt.Sprintf("%s 说: ", player.Name), rawAns)
 			continue
 		}
 

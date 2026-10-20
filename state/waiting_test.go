@@ -54,7 +54,7 @@ func TestOwnerMuteCommand(t *testing.T) {
 	if database.MutedFor(other) <= 0 {
 		t.Fatal("房主禁言未生效")
 	}
-	if database.BroadcastChat(other, "hello") {
+	if database.BroadcastChat(other, other.Name+" say: ", "hello") {
 		t.Fatal("被禁言的玩家仍然能发言")
 	}
 

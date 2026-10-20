@@ -72,6 +72,23 @@ func TestNormalizeText(t *testing.T) {
 	}
 }
 
+// TestFlattenChatLine 聊天内容压单行：换行、制表、连续空白都折成一个空格
+func TestFlattenChatLine(t *testing.T) {
+	cases := map[string]string{
+		"hello":         "hello",
+		"hello\n":       "hello",
+		"a\n\n\nb":      "a b",
+		"a\t\tb":        "a b",
+		"  hello 世界  ":  "hello 世界",
+		"a\r\nb\u200bc": "a b c",
+	}
+	for in, want := range cases {
+		if got := flattenChatLine(in); got != want {
+			t.Fatalf("flattenChatLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestSanitizeNameMasksProfanity(t *testing.T) {
 	// 全是脏话的名字整段变掩码，再退回默认名
 	if got := sanitizeName("傻 逼"); got != defaultName {

@@ -395,7 +395,7 @@ func (g *Mahjong) sayChat(gd *database.Mahjong, seat int, text string) {
 		_ = p.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
 		return
 	}
-	database.BroadcastChat(p, fmt.Sprintf("%s 说: %s\n", p.Name, strings.TrimSpace(text)))
+	database.BroadcastChat(p, fmt.Sprintf("%s 说: ", p.Name), text)
 }
 
 type mjClaim struct {

@@ -128,6 +128,7 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 			ans = autoAnswer()
 		}
 
+		rawAns := strings.TrimSpace(ans)
 		ans = strings.ToLower(ans)
 	retry:
 		if ans == "" {
@@ -198,11 +199,12 @@ func runFastPlaying(player *database.Player, game *database.Game, master bool, p
 		if invalid {
 			if timer.Invalid() {
 				ans = autoAnswer()
+				rawAns = ans
 				log.Infof("[runFastPlaying] player %d invalid input reached limit, force play %q\n", player.ID, ans)
 				goto retry
 			}
 			if game.Room.EnableChat {
-				database.BroadcastChat(player, fmt.Sprintf("%s say: %s\n", player.Name, ans))
+				database.BroadcastChat(player, fmt.Sprintf("%s say: ", player.Name), rawAns)
 			} else {
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))
 			}

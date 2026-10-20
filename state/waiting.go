@@ -140,7 +140,8 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 			access = true
 			break
 		}
-		signal = strings.TrimSpace(strings.ToLower(signal))
+		rawSignal := strings.TrimSpace(signal)
+		signal = strings.ToLower(rawSignal)
 		if signal == "" {
 			continue
 		}
@@ -178,7 +179,7 @@ func (s *waiting) waitingForStart(player *database.Player, room *database.Room) 
 			if room.State == consts.RoomStateRunning {
 				_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopenedDuringGame.Error()))
 			} else {
-				database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: %s\n", player.Name, player.Role, signal))
+				database.BroadcastChat(player, fmt.Sprintf("%s [%s] say: ", player.Name, player.Role), rawSignal)
 			}
 		} else {
 			_ = player.WriteString(fmt.Sprintf("%s\n", consts.ErrorsChatUnopened.Error()))

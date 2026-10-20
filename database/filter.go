@@ -195,3 +195,24 @@ func sanitizeChat(msg string) (string, int) {
 	masked = strings.TrimSpace(masked)
 	return masked, hits
 }
+
+// flattenChatLine 把聊天内容压成单行：换行、制表、零宽字符都折成一个空格。
+// 聊天里的 "\n" 会在客户端顶出一大片空行，也会把别人的输出挤乱，
+// 所以发出去之前统一拍平。
+func flattenChatLine(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	space := false
+	for _, r := range s {
+		if unicode.IsSpace(r) || r == '\u200b' || r == '\ufeff' {
+			space = true
+			continue
+		}
+		if space && b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		space = false
+		b.WriteRune(r)
+	}
+	return b.String()
+}

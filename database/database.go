@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-	stringx "strings"
 	"sync/atomic"
 	"time"
 
@@ -527,8 +526,10 @@ func Broadcast(roomId int64, msg string, exclude ...int64) {
 
 // BroadcastChat 统一聊天出口：所有聊天消息都必须经过这里，
 // 以便屏蔽脏词、限流、去重、禁言等防护对等待房间和所有玩法同时生效。
+// prefix 是调用方拼好的「名字 [角色] say: 」，content 才是玩家输入。
+// 只有 content 过词表，名字里带 "bi"/"si" 这种子串不会被洗掉。
 // 返回 false 表示本条消息被拦截（脏话被掩码但已计入违规、刷屏、重复、禁言）。
-func BroadcastChat(player *Player, msg string, exclude ...int64) bool {
+func BroadcastChat(player *Player, prefix, content string, exclude ...int64) bool {
 	if player == nil {
 		return false
 	}
@@ -538,16 +539,18 @@ func BroadcastChat(player *Player, msg string, exclude ...int64) bool {
 	}
 
 	// 归一化后匹配脏词，命中就把这段替换成 '*'，并记一次违规
-	msg, hits := sanitizeChat(msg)
-	msg = strings.Desensitize(msg)
-	if stringx.TrimSpace(msg) == "" {
-		return false
-	}
+	content, hits := sanitizeChat(content)
 	if hits > 0 {
 		Strike(player, "abusive language")
 	}
+	content = strings.Desensitize(content)
+	// 压成单行：内容里的换行会顶出一片空行，也会把别人的消息挤成一行
+	content = flattenChatLine(content)
+	if content == "" {
+		return false
+	}
 
-	switch chatCheck(player.ID, msg) {
+	switch chatCheck(player.ID, content) {
 	case chatDuplicate:
 		// 最近 5 条内的重复消息直接丢弃，不记违规（正常聊天也会复读）
 		return false
@@ -556,8 +559,9 @@ func BroadcastChat(player *Player, msg string, exclude ...int64) bool {
 		return false
 	}
 
-	log.Infof("chat msg, player %s[%d] %s say: %s\n", player.Name, player.ID, player.IP, msg)
-	Broadcast(player.RoomID, msg, exclude...)
+	log.Infof("chat msg, player %s[%d] %s say: %s\n", player.Name, player.ID, player.IP, content)
+	// 每条聊天固定以且仅以一个换行结尾，客户端才能正确换行
+	Broadcast(player.RoomID, prefix+content+"\n", exclude...)
 	return true
 }
 
