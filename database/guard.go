@@ -170,11 +170,17 @@ func IsIPBanned(ip string) (bool, time.Duration) {
 
 // AllowConnection 连接准入：同一 IP 的连接数上限 + 连接速率限制。
 // takeover 为顶号（同 IP 同名重连），只做速率限制，不占新的名额判断，
-// 否则 3 个连接打满后本人掉线就再也回不来。
+// 否则名额打满后本人掉线就再也回不来。
 func AllowConnection(ip string, takeover bool) error {
 	ip = normalizeIP(ip)
+	parsed := net.ParseIP(ip)
 	// 拿不到真实 IP（unix socket、测试管道等）时不限制
-	if ip == "" || net.ParseIP(ip) == nil {
+	if parsed == nil {
+		return nil
+	}
+	// 回环地址只可能是本机（本地联调、自动化测试），不做准入限制，
+	// 否则同机起几个测试客户端就会撞上限流。
+	if parsed.IsLoopback() {
 		return nil
 	}
 	now := time.Now()

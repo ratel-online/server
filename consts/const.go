@@ -51,12 +51,12 @@ const (
 	RoomStateWaiting = 1
 	RoomStateRunning = 2
 
-	GameTypeClassic = 1
-	GameTypeLaiZi   = 2
-	GameTypeSkill   = 3
-	GameTypeRunFast = 4
-	GameTypeTexas   = 5
-	GameTypeMahjong = 6
+	GameTypeClassic    = 1
+	GameTypeLaiZi      = 2
+	GameTypeSkill      = 3
+	GameTypeRunFast    = 4
+	GameTypeTexas      = 5
+	GameTypeMahjong    = 6
 	GameTypeLiar       = 7
 	GameTypeUno        = 8
 	GameTypeUndercover = 9
@@ -74,24 +74,26 @@ const (
 )
 
 // 同 IP 连接限制（挡小号刷房）
+// 上限取 4：大众麻将/德州都是 4 人桌，同一网络（家宽、网吧）下的 4 个人要能坐满，
+// 再多的同名/多开就靠顶号和禁言、封 IP 兜住。
 const (
-	MaxConnsPerIP  = 3
+	MaxConnsPerIP  = 4
 	ConnRateLimit  = 10
 	ConnRateWindow = time.Minute
 )
 
 // Room properties.
 const (
-	RoomPropsDotShuffle     = "ds"
-	RoomPropsLaiZi          = "lz"
-	RoomPropsSkill          = "sk"
-	RoomPropsPassword       = "pwd"
-	RoomPropsPlayerNum      = "pn"
-	RoomPropsChat           = "ct"
-	RoomPropsShowIP         = "ip"
-	RoomPropsJokerAsTarget  = "jt"
-	RoomPropsUndercoverNum  = "ucn" // 卧底数量
-	RoomPropsBlankWordMode  = "bwm" // 空白词模式
+	RoomPropsDotShuffle    = "ds"
+	RoomPropsLaiZi         = "lz"
+	RoomPropsSkill         = "sk"
+	RoomPropsPassword      = "pwd"
+	RoomPropsPlayerNum     = "pn"
+	RoomPropsChat          = "ct"
+	RoomPropsShowIP        = "ip"
+	RoomPropsJokerAsTarget = "jt"
+	RoomPropsUndercoverNum = "ucn" // 卧底数量
+	RoomPropsBlankWordMode = "bwm" // 空白词模式
 )
 
 var MnemonicSorted = []int{15, 14, 2, 1, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3}
@@ -138,13 +140,13 @@ var (
 	ErrorsPlayerNotInRoom         = NewErr(1, true, "Player not in room. ")
 	ErrorsTooManyConns            = NewErr(1, true, "Too many connections from your IP, please close one and retry. ")
 	ErrorsConnectTooFast          = NewErr(1, true, "Too many connection attempts from your IP, please wait a minute. ")
-	GameTypes = map[int]string{
+	GameTypes                     = map[int]string{
 		GameTypeClassic:    "斗地主",
 		GameTypeLaiZi:      "斗地主-癞子版",
 		GameTypeSkill:      "斗地主-大招版",
 		GameTypeRunFast:    "跑得快",
 		GameTypeTexas:      "德州扑克",
-		GameTypeMahjong:    "Mahjong",
+		GameTypeMahjong:    "大众麻将",
 		GameTypeLiar:       "liar's bar",
 		GameTypeUndercover: "谁是卧底",
 	}

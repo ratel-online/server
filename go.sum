@@ -10,8 +10,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fatih/color v1.13.0 h1:8LOYc1KYPPmyKMuN8QV2DNRWNbLo6LZ0iLs8+mlH53w=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
-github.com/feel-easy/mahjong v0.0.0-20220721030133-7a0f4032c008 h1:bhsYIxvD3J1bZbS7A7f2YPxadvy909nRRHZ96VBTvGE=
-github.com/feel-easy/mahjong v0.0.0-20220721030133-7a0f4032c008/go.mod h1:qDtjtiCnj2u+T0GCOd3ky4gi/0Nx2iDglGC/U9k8SYg=
 github.com/feel-easy/uno v0.0.0-20220721061415-e6a3189cfd70 h1:c5e8UeFNbIPsWKMS/arf/VYfGgrKRFUQbdPOfRn0nlE=
 github.com/feel-easy/uno v0.0.0-20220721061415-e6a3189cfd70/go.mod h1:SJtQw6YT+CnOWLq21s/NiQeB9UjMkf6ftomfhqrI1Ng=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=

@@ -199,6 +199,10 @@ func (s *waiting) ownerCommand(player *database.Player, room *database.Room, seg
 			_ = player.WriteError(consts.ErrorsGamePlayersInvalid)
 			return true, false, nil
 		}
+		if room.Type == consts.GameTypeMahjong && (room.Players < 3 || room.Players > 4) {
+			_ = player.WriteString(fmt.Sprintf("大众麻将需要 3 或 4 名玩家，当前 %d 人。\n", room.Players))
+			return true, false, nil
+		}
 		if room.Type == consts.GameTypeUndercover && room.Players < 3 {
 			_ = player.WriteString("谁是卧底游戏至少需要3名玩家！\n")
 			return true, false, nil
@@ -338,7 +342,10 @@ func viewRoomPlayers(room *database.Room, currPlayer *database.Player) {
 
 	buf.WriteString("\nSettings:\n")
 	switch room.Type {
-	case consts.GameTypeUno, consts.GameTypeMahjong:
+	case consts.GameTypeUno:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
+	case consts.GameTypeMahjong:
+		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "ip:", sprintPropsState(room.EnableShowIP)))
 	case consts.GameTypeTexas:
 		buf.WriteString(fmt.Sprintf("%-5s%-5v\n", "pn:", room.MaxPlayers))
