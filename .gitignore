@@ -20,3 +20,5 @@
 # 本地工作区元数据
 .workbuddy/
 ratel-server
+# 部署产物（交叉编译的 Linux 二进制）
+ratel-server-linux-*
