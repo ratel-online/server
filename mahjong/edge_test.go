@@ -142,11 +142,7 @@ func TestCanWinEdgeShapes(t *testing.T) {
 		}
 		return out
 	}
-	// 跨花色顺子：W9 + T1 T2 不应成立
-	if CanWin(append(hand("W9"), hand("T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "W1", "W1")...), 0) {
-		// 构造一个只有 W9,T1,T2 相邻的错误组合验证
-		_ = 0
-	}
+	// 跨花色顺子：W9 + T1 T2 不应成立（decomposeOf 直接验证）
 	bad := hand("W9", "T1", "T2")
 	if decomposeOf(bad) {
 		t.Error("跨花色 9-1-2 不应组成顺子")
@@ -155,13 +151,9 @@ func TestCanWinEdgeShapes(t *testing.T) {
 	if decomposeOf(hand("D", "N", "X")) {
 		t.Error("字牌不应组成顺子")
 	}
-	// 4 张相同 + 单张 → 不胡
-	if CanWin(append(mk(4, Tile(0)), hand("W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "T1", "T1")...), 0) {
-		_ = 0
-	}
-	// 七对：4 张相同算两对
-	if !CanWin(mk(4, Tile(0)), 0) == false {
-		_ = 0
+	// 4 张 W1 拆用(刻子+顺子) → 应判胡: W1W1W1 + W1W2W3 + W4W5W6 + W7W8W9 + T1T1
+	if !CanWin(append(mk(4, Tile(0)), hand("W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "T1", "T1")...), 0) {
+		t.Error("4 张同牌拆用(刻+顺)应判胡")
 	}
 	seven := []Tile{}
 	seven = append(seven, mk(4, Tile(0))...)
@@ -301,7 +293,7 @@ func TestKongBloomWinContext(t *testing.T) {
 	// 简化: 直接验证 Evaluate 上下文标记
 	h := hand("W1", "W1", "W2", "W3", "W4", "T5", "T6", "T7", "O8", "O8", "O8", "N", "N", "N")
 	// 有副露+点炮: 纯平胡 1 番
-	hMeld := append([]Meld{{Type: MeldPeng, Tile: Tile(27), From: 1}})
+	hMeld := []Meld{{Type: MeldPeng, Tile: Tile(27), From: 1}}
 	base := Evaluate(hand("W1", "W1", "W2", "W3", "W4", "T5", "T6", "T7", "O8", "O8", "O8"), hMeld, WinContext{})
 	if base.Fan != 1 || !containsItem(base.Items, "平胡") {
 		t.Errorf("纯平胡应为 1 番, got %d %v", base.Fan, base.Items)
