@@ -1,6 +1,9 @@
 package mahjong
 
-import "math/rand"
+import (
+	"math/rand"
+	"time"
+)
 
 // Wall 牌墙，共 136 张。正常摸牌从头部取，杠后补牌从尾部取。
 type Wall struct {
@@ -9,15 +12,20 @@ type Wall struct {
 	tail  int
 }
 
-// NewWall 洗好一副牌
+// NewWall 洗好一副牌（独立随机源，不依赖全局随机状态）
 func NewWall() *Wall {
+	return NewWallWithRand(rand.New(rand.NewSource(time.Now().UnixNano())))
+}
+
+// NewWallWithRand 用指定随机源洗牌（便于测试注入确定性随机序列）
+func NewWallWithRand(r *rand.Rand) *Wall {
 	tiles := make([]Tile, 0, NumKinds*4)
 	for k := 0; k < NumKinds; k++ {
 		for i := 0; i < 4; i++ {
 			tiles = append(tiles, Tile(k))
 		}
 	}
-	rand.Shuffle(len(tiles), func(i, j int) {
+	r.Shuffle(len(tiles), func(i, j int) {
 		tiles[i], tiles[j] = tiles[j], tiles[i]
 	})
 	return &Wall{tiles: tiles, head: 0, tail: len(tiles) - 1}

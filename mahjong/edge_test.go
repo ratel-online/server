@@ -2,7 +2,6 @@ package mahjong
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
 )
 
@@ -26,82 +25,102 @@ func hand(codes ...string) []Tile { return tilesOf(codes...) }
 
 // ---- 牌墙：杠后从牌尾补牌 ----
 
-func TestWallDrawTailNoOverlap(t *testing.T) {
-	w := NewWall()
-	total := 136
-	// 从头摸 100 张
-	var drawn []Tile
-	for i := 0; i < 100; i++ {
-		tk, ok := w.Draw()
-		if !ok {
-			t.Fatalf("Draw failed at %d", i)
-		}
-		drawn = append(drawn, tk)
+// fixedWall 构造一张已知牌序的牌墙（同包可直接访问私有字段）
+func fixedWall(codes ...string) *Wall {
+	return &Wall{tiles: tilesOf(codes...), head: 0, tail: len(codes) - 1}
+}
+
+// TestWallHeadTailNoOverlap 用固定牌序精确验证头/尾双指针互不重叠：
+// 头部按 tiles[head] 正序取、尾部按 tiles[tail] 倒序取，交替取完全部牌
+// 时每张实体恰好被取一次，head/tail 指针移动与预期一致。
+func TestWallHeadTailNoOverlap(t *testing.T) {
+	w := fixedWall("W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8")
+	want := []struct {
+		side byte
+		code string
+	}{
+		{'H', "W1"}, {'T', "W8"},
+		{'H', "W2"}, {'T', "W7"},
+		{'H', "W3"}, {'T', "W6"},
+		{'H', "W4"}, {'T', "W5"},
 	}
-	// 从尾补 30 张（模拟杠补）
-	var tail []Tile
-	for i := 0; i < 30; i++ {
-		tk, ok := w.DrawTail()
-		if !ok {
-			t.Fatalf("DrawTail failed at %d", i)
+	for i, wk := range want {
+		if w.Len() != len(want)-i {
+			t.Fatalf("step %d: Len=%d, want %d", i, w.Len(), len(want)-i)
 		}
-		tail = append(tail, tk)
-	}
-	if w.Len() != total-130 {
-		t.Fatalf("Len = %d, want %d", w.Len(), total-130)
-	}
-	// 剩余 6 张：head 侧再摸 3、tail 侧再摸 3，之后必须为空且互不重叠
-	seen := map[Tile]bool{}
-	for i := 0; i < 3; i++ {
-		tk, ok := w.Draw()
-		if !ok {
-			t.Fatalf("Draw should succeed")
-		}
-		if seen[tk] && countIn(drawn, tk)+countIn(tail, tk) >= 4 {
-			// 同一面最多 4 张；这里只检测结构性重复（同一张实体被取两次无法直接判，检查张数守恒）
-			_ = tk
-		}
-		seen[tk] = true
-	}
-	for i := 0; i < 3; i++ {
-		if _, ok := w.DrawTail(); !ok {
-			t.Fatalf("DrawTail should succeed")
+		if wk.side == 'H' {
+			tk, ok := w.Draw()
+			if !ok || tk.Code() != wk.code {
+				t.Fatalf("step %d head: got (%s,%v), want %s", i, tk.Code(), ok, wk.code)
+			}
+		} else {
+			tk, ok := w.DrawTail()
+			if !ok || tk.Code() != wk.code {
+				t.Fatalf("step %d tail: got (%s,%v), want %s", i, tk.Code(), ok, wk.code)
+			}
 		}
 	}
 	if !w.Empty() {
-		t.Fatalf("wall should be empty, len=%d", w.Len())
+		t.Fatalf("交替取完后应为空, len=%d", w.Len())
 	}
 	if _, ok := w.Draw(); ok {
-		t.Fatal("Draw on empty wall should fail")
+		t.Fatal("空墙 Draw 应失败")
 	}
 	if _, ok := w.DrawTail(); ok {
-		t.Fatal("DrawTail on empty wall should fail")
+		t.Fatal("空墙 DrawTail 应失败")
 	}
 }
 
-func countIn(list []Tile, t Tile) int {
-	n := 0
-	for _, v := range list {
-		if v == t {
-			n++
+// TestWallDrawTailFromTail 固定牌序验证杠后补牌取的是牌尾且倒序
+func TestWallDrawTailFromTail(t *testing.T) {
+	w := fixedWall("W1", "W2", "W3", "W4", "W5")
+	// 从头摸 2 张（W1 W2），再从尾补 3 张（应得 W5 W4 W3）
+	for _, want := range []string{"W1", "W2"} {
+		tk, ok := w.Draw()
+		if !ok || tk.Code() != want {
+			t.Fatalf("head draw: got (%s,%v), want %s", tk.Code(), ok, want)
 		}
 	}
-	return n
+	for _, want := range []string{"W5", "W4", "W3"} {
+		tk, ok := w.DrawTail()
+		if !ok || tk.Code() != want {
+			t.Fatalf("tail draw: got (%s,%v), want %s", tk.Code(), ok, want)
+		}
+	}
+	if !w.Empty() {
+		t.Fatal("应已取空")
+	}
 }
 
-// head==tail（墙剩最后一张）时 Draw 和 DrawTail 都能取到它
+// TestWallLastTileBothEnds 墙剩最后一张时, head 端与 tail 端都能取到
 func TestWallLastTileBothEnds(t *testing.T) {
-	w := NewWall()
+	// 场景1: head==tail 时从尾取(杠后补牌摸走最后一张)
+	w := fixedWall("W1", "W2", "W3")
 	for w.Len() > 1 {
-		_, _ = w.Draw()
+		if _, ok := w.Draw(); !ok {
+			t.Fatal("Draw should succeed")
+		}
 	}
 	if w.Len() != 1 {
 		t.Fatalf("len=%d", w.Len())
 	}
-	if _, ok := w.DrawTail(); !ok {
-		t.Fatal("DrawTail on last tile should succeed")
+	if tk, ok := w.DrawTail(); !ok || tk.Code() != "W3" {
+		t.Fatalf("DrawTail last tile: got (%s,%v), want W3", tk.Code(), ok)
 	}
 	if !w.Empty() {
+		t.Fatal("wall should be empty")
+	}
+	// 场景2: head==tail 时从头取(正常摸牌摸走最后一张)
+	w2 := fixedWall("W1", "W2", "W3")
+	for w2.Len() > 1 {
+		if _, ok := w2.Draw(); !ok {
+			t.Fatal("Draw should succeed")
+		}
+	}
+	if tk, ok := w2.Draw(); !ok || tk.Code() != "W3" {
+		t.Fatalf("Draw last tile: got (%s,%v), want W3", tk.Code(), ok)
+	}
+	if !w2.Empty() {
 		t.Fatal("wall should be empty")
 	}
 }
@@ -225,7 +244,6 @@ func assertInvariant(t *testing.T, tag string, p *Player, inTurn bool) {
 }
 
 func TestKongHandCountInvariants(t *testing.T) {
-	rand.Seed(1)
 	// 暗杠: 14张(回合内) -> 移4 -> 补1 -> 11 -> 出1 -> 10 (melds=1)
 	g := NewGame([]int64{1, 2, 3, 4}, []string{"a", "b", "c", "d"}, 0)
 	p := g.Players[0]
@@ -278,7 +296,7 @@ func TestKongHandCountInvariants(t *testing.T) {
 	g4 := NewGame([]int64{1, 2, 3, 4}, []string{"a", "b", "c", "d"}, 0)
 	p4 := g4.Players[3]
 	p4.Hand = hand("W2", "W3", "W5", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6")
-	g4.LastSeat = 0
+	g4.LastSeat = 2 // seat3 是 seat2 的下家, 符合"只有下家能吃"的座位关系
 	if !g4.ClaimChi(3, Tile(0), [2]Tile{Tile(1), Tile(2)}) {
 		t.Fatal("吃失败")
 	}

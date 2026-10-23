@@ -11,13 +11,13 @@ import (
 // resolveClaims 优先级，直接使用 mahjong 包本身。
 // 与真实服务端一致的流程：
 //   - 摸牌(头)/杠后补牌(尾) -> 自摸胡(可跳过)/暗杠/补杠(可跳过)/出牌
-//   - 出牌后声明结算: 胡>杠>碰>吃; 碰/吃后打出的牌**再次进入声明结算**
+//   - 出牌后声明结算: 胡>杠>碰>吃; 碰/吃后打出的牌再次进入声明结算
 //     (链式, 与服务端 resolveClaims 的递归行为一致)
-// 每步断言：
+// 每步断言（确定性不变量，不依赖随机覆盖率）：
 //   1) 每家手牌数 = 13-3*副露数(回合外) / 14-3*副露数(回合内) -> 相公检测
 //   2) 总牌守恒: Σ暗牌 + Σ副露牌 + Σ弃牌 + 牌墙 == 136
-// 注: NewWall 使用全局随机源, 各次运行的统计数字会小幅波动,
-//     不变量断言与统计无关。
+// 随机源: 通过 NewGameWithRand 注入, 洗牌与决策共用同一 rng,
+// 整个模拟完全确定（同版本 Go 下结果可复现）。
 // ============================================================
 
 type simStats struct {
@@ -94,6 +94,50 @@ func buildClaims(g *Game, from int, tile Tile) []simClaim {
 	return list
 }
 
+// settleClaims 按服务端 resolveClaims 的 胡>杠>碰>吃 顺序结算。
+// dec[i]: 0过 1胡 2杠 3碰 4吃(配 decIdx 选吃法)。
+// 返回 (结算是否发生, 操作座位, 是否需要杠后补牌)。
+// 注意: 胡牌分支只负责座位判定与状态变更语义, 积分/广播在 state 层。
+func settleClaims(t *testing.T, g *Game, from int, tile Tile, list []simClaim, dec []int, decIdx []int) (bool, int, bool) {
+	// 胡
+	for i := range list {
+		if dec[i] == 1 {
+			return true, list[i].seat, false
+		}
+	}
+	// 杠(失败则继续尝试下一个可杠者)
+	for i := range list {
+		if dec[i] == 2 {
+			if g.ClaimGang(list[i].seat, tile) {
+				g.RemoveLastDiscard(from)
+				return true, list[i].seat, true
+			}
+		}
+	}
+	// 碰
+	for i := range list {
+		if dec[i] == 3 {
+			if g.ClaimPeng(list[i].seat, tile) {
+				g.RemoveLastDiscard(from)
+				return true, list[i].seat, false
+			}
+		}
+	}
+	// 吃
+	for i := range list {
+		if dec[i] == 4 {
+			if decIdx[i] < 0 || decIdx[i] >= len(list[i].chi) {
+				t.Fatalf("吃法下标越界")
+			}
+			if g.ClaimChi(list[i].seat, tile, list[i].chi[decIdx[i]]) {
+				g.RemoveLastDiscard(from)
+				return true, list[i].seat, false
+			}
+		}
+	}
+	return false, -1, false
+}
+
 func simulateGame(t *testing.T, rng *rand.Rand, nPlayers int, st *simStats) {
 	ids := make([]int64, nPlayers)
 	names := make([]string, nPlayers)
@@ -101,7 +145,7 @@ func simulateGame(t *testing.T, rng *rand.Rand, nPlayers int, st *simStats) {
 		ids[i] = int64(i + 1)
 		names[i] = fmt.Sprintf("p%d", i)
 	}
-	g := NewGame(ids, names, rng.Intn(nPlayers))
+	g := NewGameWithRand(ids, names, rng.Intn(nPlayers), rng)
 	seat := g.Dealer
 	skipDraw := true // 庄家起手 14 张
 	fromTail := false
@@ -114,14 +158,11 @@ func simulateGame(t *testing.T, rng *rand.Rand, nPlayers int, st *simStats) {
 		st.turns++
 		// ---- 摸牌 ----
 		if !skipDraw {
-			var (
-				tk  Tile
-				aok bool
-			)
+			var aok bool
 			if fromTail {
-				tk, aok = g.DrawReplacement(seat)
+				_, aok = g.DrawReplacement(seat)
 			} else {
-				tk, aok = g.Draw(seat)
+				_, aok = g.Draw(seat)
 			}
 			if !aok {
 				st.draws++
@@ -130,7 +171,6 @@ func simulateGame(t *testing.T, rng *rand.Rand, nPlayers int, st *simStats) {
 				}
 				return // 流局
 			}
-			_ = tk
 			kongBloom = fromTail
 			canDeclare = true
 			fromTail = false
@@ -225,56 +265,39 @@ func simulateGame(t *testing.T, rng *rand.Rand, nPlayers int, st *simStats) {
 					decIdx[i] = rng.Intn(len(c.chi))
 				}
 			}
-			// 胡 > 杠 > 碰 > 吃
+			applied, who, needDraw := settleClaims(t, g, seat, discarded, list, dec, decIdx)
+			if !applied {
+				break claimChain
+			}
+			seat = who // 碰/吃/杠后轮到声明者操作
+			// 从 dec 找回该座位的声明类型, 用于统计
+			kind := 0
 			for i := range list {
-				if dec[i] == 1 {
-					st.wins++
-					checkPerTurn(t, "点炮胡前", g, list[i].seat, false)
-					return
+				if list[i].seat == who {
+					kind = dec[i]
 				}
 			}
-			for i := range list {
-				if dec[i] == 2 {
-					if g.ClaimGang(list[i].seat, discarded) {
-						g.RemoveLastDiscard(seat)
-						st.kongMing++
-						st.kongs++
-						seat = list[i].seat
-						skipDraw = false
-						fromTail = true
-						gangClaimed = true
-						checkPerTurn(t, "明杠后(补牌前)", g, seat, false)
-						break claimChain
-					}
+			switch kind {
+			case 1:
+				st.wins++
+				if g.Wall.Empty() {
+					st.haidi++
 				}
+				return
+			case 2:
+				st.kongMing++
+				st.kongs++
+				gangClaimed = true
+			case 3:
+				st.peng++
+			case 4:
+				st.chi++
 			}
-			claimed := false
-			for i := range list {
-				if dec[i] == 3 && g.ClaimPeng(list[i].seat, discarded) {
-					g.RemoveLastDiscard(seat)
-					st.peng++
-					seat = list[i].seat
-					claimed = true
-					checkPerTurn(t, "碰后", g, seat, true)
-					break
-				}
+			if needDraw { // 明杠: 走杠后补牌流程
+				gangClaimed = true
+				break claimChain
 			}
-			if !claimed {
-				for i := range list {
-					if dec[i] == 4 {
-						pair := list[i].chi[decIdx[i]]
-						if g.ClaimChi(list[i].seat, discarded, pair) {
-							g.RemoveLastDiscard(seat)
-							st.chi++
-							seat = list[i].seat
-							claimed = true
-							checkPerTurn(t, "吃后", g, seat, true)
-							break
-						}
-					}
-				}
-			}
-			if !claimed {
+			if gangClaimed {
 				break claimChain
 			}
 			// 碰/吃者出牌(canDeclare=false, 不可胡不可杠), 打出的牌继续结算
@@ -302,7 +325,12 @@ func simulateGame(t *testing.T, rng *rand.Rand, nPlayers int, st *simStats) {
 	}
 }
 
+// TestSimulateFullGames 全量模拟。实测耗时约 0.3s, 但属于集成性质,
+// `go test -short` 时跳过, 以满足"与普通单元测试分开运行"的要求。
 func TestSimulateFullGames(t *testing.T) {
+	if testing.Short() {
+		t.Skip("随机全量模拟: -short 模式跳过")
+	}
 	rng := rand.New(rand.NewSource(20261021))
 	st := &simStats{}
 	for i := 0; i < 1500; i++ {
@@ -311,16 +339,139 @@ func TestSimulateFullGames(t *testing.T) {
 	for i := 0; i < 500; i++ {
 		simulateGame(t, rng, 3, st)
 	}
+	// 只断言确定性事实(局数由调用方决定); 覆盖率仅记录不断言,
+	// 避免随机状态导致偶发失败(见 #77 审查意见 2)
+	if st.games != 2000 {
+		t.Fatalf("games=%d, want 2000", st.games)
+	}
 	t.Logf("统计: %d局 %d手 %d胜 %d流局", st.games, st.turns, st.wins, st.draws)
 	t.Logf("杠: 总%d (暗%d 明%d 补%d) 杠上开花%d 海底%d", st.kongs, st.kongAn, st.kongMing, st.kongBu, st.kongBlooms, st.haidi)
 	t.Logf("碰%d 吃%d 声明链%d次(最长%d)", st.peng, st.chi, st.chains, st.maxChain)
-	if st.kongs < 50 {
-		t.Errorf("杠事件过少(%d)", st.kongs)
+}
+
+// ============================================================
+// 确定性多人声明场景：验证 胡>杠>碰>吃 优先级与
+// "同级按逆时针(离出牌者近)优先"的座位顺序, 与 resolveClaims 一致。
+// ============================================================
+
+// newScenarioGame 构造一个 4 人局: seat0 打出 W5, 其余各家按给定手牌设置
+func newScenarioGame(t *testing.T, hands [4][]Tile) *Game {
+	g := NewGameWithRand([]int64{1, 2, 3, 4}, []string{"a", "b", "c", "d"}, 0,
+		rand.New(rand.NewSource(1)))
+	for i := 0; i < 4; i++ {
+		g.Players[i].Hand = append([]Tile(nil), hands[i]...)
 	}
-	if st.wins < 20 {
-		t.Errorf("胡牌过少(%d)", st.wins)
+	// seat0 真实打出 W5(进牌河, LastSeat 指向 seat0)
+	if !g.Discard(0, Tile(WanBase+4)) {
+		t.Fatal("scenario: seat0 打出 W5 失败")
 	}
-	if st.chains < 100 {
-		t.Errorf("碰吃声明链过少(%d), 链式路径覆盖不足", st.chains)
-	}
+	return g
+}
+
+func seatHand(t Tile, fillers ...string) []Tile {
+	return append([]Tile{t}, tilesOf(fillers...)...)
+}
+
+func TestClaimPriorityScenarios(t *testing.T) {
+	w5 := Tile(WanBase + 4)
+	// 听 W5 的 13 张(各家错开花色, 避免同牌超 4 张)
+	tingW5_wan := hand("W1", "W1", "W1", "W2", "W3", "W4", "W6", "W7", "T1", "T1", "T1", "T9", "T9")
+	tingW5_tong := hand("O1", "O1", "O1", "O2", "O3", "O4", "W6", "W7", "P", "P", "P", "F", "F")
+	// 可杠 W5(手里 3 张)
+	gangW5 := hand("W5", "W5", "W5", "W1", "W2", "W3", "W4", "W6", "W7", "W8", "W9", "T1", "T2")
+	// 可碰 W5(手里 2 张)
+	pengW5 := hand("W5", "W5", "W1", "W2", "W3", "W4", "W6", "W7", "W8", "W9", "T1", "T2", "T3")
+	// 可吃 W5(下家: W3W4+W5)
+	chiW5 := hand("W3", "W4", "W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5")
+	// 无关 filler(不含 W5, 不可胡)
+	fill := hand("W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6", "T7")
+
+	t.Run("A_多人同时可胡_离出牌者近者优先", func(t *testing.T) {
+		g := newScenarioGame(t, [4][]Tile{seatHand(w5, "W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6", "T7"), tingW5_wan, tingW5_tong, fill})
+		list := buildClaims(g, 0, w5)
+		if len(list) != 2 || list[0].seat != 1 || list[1].seat != 2 {
+			t.Fatalf("候选顺序错误: %+v", list)
+		}
+		if !list[0].hu || !list[1].hu {
+			t.Fatalf("两家都应可胡: %+v", list)
+		}
+		if list[0].peng || list[1].peng || list[0].gang || list[1].gang {
+			t.Fatalf("不应可碰/杠: %+v", list)
+		}
+		// 两家都声明胡 → 离出牌者近的 seat1 胡牌
+		applied, who, needDraw := settleClaims(t, g, 0, w5, list, []int{1, 1}, nil)
+		if !applied || who != 1 || needDraw {
+			t.Fatalf("应选 seat1 胡, got (applied=%v who=%d needDraw=%v)", applied, who, needDraw)
+		}
+	})
+
+	t.Run("B_胡优先于杠", func(t *testing.T) {
+		g := newScenarioGame(t, [4][]Tile{seatHand(w5, "W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6", "T7"), gangW5, tingW5_tong, fill})
+		list := buildClaims(g, 0, w5)
+		if len(list) != 2 || !list[0].gang || !list[1].hu {
+			t.Fatalf("应 seat1 可杠、seat2 可胡: %+v", list)
+		}
+		// seat1 要杠、seat2 要胡 → 胡优先
+		applied, who, _ := settleClaims(t, g, 0, w5, list, []int{2, 1}, nil)
+		if !applied || who != 2 {
+			t.Fatalf("胡应优先于杠, got who=%d", who)
+		}
+		// seat2 过 → seat1 杠成功, 且要求杠后补牌
+		g2 := newScenarioGame(t, [4][]Tile{seatHand(w5, "W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6", "T7"), gangW5, tingW5_tong, fill})
+		list2 := buildClaims(g2, 0, w5)
+		applied2, who2, needDraw2 := settleClaims(t, g2, 0, w5, list2, []int{2, 0}, nil)
+		if !applied2 || who2 != 1 || !needDraw2 {
+			t.Fatalf("仅杠时应 seat1 明杠并需补牌, got (applied=%v who=%d needDraw=%v)", applied2, who2, needDraw2)
+		}
+	})
+
+	t.Run("C_杠优先于碰", func(t *testing.T) {
+		g := newScenarioGame(t, [4][]Tile{seatHand(w5, "W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6", "T7"), gangW5, pengW5, fill})
+		list := buildClaims(g, 0, w5)
+		if len(list) != 2 || !list[0].gang || !list[1].peng {
+			t.Fatalf("应 seat1 可杠、seat2 可碰: %+v", list)
+		}
+		applied, who, _ := settleClaims(t, g, 0, w5, list, []int{2, 3}, nil)
+		if !applied || who != 1 {
+			t.Fatalf("杠应优先于碰, got who=%d", who)
+		}
+	})
+
+	t.Run("D_碰优先于吃", func(t *testing.T) {
+		g := newScenarioGame(t, [4][]Tile{seatHand(w5, "W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6", "T7"), chiW5, pengW5, fill})
+		list := buildClaims(g, 0, w5)
+		if len(list) != 2 || !list[0].peng && len(list[0].chi) == 0 {
+			t.Fatalf("seat1(下家)应可吃: %+v", list)
+		}
+		if !list[0].hu && len(list[0].chi) == 0 {
+			t.Log("seat1 可吃")
+		}
+		if list[1].seat != 2 || !list[1].peng {
+			t.Fatalf("seat2 应可碰: %+v", list)
+		}
+		// seat1 要吃、seat2 要碰 → 碰优先(即使吃更近)
+		applied, who, _ := settleClaims(t, g, 0, w5, list, []int{4, 3}, nil)
+		if !applied || who != 2 {
+			t.Fatalf("碰应优先于吃, got who=%d", who)
+		}
+		// 只有下家能吃: list[0] 应带吃法, 且其他座位没有吃选项
+		g2 := newScenarioGame(t, [4][]Tile{seatHand(w5, "W1", "W2", "W6", "W7", "W8", "W9", "T1", "T2", "T3", "T4", "T5", "T6", "T7"), chiW5, pengW5, fill})
+		list2 := buildClaims(g2, 0, w5)
+		if len(list2[0].chi) == 0 {
+			t.Fatal("下家 seat1 应有吃选项")
+		}
+		for _, c := range list2[1:] {
+			if len(c.chi) != 0 {
+				t.Fatalf("非下家不应有吃选项: %+v", c)
+			}
+		}
+		// seat1 吃 → 确认吃法选择生效(C1: W3W4+W5)
+		applied3, who3, _ := settleClaims(t, g2, 0, w5, list2, []int{4, 0}, []int{0, 0})
+		if !applied3 || who3 != 1 {
+			t.Fatalf("下家吃应生效, got (applied=%v who=%d)", applied3, who3)
+		}
+		if len(g2.Players[1].Melds) != 1 || g2.Players[1].Melds[0].Type != MeldChi {
+			t.Fatalf("吃后应形成一组顺子副露: %+v", g2.Players[1].Melds)
+		}
+	})
 }

@@ -1,6 +1,10 @@
 package mahjong
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
 
 // Player 牌桌上的一个座位
 type Player struct {
@@ -86,6 +90,11 @@ type Game struct {
 
 // NewGame 创建并洗牌发牌（庄家 14 张，其余 13 张）
 func NewGame(ids []int64, names []string, dealer int) *Game {
+	return NewGameWithRand(ids, names, dealer, rand.New(rand.NewSource(time.Now().UnixNano())))
+}
+
+// NewGameWithRand 用指定随机源创建牌局（便于测试注入确定性随机序列）
+func NewGameWithRand(ids []int64, names []string, dealer int, r *rand.Rand) *Game {
 	players := make([]*Player, 0, len(ids))
 	for i, id := range ids {
 		name := ""
@@ -100,7 +109,7 @@ func NewGame(ids []int64, names []string, dealer int) *Game {
 	if dealer < 0 || dealer >= len(players) {
 		dealer = 0
 	}
-	g := &Game{Players: players, Wall: NewWall(), Dealer: dealer, Turn: dealer, LastTile: -1, LastSeat: -1}
+	g := &Game{Players: players, Wall: NewWallWithRand(r), Dealer: dealer, Turn: dealer, LastTile: -1, LastSeat: -1}
 	for round := 0; round < 13; round++ {
 		for _, p := range players {
 			if t, ok := g.Wall.Draw(); ok {
