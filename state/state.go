@@ -53,16 +53,11 @@ func RunFrom(player *database.Player, initial consts.StateID) {
 		}
 		log.Infof("player %s state machine break up.\n", player)
 	}()
-	loopCount := 0
 	for {
 		// 被顶号后，上一代状态机必须退出，否则两个协程会抢同一个输入通道
 		if !player.IsCurrentRun(gen) {
 			log.Infof("player %s state machine superseded by a newer session, exit.\n", player)
 			return
-		}
-		loopCount++
-		if loopCount%100 == 0 {
-			log.Infof("[State.Run] Player %d loop count: %d, current state: %d\n", player.ID, loopCount, player.GetState())
 		}
 		state := states[player.GetState()]
 		stateId, err := state.Next(player)
